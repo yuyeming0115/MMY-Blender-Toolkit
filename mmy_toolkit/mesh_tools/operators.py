@@ -129,32 +129,17 @@ class MMY_OT_ImportFBX(bpy.types.Operator):
 
 
 class MMY_OT_BetterImportFBX(bpy.types.Operator):
-    """使用Better FBX插件导入"""
+    """调用Better FBX导入功能"""
     bl_idname = "mmy.better_import_fbx"
     bl_label = "Better Import FBX"
-    bl_options = {'REGISTER', 'UNDO'}
-
-    filepath: bpy.props.StringProperty(subtype="FILE_PATH")
-    filter_glob: bpy.props.StringProperty(default="*.fbx", options={'HIDDEN'})
+    bl_options = {'REGISTER'}
 
     @classmethod
     def poll(cls, context):
-        # 检查Better FBX插件是否已安装
-        return "better_fbx" in bpy.context.preferences.addons
-
-    def invoke(self, context, event):
-        context.window_manager.fileselect_add(self)
-        return {'RUNNING_MODAL'}
+        return hasattr(bpy.ops, 'better_import') and hasattr(bpy.ops.better_import, 'fbx')
 
     def execute(self, context):
-        try:
-            # 调用Better FBX的导入功能
-            bpy.ops.better_fbx.import_fbx(filepath=self.filepath)
-            self.report({'INFO'}, f"已导入(Better FBX): {self.filepath}")
-        except AttributeError:
-            self.report({'ERROR'}, "Better FBX插件未安装或版本不兼容")
-            return {'CANCELLED'}
-        except Exception as e:
-            self.report({'ERROR'}, f"导入失败: {str(e)}")
-            return {'CANCELLED'}
+        # 直接调用 Better FBX，让它打开自己的文件选择器
+        # 这样可以使用 Better FBX 的所有设置
+        bpy.ops.better_import.fbx('INVOKE_DEFAULT')
         return {'FINISHED'}

@@ -39,7 +39,7 @@ MMY 系列 Blender 效率优化工具集，适用于 Blender 4.5+。
 **特点**：
 - 点击按钮打开文件选择器
 - 动画开关：勾选后导入动画数据，默认关闭
-- Better Import FBX：若安装了Better FBX插件，会显示额外按钮，使用其配置导入
+- Better Import FBX：若安装了Better FBX插件，会显示额外按钮，直接调用其导入界面
 
 ### 预设系统
 
@@ -70,6 +70,7 @@ MMY 系列 Blender 效率优化工具集，适用于 Blender 4.5+。
 
 ## 版本
 
+- 0.4.2 - 修复Better Import FBX按钮调用方式
 - 0.4.1 - 新增Better Import FBX按钮（需安装Better FBX插件）
 - 0.4.0 - 新增导入FBX功能，支持动画开关
 - 0.3.0 - 新增UV孤岛缝合边功能，支持N面板/右键菜单/快捷键

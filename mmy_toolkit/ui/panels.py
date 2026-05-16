@@ -22,8 +22,9 @@ class VIEW3D_PT_MMYMeshTools(bpy.types.Panel):
             row.operator("mmy.import_fbx", text="导入FBX")
             row.prop(context.scene, "mmy_import_anim", text="动画")
 
-            # Better FBX按钮（仅当插件安装时显示）
-            if "better_fbx" in context.preferences.addons:
+            # Better FBX按钮
+            has_better_fbx = hasattr(bpy.ops, 'better_import') and hasattr(bpy.ops.better_import, 'fbx')
+            if has_better_fbx:
                 row2 = box.row()
                 row2.operator("mmy.better_import_fbx", text="Better Import FBX")
 
