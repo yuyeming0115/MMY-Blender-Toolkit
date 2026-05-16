@@ -119,13 +119,50 @@ class MMY_OT_ImportFBX(bpy.types.Operator):
 
     def execute(self, context):
         use_anim = context.scene.mmy_import_anim
+        reuse_materials = context.scene.mmy_reuse_materials
+
         try:
+            # 导入前记录当前场景中的对象
+            before_objs = set(context.scene.objects)
+
             bpy.ops.import_scene.fbx(filepath=self.filepath, use_anim=use_anim)
+
+            # 导入后获取新导入的对象
+            after_objs = set(context.scene.objects)
+            new_objs = after_objs - before_objs
+
+            # 如果勾选了引用已有材质
+            if reuse_materials and new_objs:
+                self._reuse_existing_materials(new_objs)
+
             self.report({'INFO'}, f"已导入: {self.filepath}")
         except Exception as e:
             self.report({'ERROR'}, f"导入失败: {str(e)}")
             return {'CANCELLED'}
         return {'FINISHED'}
+
+    def _reuse_existing_materials(self, new_objects):
+        """替换导入对象的材质为场景中已有的同名材质"""
+        import re
+        replaced_count = 0
+        for obj in new_objects:
+            if hasattr(obj.data, 'materials'):
+                for i, mat_slot in enumerate(obj.material_slots):
+                    mat = mat_slot.material
+                    if mat:
+                        # 处理材质名称（可能带有 .001、.002 等后缀）
+                        mat_name = mat.name
+                        # 去掉 Blender 自动添加的数字后缀
+                        base_name = re.sub(r'\.\d+$', '', mat_name)
+                        # 查找场景中已有的同名材质
+                        existing = bpy.data.materials.get(base_name)
+                        if existing and existing != mat:
+                            obj.material_slots[i].material = existing
+                            if mat.users == 0:
+                                bpy.data.materials.remove(mat)
+                            replaced_count += 1
+        if replaced_count > 0:
+            self.report({'INFO'}, f"已替换 {replaced_count} 个同名材质")
 
 
 class MMY_OT_BetterImportFBX(bpy.types.Operator):

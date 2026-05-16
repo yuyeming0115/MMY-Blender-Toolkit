@@ -15,6 +15,11 @@ def register():
         description="导入FBX时是否包含动画数据",
         default=False
     )
+    bpy.types.Scene.mmy_reuse_materials = bpy.props.BoolProperty(
+        name="引用已有材质",
+        description="导入FBX时，如果场景中已有同名材质则使用现有材质",
+        default=False
+    )
 
     for cls in _classes:
         try:
@@ -30,6 +35,7 @@ def register():
 def unregister():
     # 删除场景属性
     del bpy.types.Scene.mmy_import_anim
+    del bpy.types.Scene.mmy_reuse_materials
 
     for cls in reversed(_classes):
         try:

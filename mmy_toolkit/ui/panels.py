@@ -21,6 +21,7 @@ class VIEW3D_PT_MMYMeshTools(bpy.types.Panel):
             row = box.row(align=True)
             row.operator("mmy.import_fbx", text="导入FBX")
             row.prop(context.scene, "mmy_import_anim", text="动画")
+            row.prop(context.scene, "mmy_reuse_materials", text="引用已有材质")
 
             # Better FBX按钮
             has_better_fbx = hasattr(bpy.ops, 'better_import') and hasattr(bpy.ops.better_import, 'fbx')
