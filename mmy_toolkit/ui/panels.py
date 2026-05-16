@@ -3,29 +3,32 @@ import bpy
 
 class VIEW3D_PT_MMYMeshTools(bpy.types.Panel):
     """MMY网格工具面板"""
-    bl_label = "MMY网格工具"
+    bl_label = "MMY工具"
     bl_idname = "VIEW3D_PT_MMY_mesh_tools"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category = "MMY工具"
 
-    @classmethod
-    def poll(cls, context):
-        obj = context.active_object
-        return obj and obj.type == 'MESH'
-
     def draw(self, context):
         layout = self.layout
         obj = context.active_object
+        mode = obj.mode if obj else 'OBJECT'
 
-        if obj.mode == 'EDIT':
+        # 对象模式：导入工具
+        if mode == 'OBJECT':
             box = layout.box()
-            box.label(text="缝合边工具", icon='MESH_DATA')
+            box.label(text="导入工具")
+            row = box.row(align=True)
+            row.operator("mmy.import_fbx", text="导入FBX")
+            row.prop(context.scene, "mmy_import_anim", text="动画")
+
+        # 编辑模式：缝合边工具
+        if mode == 'EDIT' and obj and obj.type == 'MESH':
+            box = layout.box()
+            box.label(text="缝合边工具")
             row = box.row()
             row.operator("mmy.mark_uv_island_seams")
             row.scale_y = 1.5
-        else:
-            layout.label(text="请进入编辑模式", icon='INFO')
 
 
 _classes = (

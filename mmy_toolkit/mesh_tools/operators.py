@@ -102,3 +102,27 @@ class MMY_OT_MarkUVIslandSeams(bpy.types.Operator):
     def _uv_close(self, uv1, uv2, tolerance):
         """检查两个UV坐标是否接近"""
         return abs(uv1.x - uv2.x) < tolerance and abs(uv1.y - uv2.y) < tolerance
+
+
+class MMY_OT_ImportFBX(bpy.types.Operator):
+    """导入FBX模型"""
+    bl_idname = "mmy.import_fbx"
+    bl_label = "导入FBX"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    filepath: bpy.props.StringProperty(subtype="FILE_PATH")
+    filter_glob: bpy.props.StringProperty(default="*.fbx", options={'HIDDEN'})
+
+    def invoke(self, context, event):
+        context.window_manager.fileselect_add(self)
+        return {'RUNNING_MODAL'}
+
+    def execute(self, context):
+        use_anim = context.scene.mmy_import_anim
+        try:
+            bpy.ops.import_scene.fbx(filepath=self.filepath, use_anim=use_anim)
+            self.report({'INFO'}, f"已导入: {self.filepath}")
+        except Exception as e:
+            self.report({'ERROR'}, f"导入失败: {str(e)}")
+            return {'CANCELLED'}
+        return {'FINISHED'}
