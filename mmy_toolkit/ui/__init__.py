@@ -1,6 +1,9 @@
+from . import panels
+
+
 def register():
-    pass
+    panels.register()
 
 
 def unregister():
-    pass
+    panels.unregister()

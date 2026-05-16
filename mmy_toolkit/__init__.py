@@ -7,7 +7,7 @@ import re
 bl_info = {
     "name": "MMY Blender Toolkit",
     "blender": (4, 5, 0),
-    "version": (0, 2, 0),
+    "version": (0, 3, 0),
     "category": "Pipeline",
     "description": "MMY 系列 Blender 效率优化工具集",
 }
@@ -220,6 +220,40 @@ class MMY_MT_PresetMenu(bpy.types.Menu):
             op.preset_name = name
 
 
+# ============ 快捷键管理 ============
+addon_keymaps = []
+
+
+def _get_keymap_item(operator_id, context=None):
+    """获取指定操作符的keymap item"""
+    try:
+        if context:
+            wm = context.window_manager
+        else:
+            wm = bpy.context.window_manager
+        kc = wm.keyconfigs.addon
+        if kc:
+            km = kc.keymaps.find("Mesh", space_type="VIEW_3D")
+            if km:
+                for kmi in km.keymap_items:
+                    if kmi.idname == operator_id:
+                        return km, kmi
+    except:
+        pass
+    return None, None
+
+
+class MMY_OT_RestoreKeymaps(bpy.types.Operator):
+    """恢复默认快捷键"""
+    bl_idname = "mmy.restore_keymaps"
+    bl_label = "恢复快捷键"
+
+    def execute(self, context):
+        _register_keymaps()
+        self.report({'INFO'}, "快捷键已恢复")
+        return {'FINISHED'}
+
+
 # ============ Preferences ============
 class MMY_Preferences(bpy.types.AddonPreferences):
     bl_idname = "mmy_toolkit"
@@ -229,13 +263,33 @@ class MMY_Preferences(bpy.types.AddonPreferences):
     def draw(self, context):
         layout = self.layout
 
+        # === 快捷键配置 ===
+        layout.label(text="快捷键配置:")
+        box = layout.box()
+        row = box.row()
+        row.label(text="UV孤岛缝合边:")
+        try:
+            km, kmi = _get_keymap_item("mmy.mark_uv_island_seams", context)
+            if kmi:
+                row.prop(kmi, "type", text="")
+                row.prop(kmi, "value", text="")
+                row.operator("mmy.restore_keymaps", text="恢复默认")
+            else:
+                row.label(text="未设置")
+                row.operator("mmy.restore_keymaps", text="添加快捷键")
+        except:
+            row.label(text="请重启Blender后配置")
+        row.label(text="(编辑模式)")
+
+        layout.separator()
+
         # === 左右两列布局 ===
         row = layout.row()
         col_left = row.column()
         col_right = row.column()
 
         # 左列：后缀编辑
-        col_left.label(text="当前后缀:", icon="TEXT")
+        col_left.label(text="当前后缀:")
         box = col_left.box()
         for i, item in enumerate(self.current_suffixes):
             r = box.row(align=True)
@@ -246,7 +300,7 @@ class MMY_Preferences(bpy.types.AddonPreferences):
         box.operator("mmy.save_preset", text="保存预设", icon="FILE_TICK")
 
         # 右列：预设列表
-        col_right.label(text="预设列表:", icon="PRESET")
+        col_right.label(text="预设列表:")
         box = col_right.box()
         current = get_current_preset_name()
         for name in get_all_preset_names():
@@ -304,13 +358,58 @@ _classes = (
     MMY_OT_SavePreset,
     MMY_OT_DeletePreset,
     MMY_OT_OpenPrefs,
+    MMY_OT_RestoreKeymaps,
     MMY_MT_PresetMenu,
     MMY_Preferences,
 )
 
 
+# ============ 子模块 ============
+from . import mesh_tools
+from . import ui
+
+
+# ============ 快捷键注册 ============
+def _register_keymaps():
+    """注册插件快捷键"""
+    global addon_keymaps
+    try:
+        wm = bpy.context.window_manager
+        kc = wm.keyconfigs.addon
+        if kc:
+            km = kc.keymaps.find("Mesh", space_type="VIEW_3D")
+            if km:
+                # UV孤岛缝合边快捷键（默认不绑定）
+                kmi = km.keymap_items.new(
+                    idname="mmy.mark_uv_island_seams",
+                    type="NONE",
+                    value="PRESS",
+                    shift=False,
+                    ctrl=False,
+                    alt=False
+                )
+                addon_keymaps.append((km, kmi))
+    except:
+        pass
+
+
+def _unregister_keymaps():
+    """注销插件快捷键"""
+    global addon_keymaps
+    for km, kmi in addon_keymaps:
+        try:
+            km.keymap_items.remove(kmi)
+        except:
+            pass
+    addon_keymaps.clear()
+
+
 # ============ 注册/注销 ============
 def register():
+    # 注册子模块
+    mesh_tools.register()
+    ui.register()
+
     # 注册所有类
     for cls in _classes:
         try:
@@ -321,6 +420,9 @@ def register():
                 bpy.utils.register_class(cls)
             except:
                 pass
+
+    # 注册快捷键
+    _register_keymaps()
 
     # 挂载绘制函数
     try:
@@ -341,6 +443,13 @@ def register():
 
 
 def unregister():
+    # 注销快捷键
+    _unregister_keymaps()
+
+    # 注销子模块
+    ui.unregister()
+    mesh_tools.unregister()
+
     # 移除绘制函数
     try:
         bpy.types.FILEBROWSER_PT_directory_path.remove(draw_suffix_menu)
