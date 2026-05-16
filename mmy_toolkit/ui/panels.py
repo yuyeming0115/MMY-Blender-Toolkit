@@ -22,6 +22,11 @@ class VIEW3D_PT_MMYMeshTools(bpy.types.Panel):
             row.operator("mmy.import_fbx", text="导入FBX")
             row.prop(context.scene, "mmy_import_anim", text="动画")
 
+            # Better FBX按钮（仅当插件安装时显示）
+            if "better_fbx" in context.preferences.addons:
+                row2 = box.row()
+                row2.operator("mmy.better_import_fbx", text="Better Import FBX")
+
         # 编辑模式：缝合边工具
         if mode == 'EDIT' and obj and obj.type == 'MESH':
             box = layout.box()

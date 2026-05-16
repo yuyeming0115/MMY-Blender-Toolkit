@@ -4,6 +4,7 @@ from . import operators
 _classes = (
     operators.MMY_OT_MarkUVIslandSeams,
     operators.MMY_OT_ImportFBX,
+    operators.MMY_OT_BetterImportFBX,
 )
 
 
