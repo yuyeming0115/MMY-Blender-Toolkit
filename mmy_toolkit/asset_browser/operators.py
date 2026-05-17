@@ -90,14 +90,12 @@ class MMY_OT_CreateAsset(bpy.types.Operator):
             bpy.context.scene.collection.children.link(asset_collection)
 
             # 7. 将所有导出的对象链接到资产集合
+            # 注意：不从 scene 中移除对象，否则对象会因无 scene 引用而被 Blender
+            # 视为未使用数据块，保存后再次打开时文件内容为空
             exported_obj_names = [obj.name for obj in selected_objects]
             for obj_name in exported_obj_names:
                 obj = bpy.data.objects.get(obj_name)
                 if obj:
-                    # 从场景根集合移除（如果已链接）
-                    if obj.name in bpy.context.scene.collection.objects:
-                        bpy.context.scene.collection.objects.unlink(obj)
-                    # 链接到资产集合
                     asset_collection.objects.link(obj)
 
             # 8. 标记集合为资产
