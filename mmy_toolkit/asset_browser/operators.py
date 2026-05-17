@@ -66,6 +66,10 @@ class MMY_OT_CreateAsset(bpy.types.Operator):
             # 先保存对象名称（打开新文件后原引用会失效）
             exported_obj_names = [obj.name for obj in selected_objects]
 
+            # 在 open_mainfile 之前保存需要的属性值（之后 scene 会被替换）
+            auto_preview = props.auto_preview
+            compress = props.compress
+
             datablocks = set()
 
             for obj in selected_objects:
@@ -107,7 +111,7 @@ class MMY_OT_CreateAsset(bpy.types.Operator):
                 print(f"[MMY] Catalog ID 设置为: {catalog_id}")
 
             # 9. 查找并设置预览图
-            if props.auto_preview:
+            if auto_preview:
                 preview_path = None
                 for ext in ['.png', '.jpg', '.jpeg', '.PNG', '.JPG', '.JPEG']:
                     test_path = os.path.join(asset_path, f"{asset_name}{ext}")
@@ -119,7 +123,7 @@ class MMY_OT_CreateAsset(bpy.types.Operator):
                     self._set_preview(preview_path, asset_collection)
 
             # 10. 保存文件
-            bpy.ops.wm.save_mainfile(filepath=filepath, compress=props.compress)
+            bpy.ops.wm.save_mainfile(filepath=filepath, compress=compress)
 
             # 11. 记录最近路径
             add_recent_asset_path(asset_path)
