@@ -101,11 +101,15 @@ class MMY_OT_CreateAsset(bpy.types.Operator):
             # 6. 打开新文件并设置资产属性
             bpy.ops.wm.open_mainfile(filepath=filepath)
 
-            # 6. 创建资产集合
+            # 启用自动打包（确保后续新增的外部资源也会自动打包）
+            bpy.data.use_auto_pack = True
+            print("[MMY] 已启用自动打包")
+
+            # 7. 创建资产集合
             asset_collection = bpy.data.collections.new(asset_name)
             bpy.context.scene.collection.children.link(asset_collection)
 
-            # 7. 将所有导出的对象链接到资产集合
+            # 8. 将所有导出的对象链接到资产集合
             # 注意：不从 scene 中移除对象，否则对象会因无 scene 引用而被 Blender
             # 视为未使用数据块，保存后再次打开时文件内容为空
             for obj_name in exported_obj_names:
@@ -113,13 +117,13 @@ class MMY_OT_CreateAsset(bpy.types.Operator):
                 if obj:
                     asset_collection.objects.link(obj)
 
-            # 8. 标记集合为资产
+            # 9. 标记集合为资产
             asset_collection.asset_mark()
             if catalog_id:
                 asset_collection.asset_data.catalog_id = catalog_id
                 print(f"[MMY] Catalog ID 设置为: {catalog_id}")
 
-            # 9. 查找并设置预览图
+            # 10. 查找并设置预览图
             if auto_preview:
                 preview_path = None
                 for ext in ['.png', '.jpg', '.jpeg', '.PNG', '.JPG', '.JPEG']:
@@ -131,14 +135,14 @@ class MMY_OT_CreateAsset(bpy.types.Operator):
                 if preview_path:
                     self._set_preview(preview_path, asset_collection)
 
-            # 10. 保存文件
+            # 11. 保存文件
             bpy.ops.wm.save_mainfile(filepath=filepath, compress=compress)
             print("[MMY] 资产文件已保存")
 
-            # 11. 记录最近路径
+            # 12. 记录最近路径
             add_recent_asset_path(asset_path)
 
-            # 12. 返回原文件
+            # 13. 返回原文件
             if original_filepath and os.path.exists(original_filepath):
                 bpy.ops.wm.open_mainfile(filepath=original_filepath)
             else:
