@@ -102,7 +102,7 @@ class MMY_OT_CreateAsset(bpy.types.Operator):
             bpy.ops.wm.open_mainfile(filepath=filepath)
 
             # 启用自动打包（确保后续新增的外部资源也会自动打包）
-            bpy.data.use_auto_pack = True
+            bpy.ops.file.autopack_toggle()
             print("[MMY] 已启用自动打包")
 
             # 7. 创建资产集合
