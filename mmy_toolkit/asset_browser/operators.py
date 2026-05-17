@@ -123,8 +123,24 @@ class MMY_OT_CreateAsset(bpy.types.Operator):
                     self._set_preview(preview_path, asset_collection)
 
             # 10. 打包所有外部数据（贴图、材质节点图片等）
-            bpy.ops.file.pack_all()
-            print("[MMY] 已打包所有外部数据")
+            # 先清理无效的图片引用，避免 pack_all 报错中断流程
+            for img in list(bpy.data.images):
+                img_path = bpy.path.abspath(img.filepath) if img.filepath else ""
+                if img.filepath and not os.path.exists(img_path):
+                    print(f"[MMY] 移除无效图片引用: {img.name} -> {img.filepath}")
+                    bpy.data.images.remove(img)
+                elif img.filepath:
+                    # 确保路径是绝对路径，便于打包
+                    img.filepath = img_path
+
+            try:
+                result = bpy.ops.file.pack_all()
+                if result == {'FINISHED'}:
+                    print("[MMY] 已打包所有外部数据")
+                else:
+                    print(f"[MMY] pack_all 返回: {result}")
+            except Exception as e:
+                print(f"[MMY] 打包外部数据出错: {e}")
 
             # 11. 保存文件
             bpy.ops.wm.save_mainfile(filepath=filepath, compress=compress)
