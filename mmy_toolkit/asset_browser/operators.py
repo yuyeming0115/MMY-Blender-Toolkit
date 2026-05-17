@@ -122,13 +122,17 @@ class MMY_OT_CreateAsset(bpy.types.Operator):
                 if preview_path:
                     self._set_preview(preview_path, asset_collection)
 
-            # 10. 保存文件
+            # 10. 打包所有外部数据（贴图、材质节点图片等）
+            bpy.ops.file.pack_all()
+            print("[MMY] 已打包所有外部数据")
+
+            # 11. 保存文件
             bpy.ops.wm.save_mainfile(filepath=filepath, compress=compress)
 
-            # 11. 记录最近路径
+            # 12. 记录最近路径
             add_recent_asset_path(asset_path)
 
-            # 12. 返回原文件
+            # 13. 返回原文件
             if original_filepath and os.path.exists(original_filepath):
                 bpy.ops.wm.open_mainfile(filepath=original_filepath)
             else:
@@ -155,27 +159,32 @@ class MMY_OT_CreateAsset(bpy.types.Operator):
     def _set_preview(self, preview_path, collection):
         """设置资产预览图"""
         try:
-            # 加载图片
-            img = bpy.data.images.load(preview_path, check_existing=True)
+            # 方法1：直接调用操作符（不覆盖context）
+            bpy.ops.ed.lib_id_load_custom_preview(filepath=preview_path)
+            print(f"[MMY] 预览图设置成功: {preview_path}")
+            return
+        except:
+            pass
 
-            # 尝试使用操作符设置预览
+        # 方法2：尝试在3D视图中设置
+        try:
             for window in bpy.context.window_manager.windows:
                 for area in window.screen.areas:
-                    if area.type in ['OUTLINER', 'VIEW_3D', 'ASSETS']:
+                    if area.type == 'VIEW_3D':
                         for region in area.regions:
                             if region.type == 'WINDOW':
-                                try:
-                                    with bpy.context.temp_override(window=window, area=area, region=region):
-                                        bpy.ops.ed.lib_id_load_custom_preview(filepath=preview_path)
-                                        print(f"[MMY] 预览图设置成功: {preview_path}")
-                                        return
-                                except:
-                                    continue
-
-            print(f"[MMY] 预览图需手动设置: {preview_path}")
-
+                                with bpy.context.temp_override(
+                                    window=window,
+                                    area=area,
+                                    region=region,
+                                ):
+                                    bpy.ops.ed.lib_id_load_custom_preview(filepath=preview_path)
+                                print(f"[MMY] 预览图设置成功(VIEW_3D): {preview_path}")
+                                return
         except Exception as e:
-            print(f"[MMY] 预览图处理出错: {e}")
+            print(f"[MMY] 预览图设置失败: {e}")
+
+        print(f"[MMY] 预览图需手动设置: {preview_path}")
 
     def _sync_favorites_to_props(self, context):
         """同步收藏路径到场景属性"""
