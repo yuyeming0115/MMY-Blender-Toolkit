@@ -102,7 +102,17 @@ class MMY_OT_CreateAsset(bpy.types.Operator):
             bpy.ops.wm.open_mainfile(filepath=filepath)
 
             # 启用自动打包（确保后续新增的外部资源也会自动打包）
-            bpy.context.preferences.filepaths.use_file_auto_pack = True
+            # Blender 5.x API 可能变化，失败不影响主流程
+            try:
+                # Blender 4.x 及之前版本
+                bpy.data.use_auto_pack = True
+            except AttributeError:
+                try:
+                    # 尝试 Blender 5.x 的新 API
+                    if hasattr(bpy.context.preferences.filepaths, 'use_file_auto_pack'):
+                        bpy.context.preferences.filepaths.use_file_auto_pack = True
+                except Exception:
+                    pass
             print("[MMY] 已启用自动打包")
 
             # 7. 创建资产集合
