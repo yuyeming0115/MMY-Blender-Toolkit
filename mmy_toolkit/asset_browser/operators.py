@@ -62,7 +62,16 @@ class MMY_OT_CreateAsset(bpy.types.Operator):
                 bpy.ops.wm.save_mainfile()
 
         try:
-            # 4. 收集需要导出的数据块
+            # 4. 先在原文件中打包所有外部数据（贴图、材质节点图片等）
+            # 这样导出时贴图已经嵌入blend文件，新文件会自动携带贴图
+            print("[MMY] 正在打包原文件的外部数据...")
+            try:
+                bpy.ops.file.pack_all()
+                print("[MMY] 原文件外部数据打包完成")
+            except Exception as e:
+                print(f"[MMY] 打包外部数据出错（部分贴图可能未找到）: {e}")
+
+            # 5. 收集需要导出的数据块
             # 先保存对象名称（打开新文件后原引用会失效）
             exported_obj_names = [obj.name for obj in selected_objects]
 
@@ -89,7 +98,7 @@ class MMY_OT_CreateAsset(bpy.types.Operator):
             print(f"[MMY] 数据已导出到: {filepath}")
             print(f"[MMY] 导出的数据块数量: {len(datablocks)}")
 
-            # 5. 打开新文件并设置资产属性
+            # 6. 打开新文件并设置资产属性
             bpy.ops.wm.open_mainfile(filepath=filepath)
 
             # 6. 创建资产集合
@@ -122,33 +131,14 @@ class MMY_OT_CreateAsset(bpy.types.Operator):
                 if preview_path:
                     self._set_preview(preview_path, asset_collection)
 
-            # 10. 打包所有外部数据（贴图、材质节点图片等）
-            # 先清理无效的图片引用，避免 pack_all 报错中断流程
-            for img in list(bpy.data.images):
-                img_path = bpy.path.abspath(img.filepath) if img.filepath else ""
-                if img.filepath and not os.path.exists(img_path):
-                    print(f"[MMY] 移除无效图片引用: {img.name} -> {img.filepath}")
-                    bpy.data.images.remove(img)
-                elif img.filepath:
-                    # 确保路径是绝对路径，便于打包
-                    img.filepath = img_path
-
-            try:
-                result = bpy.ops.file.pack_all()
-                if result == {'FINISHED'}:
-                    print("[MMY] 已打包所有外部数据")
-                else:
-                    print(f"[MMY] pack_all 返回: {result}")
-            except Exception as e:
-                print(f"[MMY] 打包外部数据出错: {e}")
-
-            # 11. 保存文件
+            # 10. 保存文件
             bpy.ops.wm.save_mainfile(filepath=filepath, compress=compress)
+            print("[MMY] 资产文件已保存")
 
-            # 12. 记录最近路径
+            # 11. 记录最近路径
             add_recent_asset_path(asset_path)
 
-            # 13. 返回原文件
+            # 12. 返回原文件
             if original_filepath and os.path.exists(original_filepath):
                 bpy.ops.wm.open_mainfile(filepath=original_filepath)
             else:
