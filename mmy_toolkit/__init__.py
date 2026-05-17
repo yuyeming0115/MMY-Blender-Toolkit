@@ -367,6 +367,7 @@ _classes = (
 # ============ 子模块 ============
 from . import mesh_tools
 from . import ui
+from . import asset_browser
 
 
 # ============ 快捷键注册 ============
@@ -409,6 +410,7 @@ def register():
     # 注册子模块
     mesh_tools.register()
     ui.register()
+    asset_browser.register()
 
     # 注册所有类
     for cls in _classes:
@@ -447,6 +449,7 @@ def unregister():
     _unregister_keymaps()
 
     # 注销子模块
+    asset_browser.unregister()
     ui.unregister()
     mesh_tools.unregister()
 
