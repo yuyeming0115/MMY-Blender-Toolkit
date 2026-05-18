@@ -19,6 +19,7 @@ _classes = (
     operators.MMY_OT_RemoveFavoritePath,
     operators.MMY_OT_SetPathFromHistory,
     operators.MMY_OT_RefreshRecentPaths,
+    operators.MMY_OT_RefreshAllPreviews,
 )
 
 

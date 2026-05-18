@@ -116,6 +116,13 @@ class VIEW3D_PT_MMYMeshTools(bpy.types.Panel):
         row.scale_y = 1.5
         row.operator("mmy.create_asset", text="建立资产", icon='ASSET_MANAGER')
 
+        # === 批量刷新预览图 ===
+        if props.asset_path:
+            layout.separator(factor=0.5)
+            row = layout.row()
+            row.scale_y = 1.2
+            row.operator("mmy.refresh_all_previews", text="批量刷新预览图", icon='FILE_REFRESH')
+
         # 显示选中对象数量
         selected_count = len(context.selected_objects)
         if selected_count > 0:
