@@ -178,33 +178,10 @@ class MMY_OT_CreateAsset(bpy.types.Operator):
 
     def _set_preview(self, preview_path, collection):
         """设置资产预览图"""
-        try:
-            # 方法1：直接调用操作符（不覆盖context）
-            bpy.ops.ed.lib_id_load_custom_preview(filepath=preview_path)
+        if self._set_preview_correct(collection, preview_path):
             print(f"[MMY] 预览图设置成功: {preview_path}")
-            return
-        except:
-            pass
-
-        # 方法2：尝试在3D视图中设置
-        try:
-            for window in bpy.context.window_manager.windows:
-                for area in window.screen.areas:
-                    if area.type == 'VIEW_3D':
-                        for region in area.regions:
-                            if region.type == 'WINDOW':
-                                with bpy.context.temp_override(
-                                    window=window,
-                                    area=area,
-                                    region=region,
-                                ):
-                                    bpy.ops.ed.lib_id_load_custom_preview(filepath=preview_path)
-                                print(f"[MMY] 预览图设置成功(VIEW_3D): {preview_path}")
-                                return
-        except Exception as e:
-            print(f"[MMY] 预览图设置失败: {e}")
-
-        print(f"[MMY] 预览图需手动设置: {preview_path}")
+        else:
+            print(f"[MMY] 预览图需手动设置: {preview_path}")
 
     def _sync_favorites_to_props(self, context):
         """同步收藏路径到场景属性"""
@@ -308,6 +285,159 @@ class MMY_OT_SetPathFromHistory(bpy.types.Operator):
         return {'FINISHED'}
 
 
+class MMY_OT_RefreshAllPreviews(bpy.types.Operator):
+    """批量刷新目录下所有资产的预览图"""
+    bl_idname = "mmy.refresh_all_previews"
+    bl_label = "批量刷新预览图"
+    bl_options = {'REGISTER'}
+
+    @classmethod
+    def poll(cls, context):
+        props = context.scene.mmy_asset_creator
+        return bool(props.asset_path)
+
+    def invoke(self, context, event):
+        props = context.scene.mmy_asset_creator
+        return context.window_manager.invoke_confirm(
+            self,
+            event,
+            title="批量刷新预览图",
+            message=f"将刷新目录 {props.asset_path} 下所有资产的预览图，确认继续？"
+        )
+
+    def execute(self, context):
+        props = context.scene.mmy_asset_creator
+        target_dir = props.asset_path
+
+        if not os.path.exists(target_dir):
+            self.report({'ERROR'}, f"目录不存在: {target_dir}")
+            return {'CANCELLED'}
+
+        # 收集所有 .blend 文件
+        try:
+            blend_files = [
+                f for f in os.listdir(target_dir)
+                if f.lower().endswith('.blend')
+            ]
+        except PermissionError:
+            self.report({'ERROR'}, f"无法访问目录: {target_dir}")
+            return {'CANCELLED'}
+
+        if not blend_files:
+            self.report({'WARNING'}, f"目录下没有 .blend 文件: {target_dir}")
+            return {'CANCELLED'}
+
+        # 记录当前文件路径以便返回
+        original_filepath = bpy.data.filepath
+
+        success_count = 0
+        skip_count = 0
+        fail_count = 0
+        error_details = []
+
+        for blend_name in blend_files:
+            blend_path = os.path.join(target_dir, blend_name)
+            asset_name = os.path.splitext(blend_name)[0]
+
+            # 查找匹配的预览图
+            preview_path = None
+            for ext in ['.png', '.jpg', '.jpeg', '.PNG', '.JPG', '.JPEG']:
+                test_path = os.path.join(target_dir, f"{asset_name}{ext}")
+                if os.path.exists(test_path):
+                    preview_path = test_path
+                    break
+
+            if not preview_path:
+                skip_count += 1
+                print(f"[MMY] 跳过 {blend_name}: 未找到预览图")
+                continue
+
+            try:
+                # 打开目标 .blend 文件
+                bpy.ops.wm.open_mainfile(filepath=blend_path)
+
+                # 刷新 UI，确保编辑器上下文正确
+                for window in bpy.context.window_manager.windows:
+                    window.screen.areas.update()
+
+                # 查找被标记为资产的数据块
+                asset_id = None
+                for collection in bpy.data.collections:
+                    if collection.asset_data is not None:
+                        asset_id = collection
+                        break
+                if asset_id is None:
+                    for obj in bpy.data.objects:
+                        if obj.asset_data is not None:
+                            asset_id = obj
+                            break
+
+                if asset_id is None:
+                    skip_count += 1
+                    print(f"[MMY] 跳过 {blend_name}: 未找到已标记的资产")
+                    self._return_to_original(original_filepath)
+                    continue
+
+                # 使用正确的 API 设置预览图
+                if not self._set_preview_correct(asset_id, preview_path):
+                    print(f"[MMY] 预览图设置失败: {blend_name}")
+                    continue
+
+                # 保存
+                bpy.ops.wm.save_mainfile(filepath=blend_path)
+                success_count += 1
+                print(f"[MMY] 已刷新: {blend_name} -> {os.path.basename(preview_path)}")
+
+            except Exception as e:
+                import traceback
+                fail_count += 1
+                error_details.append(f"{blend_name}: {e}")
+                print(f"[MMY] 刷新失败 {blend_name}: {traceback.format_exc()}")
+
+            # 回到原文件
+            self._return_to_original(original_filepath)
+
+        # 汇总报告
+        msg = f"完成: {success_count} 成功, {skip_count} 跳过, {fail_count} 失败"
+        if error_details:
+            msg += " | " + "; ".join(error_details)
+        self.report({'INFO'}, msg)
+        return {'FINISHED'}
+
+    def _set_preview_correct(self, asset_id, preview_path):
+        """使用正确的 API 设置资产预览图"""
+        try:
+            # 检查文件存在
+            if not os.path.exists(preview_path):
+                print(f"[MMY] 预览图文件不存在: {preview_path}")
+                return False
+
+            # 方法1: 使用 temp_override 并传入 id 参数
+            try:
+                with bpy.context.temp_override(id=asset_id):
+                    bpy.ops.ed.lib_id_load_custom_preview(filepath=preview_path)
+                print(f"[MMY] 预览图设置成功 (temp_override): {preview_path}")
+                return True
+            except Exception as e1:
+                print(f"[MMY] temp_override 方式失败: {e1}")
+
+            print(f"[MMY] 无法设置预览图")
+            return False
+
+        except Exception as e:
+            print(f"[MMY] 设置预览图失败: {e}")
+            import traceback
+            print(traceback.format_exc())
+            return False
+
+    def _return_to_original(self, original_filepath):
+        """返回到原始文件"""
+        if original_filepath and os.path.exists(original_filepath):
+            bpy.ops.wm.open_mainfile(filepath=original_filepath)
+        else:
+            bpy.ops.wm.read_homefile()
+
+
 class MMY_OT_RefreshRecentPaths(bpy.types.Operator):
     """刷新最近使用路径"""
     bl_idname = "mmy.refresh_recent_paths"
@@ -335,6 +465,7 @@ _classes = (
     MMY_OT_RemoveFavoritePath,
     MMY_OT_SetPathFromHistory,
     MMY_OT_RefreshRecentPaths,
+    MMY_OT_RefreshAllPreviews,
 )
 
 
