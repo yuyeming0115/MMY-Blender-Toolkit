@@ -52,6 +52,9 @@ class VIEW3D_PT_MMYMeshTools(bpy.types.Panel):
                 row2 = box.row()
                 row2.operator("mmy.better_import_fbx", text="Better Import FBX")
 
+            # 查找缺失文件
+            box.operator("file.find_missing_files", text="查找缺失文件", icon='FILE_REFRESH')
+
             # 资产创建工具
             try:
                 self._draw_asset_creator(layout, context)
