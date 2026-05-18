@@ -14,10 +14,11 @@ class VIEW3D_PT_MMYMeshTools(bpy.types.Panel):
         obj = context.active_object
         mode = obj.mode if obj else 'OBJECT'
 
-        # 对象模式：导入工具
+        # 对象模式：导入工具 + 资产创建
         if mode == 'OBJECT':
+            # 导入工具
             box = layout.box()
-            box.label(text="导入工具")
+            box.label(text="导入工具", icon='IMPORT')
             row = box.row(align=True)
             row.operator("mmy.import_fbx", text="导入FBX")
             row.prop(context.scene, "mmy_import_anim", text="动画")
@@ -41,7 +42,7 @@ class VIEW3D_PT_MMYMeshTools(bpy.types.Panel):
         # 编辑模式：缝合边工具
         if mode == 'EDIT' and obj and obj.type == 'MESH':
             box = layout.box()
-            box.label(text="缝合边工具")
+            box.label(text="缝合边工具", icon='SNAP_EDGE')
             row = box.row()
             row.operator("mmy.mark_uv_island_seams")
             row.scale_y = 1.5
