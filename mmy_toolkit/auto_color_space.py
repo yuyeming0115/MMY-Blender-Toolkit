@@ -1,8 +1,7 @@
 """自动检测法线贴图并设置 Non-Color 颜色空间
 
-实现方式：
-1. 持续性 timer（每秒扫描一次）— 覆盖拖放等不走 operator 的路径
-2. hook bpy.ops.node.add_image — 覆盖 Shift+A 和菜单添加
+实现方式：hook bpy.data.images.load 和 bpy.ops.node.add_image，
+在图片加载时立即检查所有使用它的节点并设置 Non-Color。
 """
 
 import bpy
@@ -10,9 +9,6 @@ import os
 
 # 默认关键词列表
 DEFAULT_KEYWORDS = ["normal", "nrm", "normalmap", "nmap", "bump"]
-
-# 记录已处理的图像
-_processed_images = set()
 
 
 def _get_keywords():
@@ -43,37 +39,36 @@ def _is_normal_map(image_name):
     return False
 
 
-def _scan_all():
-    """扫描所有材质节点树，返回下次执行间隔（持续运行）"""
-    try:
-        if not _is_enabled():
-            return 1.0
-    except:
-        return 1.0
-
+def _check_image_nodes(img):
+    """检查所有材质中使用该图像的节点，如果是法线贴图则设置 Non-Color"""
+    if not _is_normal_map(img.name):
+        return
     for mat in bpy.data.materials:
         if not mat.use_nodes or not mat.node_tree:
             continue
         for node in mat.node_tree.nodes:
-            if node.type != 'IMAGE_TEXTURE' or not node.image:
-                continue
-            img_name = node.image.name
-            if img_name in _processed_images:
-                continue
-            if _is_normal_map(img_name) and node.color_space != 'NONE':
-                node.color_space = 'NONE'
-                _processed_images.add(img_name)
-                print(f"[MMY] 自动设置 Non-Color: {img_name}")
-    return 1.0
+            if node.type == 'IMAGE_TEXTURE' and node.image == img:
+                if node.color_space != 'NONE':
+                    node.color_space = 'NONE'
+                    print(f"[MMY] 自动设置 Non-Color: {img.name}")
 
 
+_original_images_load = None
 _original_add_image = None
 
 
+def _wrapped_images_load(filepath, check_existing=True, load_still=False):
+    """hook Images.load — 图片加载时检查"""
+    img = _original_images_load(filepath, check_existing=check_existing, load_still=load_still)
+    if img:
+        _check_image_nodes(img)
+    return img
+
+
 def _wrapped_add_image(self, context, **kwargs):
-    """包装 node.add_image 操作符"""
+    """hook node.add_image — Shift+A 或菜单添加时检查"""
     result = _original_add_image(self, context, **kwargs)
-    # 立即扫描（不依赖 timer）
+    # 立即检查当前节点编辑器中的最新节点
     try:
         space = context.space_data
         if space and space.type == 'NODE_EDITOR':
@@ -81,11 +76,9 @@ def _wrapped_add_image(self, context, **kwargs):
             if tree:
                 for node in reversed(tree.nodes):
                     if node.type == 'IMAGE_TEXTURE' and node.image:
-                        img_name = node.image.name
-                        if _is_normal_map(img_name) and node.color_space != 'NONE':
+                        if _is_normal_map(node.image.name) and node.color_space != 'NONE':
                             node.color_space = 'NONE'
-                            _processed_images.add(img_name)
-                            print(f"[MMY] 自动设置 Non-Color: {img_name}")
+                            print(f"[MMY] 自动设置 Non-Color: {node.image.name}")
                         break
     except:
         pass
@@ -93,21 +86,24 @@ def _wrapped_add_image(self, context, **kwargs):
 
 
 def register():
-    global _original_add_image
-    _processed_images.clear()
+    global _original_images_load, _original_add_image
 
-    # 方式1：hook 操作符
+    # 方式1：hook bpy.data.images.load（覆盖拖放、文件浏览器加载等）
+    if hasattr(bpy.data, 'images') and hasattr(bpy.data.images, 'load'):
+        _original_images_load = bpy.data.images.load
+        bpy.data.images.load = _wrapped_images_load
+
+    # 方式2：hook bpy.ops.node.add_image（覆盖 Shift+A 和菜单）
     if hasattr(bpy.ops, 'node') and hasattr(bpy.ops.node, 'add_image'):
         _original_add_image = bpy.ops.node.add_image
         bpy.ops.node.add_image = _wrapped_add_image
 
-    # 方式2：持续性 timer（每秒扫描一次）
-    bpy.app.timers.register(_scan_all, first_interval=1.0)
-
 
 def unregister():
-    global _original_add_image
+    global _original_images_load, _original_add_image
+    if _original_images_load is not None:
+        bpy.data.images.load = _original_images_load
+        _original_images_load = None
     if _original_add_image is not None:
         bpy.ops.node.add_image = _original_add_image
         _original_add_image = None
-    _processed_images.clear()
