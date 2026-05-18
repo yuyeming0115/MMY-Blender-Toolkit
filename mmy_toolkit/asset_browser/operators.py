@@ -291,6 +291,17 @@ class MMY_OT_RefreshAllPreviews(bpy.types.Operator):
     bl_label = "批量刷新预览图"
     bl_options = {'REGISTER'}
 
+    # 用于 timer 链式执行的状态
+    _blend_files = []
+    _preview_paths = {}
+    _target_dir = ""
+    _original_filepath = ""
+    _current_index = 0
+    _success_count = 0
+    _skip_count = 0
+    _fail_count = 0
+    _error_details = []
+
     @classmethod
     def poll(cls, context):
         props = context.scene.mmy_asset_creator
@@ -313,7 +324,7 @@ class MMY_OT_RefreshAllPreviews(bpy.types.Operator):
             self.report({'ERROR'}, f"目录不存在: {target_dir}")
             return {'CANCELLED'}
 
-        # 收集所有 .blend 文件
+        # 收集所有 .blend 文件及其预览图路径
         try:
             blend_files = [
                 f for f in os.listdir(target_dir)
@@ -327,82 +338,220 @@ class MMY_OT_RefreshAllPreviews(bpy.types.Operator):
             self.report({'WARNING'}, f"目录下没有 .blend 文件: {target_dir}")
             return {'CANCELLED'}
 
-        # 记录当前文件路径以便返回
-        original_filepath = bpy.data.filepath
+        # 初始化状态
+        MMY_OT_RefreshAllPreviews._blend_files = blend_files
+        MMY_OT_RefreshAllPreviews._preview_paths = {}
+        MMY_OT_RefreshAllPreviews._target_dir = target_dir
+        MMY_OT_RefreshAllPreviews._original_filepath = bpy.data.filepath
+        MMY_OT_RefreshAllPreviews._current_index = 0
+        MMY_OT_RefreshAllPreviews._success_count = 0
+        MMY_OT_RefreshAllPreviews._skip_count = 0
+        MMY_OT_RefreshAllPreviews._fail_count = 0
+        MMY_OT_RefreshAllPreviews._error_details = []
 
-        success_count = 0
-        skip_count = 0
-        fail_count = 0
-        error_details = []
-
+        # 预先查找所有预览图
         for blend_name in blend_files:
-            blend_path = os.path.join(target_dir, blend_name)
             asset_name = os.path.splitext(blend_name)[0]
-
-            # 查找匹配的预览图
             preview_path = None
             for ext in ['.png', '.jpg', '.jpeg', '.PNG', '.JPG', '.JPEG']:
                 test_path = os.path.join(target_dir, f"{asset_name}{ext}")
                 if os.path.exists(test_path):
                     preview_path = test_path
                     break
+            MMY_OT_RefreshAllPreviews._preview_paths[blend_name] = preview_path
 
-            if not preview_path:
-                skip_count += 1
-                print(f"[MMY] 跳过 {blend_name}: 未找到预览图")
-                continue
+        # 启动第一个文件的处理
+        self._process_next_file()
 
-            try:
-                # 打开目标 .blend 文件
-                bpy.ops.wm.open_mainfile(filepath=blend_path)
+        return {'RUNNING_MODAL'}
 
-                # 刷新 UI，确保编辑器上下文正确
-                for window in bpy.context.window_manager.windows:
-                    window.screen.areas.update()
+    def _process_next_file(self):
+        """处理下一个文件（打开并设置预览图，然后用 timer 延迟保存）"""
+        cls = MMY_OT_RefreshAllPreviews
 
-                # 查找被标记为资产的数据块
-                asset_id = None
-                for collection in bpy.data.collections:
-                    if collection.asset_data is not None:
-                        asset_id = collection
+        if cls._current_index >= len(cls._blend_files):
+            # 所有文件处理完毕，返回原文件并报告
+            self._finish_processing()
+            return
+
+        blend_name = cls._blend_files[cls._current_index]
+        blend_path = os.path.join(cls._target_dir, blend_name)
+        preview_path = cls._preview_paths.get(blend_name)
+
+        if not preview_path:
+            cls._skip_count += 1
+            print(f"[MMY] 跳过 {blend_name}: 未找到预览图")
+            cls._current_index += 1
+            self._process_next_file()
+            return
+
+        try:
+            # 打开目标 .blend 文件
+            bpy.ops.wm.open_mainfile(filepath=blend_path)
+
+            # 刷新 UI
+            for window in bpy.context.window_manager.windows:
+                for area in window.screen.areas:
+                    area.tag_redraw()
+                window.screen.areas.update()
+
+            # 查找被标记为资产的数据块
+            asset_id = None
+            for collection in bpy.data.collections:
+                if collection.asset_data is not None:
+                    asset_id = collection
+                    break
+            if asset_id is None:
+                for obj in bpy.data.objects:
+                    if obj.asset_data is not None:
+                        asset_id = obj
                         break
-                if asset_id is None:
-                    for obj in bpy.data.objects:
-                        if obj.asset_data is not None:
-                            asset_id = obj
-                            break
 
-                if asset_id is None:
-                    skip_count += 1
-                    print(f"[MMY] 跳过 {blend_name}: 未找到已标记的资产")
-                    self._return_to_original(original_filepath)
-                    continue
+            if asset_id is None:
+                cls._skip_count += 1
+                print(f"[MMY] 跳过 {blend_name}: 未找到已标记的资产")
+                cls._current_index += 1
+                self._process_next_file()
+                return
 
-                # 使用正确的 API 设置预览图
-                if not self._set_preview_correct(asset_id, preview_path):
-                    print(f"[MMY] 预览图设置失败: {blend_name}")
-                    continue
+            # 设置资产预览图
+            if not self._set_preview_correct(asset_id, preview_path):
+                cls._fail_count += 1
+                cls._error_details.append(f"{blend_name}: 预览图设置失败")
+                cls._current_index += 1
+                self._process_next_file()
+                return
 
-                # 保存
-                bpy.ops.wm.save_mainfile(filepath=blend_path)
-                success_count += 1
-                print(f"[MMY] 已刷新: {blend_name} -> {os.path.basename(preview_path)}")
+            # 切换 3D 视窗到材质预览模式
+            self._setup_viewport_for_preview()
 
-            except Exception as e:
-                import traceback
-                fail_count += 1
-                error_details.append(f"{blend_name}: {e}")
-                print(f"[MMY] 刷新失败 {blend_name}: {traceback.format_exc()}")
+            # 注册 timer，延迟保存（等待界面渲染）
+            bpy.app.timers.register(
+                self._delayed_save,
+                first_interval=0.5  # 等待 0.5 秒让界面渲染
+            )
 
-            # 回到原文件
-            self._return_to_original(original_filepath)
+        except Exception as e:
+            import traceback
+            cls._fail_count += 1
+            cls._error_details.append(f"{blend_name}: {e}")
+            print(f"[MMY] 处理失败 {blend_name}: {traceback.format_exc()}")
+            cls._current_index += 1
+            self._process_next_file()
+
+    def _delayed_save(self):
+        """timer 回调：保存当前文件并继续处理下一个"""
+        cls = MMY_OT_RefreshAllPreviews
+
+        blend_name = cls._blend_files[cls._current_index]
+        blend_path = os.path.join(cls._target_dir, blend_name)
+
+        try:
+            # 保存文件（此时界面已渲染，文件预览图会正确生成）
+            bpy.ops.wm.save_mainfile(filepath=blend_path)
+            cls._success_count += 1
+            print(f"[MMY] 已刷新: {blend_name}")
+        except Exception as e:
+            cls._fail_count += 1
+            cls._error_details.append(f"{blend_name}: 保存失败 {e}")
+            print(f"[MMY] 保存失败 {blend_name}: {e}")
+
+        cls._current_index += 1
+
+        # 继续处理下一个文件（等待额外时间让下一个文件加载）
+        if cls._current_index < len(cls._blend_files):
+            bpy.app.timers.register(
+                self._process_next_file_wrapper,
+                first_interval=0.2
+            )
+        else:
+            self._finish_processing()
+
+        return None  # timer 不再重复执行
+
+    def _process_next_file_wrapper(self):
+        """timer 包装器：处理下一个文件"""
+        self._process_next_file()
+        return None
+
+    def _finish_processing(self):
+        """完成所有处理，返回原文件并报告结果"""
+        cls = MMY_OT_RefreshAllPreviews
+
+        # 返回原文件
+        original_filepath = cls._original_filepath
+        if original_filepath and os.path.exists(original_filepath):
+            bpy.ops.wm.open_mainfile(filepath=original_filepath)
+        else:
+            bpy.ops.wm.read_homefile()
 
         # 汇总报告
-        msg = f"完成: {success_count} 成功, {skip_count} 跳过, {fail_count} 失败"
-        if error_details:
-            msg += " | " + "; ".join(error_details)
-        self.report({'INFO'}, msg)
-        return {'FINISHED'}
+        msg = f"完成: {cls._success_count} 成功, {cls._skip_count} 跳过, {cls._fail_count} 失败"
+        if cls._error_details:
+            msg += " | " + "; ".join(cls._error_details[:3])  # 只显示前3个错误
+        print(f"[MMY] {msg}")
+
+        # 清理状态
+        cls._blend_files = []
+        cls._preview_paths = {}
+        cls._current_index = 0
+
+    def _setup_viewport_for_preview(self):
+        """切换 3D 视窗到材质预览模式，全选模型并最大化显示"""
+        try:
+            # 先切换到对象模式
+            if bpy.context.mode != 'OBJECT':
+                bpy.ops.object.mode_set(mode='OBJECT')
+                print(f"[MMY] 已切换到对象模式")
+
+            # 全选所有对象
+            for obj in bpy.data.objects:
+                if obj.visible_get():
+                    obj.select_set(True)
+            # 设置活动对象（确保有选中）
+            visible_objs = [obj for obj in bpy.data.objects if obj.visible_get()]
+            if visible_objs:
+                bpy.context.view_layer.objects.active = visible_objs[0]
+            print(f"[MMY] 已全选所有可见对象: {len(visible_objs)} 个")
+
+            # 查找 3D 视窗
+            for window in bpy.context.window_manager.windows:
+                for area in window.screen.areas:
+                    if area.type == 'VIEW_3D':
+                        space = area.spaces.active
+                        region = None
+                        for r in area.regions:
+                            if r.type == 'WINDOW':
+                                region = r
+                                break
+
+                        # 切换到材质预览模式
+                        if space and hasattr(space, 'shading'):
+                            space.shading.type = 'MATERIAL'
+                            print(f"[MMY] 已切换到材质预览模式")
+
+                        if space and region:
+                            # 使用正确的上下文执行操作
+                            with bpy.context.temp_override(window=window, area=area, region=region, space_data=space):
+                                # 框显所选对象
+                                bpy.ops.view3d.view_selected()
+                                print(f"[MMY] 已框显所选模型")
+
+                                # 最大最大化 3D 视窗
+                                bpy.ops.screen.screen_full_area(use_hide_panels=True)
+                                print(f"[MMY] 已最大化 3D 视窗")
+
+                        # 刷新渲染
+                        for r in area.regions:
+                            r.tag_redraw()
+                        return
+
+            print(f"[MMY] 未找到 3D 视窗")
+
+        except Exception as e:
+            print(f"[MMY] 切换视窗模式失败: {e}")
+            import traceback
+            print(traceback.format_exc())
 
     def _set_preview_correct(self, asset_id, preview_path):
         """使用正确的 API 设置资产预览图"""
