@@ -1,6 +1,28 @@
 import bpy
 
 
+class MMY_MT_FavoritePathMenu(bpy.types.Menu):
+    """收藏路径下拉菜单"""
+    bl_idname = "MMY_MT_favorite_path_menu"
+    bl_label = "收藏路径"
+
+    def draw(self, context):
+        layout = self.layout
+        props = context.scene.mmy_asset_creator
+        if not hasattr(context.scene, 'mmy_asset_creator'):
+            return
+        try:
+            if len(props.favorite_paths) == 0:
+                layout.label(text="暂无收藏路径")
+                return
+            for item in props.favorite_paths:
+                display_text = item.alias if item.alias else item.path
+                op = layout.operator("mmy.set_path_from_history", text=display_text)
+                op.path = item.path
+        except:
+            layout.label(text="加载失败")
+
+
 class VIEW3D_PT_MMYMeshTools(bpy.types.Panel):
     """MMY网格工具面板"""
     bl_label = "MMY工具"
@@ -64,34 +86,9 @@ class VIEW3D_PT_MMYMeshTools(bpy.types.Panel):
         # === 路径设置 ===
         row = box.row(align=True)
         row.prop(props, "asset_path", text="")
-        row.operator("mmy.select_asset_path", text="", icon='FILE_FOLDER')
 
-        # 最近使用路径
-        try:
-            if len(props.recent_paths) > 0:
-                col = box.column()
-                col.label(text="最近:", icon='HISTORY')
-                for item in props.recent_paths[:5]:
-                    row = col.row(align=True)
-                    op = row.operator("mmy.set_path_from_history", text=item.path, translate=False)
-                    op.path = item.path
-        except:
-            pass
-
-        # 收藏路径
-        try:
-            if len(props.favorite_paths) > 0:
-                col = box.column()
-                col.label(text="收藏:", icon='STAR')
-                for item in props.favorite_paths:
-                    row = col.row(align=True)
-                    display_text = item.alias if item.alias else item.path
-                    op = row.operator("mmy.set_path_from_history", text=display_text)
-                    op.path = item.path
-                    rm_op = row.operator("mmy.remove_favorite_path", text="", icon='X')
-                    rm_op.path = item.path
-        except:
-            pass
+        # 最近使用路径下拉菜单
+        row.menu("MMY_MT_favorite_path_menu", text="", icon='BOOKMARKS')
 
         # 添加收藏按钮
         if props.asset_path:
@@ -125,6 +122,7 @@ class VIEW3D_PT_MMYMeshTools(bpy.types.Panel):
 
 
 _classes = (
+    MMY_MT_FavoritePathMenu,
     VIEW3D_PT_MMYMeshTools,
 )
 
