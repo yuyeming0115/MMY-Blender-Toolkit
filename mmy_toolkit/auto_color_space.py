@@ -1,4 +1,7 @@
-"""材质编辑器快捷操作：切换颜色空间和 Alpha 模式"""
+"""材质编辑器快捷操作：切换颜色空间和 Alpha 模式
+
+同时挂载到右键菜单和着色器编辑器顶部菜单。
+"""
 
 import bpy
 
@@ -6,81 +9,56 @@ import bpy
 class MMY_OT_ToggleColorSpace(bpy.types.Operator):
     """切换选中贴图节点的颜色空间（sRGB ↔ Non-Color）"""
     bl_idname = "mmy.toggle_color_space"
-    bl_label = "切换颜色空间"
-    bl_description = "切换选中贴图节点的颜色空间（sRGB ↔ Non-Color）"
+    bl_label = "Toggle sRGB / Non-Color (切换色彩空间)"
     bl_options = {'REGISTER', 'UNDO'}
 
     @classmethod
     def poll(cls, context):
-        space = context.space_data
-        if not space or space.type != 'NODE_EDITOR':
-            return False
-        tree = getattr(space, 'node_tree', None) or getattr(space, 'edit_tree', None)
-        if not tree:
-            return False
-        for node in tree.nodes:
-            if node.select and node.type == 'IMAGE_TEXTURE' and node.image:
-                return True
-        return False
+        return context.space_data.type == 'NODE_EDITOR'
 
     def execute(self, context):
-        space = context.space_data
-        tree = getattr(space, 'node_tree', None) or getattr(space, 'edit_tree', None)
-        if not tree:
-            return {'CANCELLED'}
-
         count = 0
-        for node in tree.nodes:
-            if not (node.select and node.type == 'IMAGE_TEXTURE' and node.image):
-                continue
-            if node.color_space == 'NONE':
-                node.color_space = 'sRGB'
-                count += 1
-            else:
-                node.color_space = 'NONE'
-                count += 1
+        for node in context.selected_nodes:
+            if node.type == 'TEX_IMAGE' and node.image:
+                try:
+                    current = node.image.colorspace_settings.name
+                    if current in ('sRGB', 'sRGB OETF'):
+                        node.image.colorspace_settings.name = 'Non-Color'
+                    else:
+                        node.image.colorspace_settings.name = 'sRGB'
+                    count += 1
+                except:
+                    pass
         if count > 0:
             self.report({'INFO'}, f"已切换 {count} 个贴图节点的颜色空间")
         return {'FINISHED'}
 
 
 class MMY_OT_ToggleAlphaMode(bpy.types.Operator):
-    """切换选中贴图节点的 Alpha 模式（Straight ↔ Packed）"""
+    """切换选中贴图节点的 Alpha 模式（Straight ↔ Channel Packed）"""
     bl_idname = "mmy.toggle_alpha_mode"
-    bl_label = "切换 Alpha 模式"
-    bl_description = "切换选中贴图节点的 Alpha 模式（Straight ↔ Packed）"
+    bl_label = "Toggle Alpha: Straight ↔ Packed (切换Alpha模式)"
     bl_options = {'REGISTER', 'UNDO'}
 
     @classmethod
     def poll(cls, context):
-        space = context.space_data
-        if not space or space.type != 'NODE_EDITOR':
-            return False
-        tree = getattr(space, 'node_tree', None) or getattr(space, 'edit_tree', None)
-        if not tree:
-            return False
-        for node in tree.nodes:
-            if node.select and node.type == 'IMAGE_TEXTURE' and node.image:
-                return True
-        return False
+        return context.space_data.type == 'NODE_EDITOR'
 
     def execute(self, context):
-        space = context.space_data
-        tree = getattr(space, 'node_tree', None) or getattr(space, 'edit_tree', None)
-        if not tree:
-            return {'CANCELLED'}
-
         count = 0
-        for node in tree.nodes:
-            if not (node.select and node.type == 'IMAGE_TEXTURE' and node.image):
-                continue
-            img = node.image
-            if img.alpha_mode == 'PREMUL':
-                img.alpha_mode = 'STRAIGHT'
-                count += 1
-            else:
-                img.alpha_mode = 'PREMUL'
-                count += 1
+        for node in context.selected_nodes:
+            if node.type == 'TEX_IMAGE' and node.image:
+                try:
+                    current = node.image.alpha_mode
+                    if current == 'STRAIGHT':
+                        node.image.alpha_mode = 'CHANNEL_PACKED'
+                    elif current == 'CHANNEL_PACKED':
+                        node.image.alpha_mode = 'STRAIGHT'
+                    else:
+                        node.image.alpha_mode = 'CHANNEL_PACKED'
+                    count += 1
+                except Exception as e:
+                    print(f"[MMY] 切换Alpha模式失败 {node.image.name}: {e}")
         if count > 0:
             self.report({'INFO'}, f"已切换 {count} 个贴图节点的 Alpha 模式")
         return {'FINISHED'}
@@ -90,6 +68,33 @@ _classes = (
     MMY_OT_ToggleColorSpace,
     MMY_OT_ToggleAlphaMode,
 )
+
+
+def _has_image_node(context):
+    """检查是否有选中的图片节点"""
+    selected = getattr(context, 'selected_nodes', [])
+    return any(node.type == 'TEX_IMAGE' for node in selected)
+
+
+def _draw_context_menu(self, context):
+    """右键菜单：仅在有选中的图片节点时显示"""
+    if not _has_image_node(context):
+        return
+    self.layout.separator()
+    self.layout.operator("mmy.toggle_color_space", icon='COLOR')
+    self.layout.operator("mmy.toggle_alpha_mode", icon='FILE_REFRESH')
+
+
+def _draw_header_menu(self, context):
+    """顶部菜单：仅在有选中的图片节点时显示"""
+    if context.space_data.type != 'NODE_EDITOR':
+        return
+    if not _has_image_node(context):
+        return
+    self.layout.separator()
+    row = self.layout.row(align=True)
+    row.operator("mmy.toggle_color_space", text="", icon='COLOR')
+    row.operator("mmy.toggle_alpha_mode", text="", icon='FILE_REFRESH')
 
 
 def register():
@@ -103,17 +108,26 @@ def register():
             except:
                 pass
 
-    # 挂载到着色器编辑器顶部菜单
+    # 右键菜单
     try:
-        bpy.types.NODE_HT_header.append(_draw_shader_header_menu)
+        bpy.types.NODE_MT_context_menu.append(_draw_context_menu)
+    except:
+        pass
+
+    # 顶部菜单
+    try:
+        bpy.types.NODE_HT_header.append(_draw_header_menu)
     except:
         pass
 
 
 def unregister():
-    # 移除菜单
     try:
-        bpy.types.NODE_HT_header.remove(_draw_shader_header_menu)
+        bpy.types.NODE_MT_context_menu.remove(_draw_context_menu)
+    except:
+        pass
+    try:
+        bpy.types.NODE_HT_header.remove(_draw_header_menu)
     except:
         pass
 
@@ -122,27 +136,3 @@ def unregister():
             bpy.utils.unregister_class(cls)
         except:
             pass
-
-
-def _draw_shader_header_menu(self, context):
-    """在着色器编辑器顶部菜单添加快捷按钮"""
-    space = context.space_data
-    if not space or space.type != 'NODE_EDITOR':
-        return
-    tree = getattr(space, 'node_tree', None) or getattr(space, 'edit_tree', None)
-    if not tree:
-        return
-
-    # 检查是否有选中的 IMAGE_TEXTURE 节点
-    has_selection = False
-    for node in tree.nodes:
-        if node.select and node.type == 'IMAGE_TEXTURE' and node.image:
-            has_selection = True
-            break
-    if not has_selection:
-        return
-
-    self.layout.separator()
-    row = self.layout.row(align=True)
-    row.operator("mmy.toggle_color_space", icon='COLOR')
-    row.operator("mmy.toggle_alpha_mode", icon='IMAGE_ALPHA')

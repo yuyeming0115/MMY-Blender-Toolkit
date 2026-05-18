@@ -41,6 +41,18 @@ MMY 系列 Blender 效率优化工具集，适用于 Blender 4.5+。
 - 动画开关：勾选后导入动画数据，默认关闭
 - Better Import FBX：若安装了Better FBX插件，会显示额外按钮，直接调用其导入界面
 
+### 材质编辑器快捷操作
+
+在着色器编辑器中，选中图片纹理节点时可使用以下功能：
+
+**入口**：
+- 右键菜单：选中 Image Texture 节点后右键 → "Toggle sRGB / Non-Color" / "Toggle Alpha"
+- 顶部工具栏：选中节点后显示两个图标按钮（色彩空间 / Alpha模式）
+
+**功能**：
+- 切换颜色空间：sRGB ↔ Non-Color（适用于法线贴图、 Roughness 贴图等）
+- 切换 Alpha 模式：Straight ↔ Channel Packed
+
 ### 预设系统
 
 - 预设保存为 JSON 文件，可迁移到其他电脑
@@ -70,6 +82,7 @@ MMY 系列 Blender 效率优化工具集，适用于 Blender 4.5+。
 
 ## 版本
 
+- 0.5.0 - 新增材质编辑器快捷操作：手动切换颜色空间和Alpha模式（右键菜单+顶部工具栏）
 - 0.4.2 - 修复Better Import FBX按钮调用方式
 - 0.4.1 - 新增Better Import FBX按钮（需安装Better FBX插件）
 - 0.4.0 - 新增导入FBX功能，支持动画开关

@@ -7,7 +7,7 @@ import re
 bl_info = {
     "name": "MMY Blender Toolkit",
     "blender": (4, 5, 0),
-    "version": (0, 4, 2),
+    "version": (0, 5, 0),
     "category": "Pipeline",
     "description": "MMY 系列 Blender 效率优化工具集",
 }
