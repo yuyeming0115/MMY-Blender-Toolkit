@@ -369,6 +369,7 @@ from . import mesh_tools
 from . import ui
 from . import asset_browser
 from . import auto_color_space
+from . import camera_tools
 
 
 # ============ 快捷键注册 ============
@@ -413,6 +414,7 @@ def register():
     ui.register()
     asset_browser.register()
     auto_color_space.register()
+    camera_tools.register()
 
     # 注册所有类
     for cls in _classes:
@@ -451,6 +453,7 @@ def unregister():
     _unregister_keymaps()
 
     # 注销子模块
+    camera_tools.unregister()
     auto_color_space.unregister()
     asset_browser.unregister()
     ui.unregister()

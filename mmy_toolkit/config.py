@@ -6,6 +6,7 @@ import os
 PRESETS_DIR = os.path.join(os.path.dirname(__file__), "presets")
 PRESET_FILE = os.path.join(PRESETS_DIR, "suffix_presets.json")
 ASSET_PRESET_FILE = os.path.join(PRESETS_DIR, "asset_presets.json")
+LENS_PRESET_FILE = os.path.join(PRESETS_DIR, "lens_presets.json")
 
 # 默认预设数据
 DEFAULT_PRESETS = {
@@ -198,3 +199,73 @@ def get_favorite_paths() -> list:
     """获取收藏路径列表"""
     data = load_asset_presets()
     return data.get("favorite_paths", [])
+
+
+# ============ 焦距预设配置 ============
+
+DEFAULT_LENS_PRESETS = {
+    "presets": {
+        "24mm": 24.0,
+        "35mm": 35.0,
+        "50mm": 50.0,
+        "85mm": 85.0,
+        "135mm": 135.0,
+    }
+}
+
+
+def load_lens_presets() -> dict:
+    """加载焦距预设配置"""
+    ensure_presets_dir()
+    if os.path.exists(LENS_PRESET_FILE):
+        try:
+            with open(LENS_PRESET_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, IOError):
+            pass
+    save_lens_presets(DEFAULT_LENS_PRESETS)
+    return DEFAULT_LENS_PRESETS.copy()
+
+
+def save_lens_presets(data: dict):
+    """保存焦距预设配置"""
+    ensure_presets_dir()
+    with open(LENS_PRESET_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+def get_lens_presets() -> dict:
+    """获取所有焦距预设"""
+    data = load_lens_presets()
+    return data.get("presets", DEFAULT_LENS_PRESETS["presets"])
+
+
+def get_lens_preset_value(name: str) -> float:
+    """获取指定预设的焦距值"""
+    presets = get_lens_presets()
+    return presets.get(name, 50.0)
+
+
+def add_lens_preset(name: str, value: float):
+    """添加或更新焦距预设"""
+    data = load_lens_presets()
+    data["presets"][name] = value
+    save_lens_presets(data)
+
+
+def delete_lens_preset(name: str) -> bool:
+    """删除焦距预设（保留默认预设）"""
+    if name in DEFAULT_LENS_PRESETS["presets"]:
+        return False
+    data = load_lens_presets()
+    if name in data.get("presets", {}):
+        del data["presets"][name]
+        save_lens_presets(data)
+        return True
+    return False
+
+
+def get_all_lens_preset_names() -> list:
+    """获取所有焦距预设名称列表"""
+    presets = get_lens_presets()
+    return list(presets.keys())
