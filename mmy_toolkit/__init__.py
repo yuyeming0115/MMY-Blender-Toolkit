@@ -111,10 +111,6 @@ class MMY_SuffixItem(bpy.types.PropertyGroup):
     name: bpy.props.StringProperty(name="后缀", default="_")
 
 
-class MMY_KeywordItem(bpy.types.PropertyGroup):
-    keyword: bpy.props.StringProperty(name="关键词", default="")
-
-
 # ============ Operators ============
 class MMY_OT_SaveWithSuffix(bpy.types.Operator):
     bl_idname = "mmy.save_with_suffix"
@@ -258,42 +254,11 @@ class MMY_OT_RestoreKeymaps(bpy.types.Operator):
         return {'FINISHED'}
 
 
-class MMY_OT_AddNormalKeyword(bpy.types.Operator):
-    """添加法线贴图关键词"""
-    bl_idname = "mmy.add_normal_keyword"
-    bl_label = "添加关键词"
-
-    def execute(self, context):
-        prefs = context.preferences.addons["mmy_toolkit"].preferences
-        item = prefs.normal_map_keywords.add()
-        item.keyword = "new"
-        return {'FINISHED'}
-
-
-class MMY_OT_RemoveNormalKeyword(bpy.types.Operator):
-    """删除法线贴图关键词"""
-    bl_idname = "mmy.remove_normal_keyword"
-    bl_label = "删除关键词"
-
-    index: bpy.props.IntProperty()
-
-    def execute(self, context):
-        prefs = context.preferences.addons["mmy_toolkit"].preferences
-        prefs.normal_map_keywords.remove(self.index)
-        return {'FINISHED'}
-
-
 # ============ Preferences ============
 class MMY_Preferences(bpy.types.AddonPreferences):
     bl_idname = "mmy_toolkit"
 
     current_suffixes: bpy.props.CollectionProperty(type=MMY_SuffixItem)
-    normal_map_keywords: bpy.props.CollectionProperty(type=MMY_KeywordItem)
-    auto_set_non_color: bpy.props.BoolProperty(
-        name="自动设置 Non-Color",
-        description="拖入法线贴图时自动设置颜色空间为非色彩",
-        default=True
-    )
 
     def draw(self, context):
         layout = self.layout
@@ -349,21 +314,6 @@ class MMY_Preferences(bpy.types.AddonPreferences):
         layout.separator()
         layout.label(text="预设文件: presets/suffix_presets.json（可迁移）")
 
-        # === 颜色空间自动设置 ===
-        layout.separator()
-        box = layout.box()
-        box.label(text="颜色空间自动设置:")
-        box.prop(self, "auto_set_non_color")
-        if self.auto_set_non_color:
-            box.label(text="法线贴图关键词（文件名包含以下关键词即自动设置 Non-Color）:")
-            for i, item in enumerate(self.normal_map_keywords):
-                r = box.row(align=True)
-                r.prop(item, "keyword", text="")
-                op = r.operator("mmy.remove_normal_keyword", text="", icon="X")
-                op.index = i
-            box.operator("mmy.add_normal_keyword", text="添加关键词", icon="ADD")
-            box.label(text="默认: normal, nrm, normalmap, nmap, bump")
-
 
 # ============ 绘制函数 ============
 def draw_suffix_menu(self, context):
@@ -401,7 +351,6 @@ def draw_suffix_menu(self, context):
 # ============ 所有类 ============
 _classes = (
     MMY_SuffixItem,
-    MMY_KeywordItem,
     MMY_OT_SaveWithSuffix,
     MMY_OT_SelectPreset,
     MMY_OT_AddSuffix,
@@ -410,8 +359,6 @@ _classes = (
     MMY_OT_DeletePreset,
     MMY_OT_OpenPrefs,
     MMY_OT_RestoreKeymaps,
-    MMY_OT_AddNormalKeyword,
-    MMY_OT_RemoveNormalKeyword,
     MMY_MT_PresetMenu,
     MMY_Preferences,
 )
@@ -497,13 +444,6 @@ def register():
             for suffix in get_current_suffixes():
                 item = addon.preferences.current_suffixes.add()
                 item.name = suffix
-
-        # 初始化默认关键词
-        from .auto_color_space import DEFAULT_KEYWORDS
-        if len(addon.preferences.normal_map_keywords) == 0:
-            for kw in DEFAULT_KEYWORDS:
-                item = addon.preferences.normal_map_keywords.add()
-                item.keyword = kw
 
 
 def unregister():

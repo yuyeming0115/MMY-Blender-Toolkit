@@ -1,109 +1,148 @@
-"""自动检测法线贴图并设置 Non-Color 颜色空间
-
-实现方式：hook bpy.data.images.load 和 bpy.ops.node.add_image，
-在图片加载时立即检查所有使用它的节点并设置 Non-Color。
-"""
+"""材质编辑器快捷操作：切换颜色空间和 Alpha 模式"""
 
 import bpy
-import os
-
-# 默认关键词列表
-DEFAULT_KEYWORDS = ["normal", "nrm", "normalmap", "nmap", "bump"]
 
 
-def _get_keywords():
-    try:
-        prefs = bpy.context.preferences.addons.get("mmy_toolkit")
-        if prefs and prefs.preferences:
-            return [k.strip().lower() for k in prefs.preferences.normal_map_keywords if k.strip()]
-    except:
-        pass
-    return DEFAULT_KEYWORDS
+class MMY_OT_ToggleColorSpace(bpy.types.Operator):
+    """切换选中贴图节点的颜色空间（sRGB ↔ Non-Color）"""
+    bl_idname = "mmy.toggle_color_space"
+    bl_label = "切换颜色空间"
+    bl_description = "切换选中贴图节点的颜色空间（sRGB ↔ Non-Color）"
+    bl_options = {'REGISTER', 'UNDO'}
 
-
-def _is_enabled():
-    try:
-        prefs = bpy.context.preferences.addons.get("mmy_toolkit")
-        return prefs and prefs.preferences and prefs.preferences.auto_set_non_color
-    except:
-        return False
-
-
-def _is_normal_map(image_name):
-    if not image_name:
-        return False
-    base = os.path.splitext(image_name)[0].lower()
-    for kw in _get_keywords():
-        if kw and kw in base:
-            return True
-    return False
-
-
-def _check_image_nodes(img):
-    """检查所有材质中使用该图像的节点，如果是法线贴图则设置 Non-Color"""
-    if not _is_normal_map(img.name):
-        return
-    for mat in bpy.data.materials:
-        if not mat.use_nodes or not mat.node_tree:
-            continue
-        for node in mat.node_tree.nodes:
-            if node.type == 'IMAGE_TEXTURE' and node.image == img:
-                if node.color_space != 'NONE':
-                    node.color_space = 'NONE'
-                    print(f"[MMY] 自动设置 Non-Color: {img.name}")
-
-
-_original_images_load = None
-_original_add_image = None
-
-
-def _wrapped_images_load(filepath, check_existing=True, load_still=False):
-    """hook Images.load — 图片加载时检查"""
-    img = _original_images_load(filepath, check_existing=check_existing, load_still=load_still)
-    if img:
-        _check_image_nodes(img)
-    return img
-
-
-def _wrapped_add_image(self, context, **kwargs):
-    """hook node.add_image — Shift+A 或菜单添加时检查"""
-    result = _original_add_image(self, context, **kwargs)
-    # 立即检查当前节点编辑器中的最新节点
-    try:
+    @classmethod
+    def poll(cls, context):
         space = context.space_data
-        if space and space.type == 'NODE_EDITOR':
-            tree = getattr(space, 'node_tree', None) or getattr(space, 'edit_tree', None)
-            if tree:
-                for node in reversed(tree.nodes):
-                    if node.type == 'IMAGE_TEXTURE' and node.image:
-                        if _is_normal_map(node.image.name) and node.color_space != 'NONE':
-                            node.color_space = 'NONE'
-                            print(f"[MMY] 自动设置 Non-Color: {node.image.name}")
-                        break
-    except:
-        pass
-    return result
+        if not space or space.type != 'NODE_EDITOR':
+            return False
+        tree = getattr(space, 'node_tree', None) or getattr(space, 'edit_tree', None)
+        if not tree:
+            return False
+        for node in tree.nodes:
+            if node.select and node.type == 'IMAGE_TEXTURE' and node.image:
+                return True
+        return False
+
+    def execute(self, context):
+        space = context.space_data
+        tree = getattr(space, 'node_tree', None) or getattr(space, 'edit_tree', None)
+        if not tree:
+            return {'CANCELLED'}
+
+        count = 0
+        for node in tree.nodes:
+            if not (node.select and node.type == 'IMAGE_TEXTURE' and node.image):
+                continue
+            if node.color_space == 'NONE':
+                node.color_space = 'sRGB'
+                count += 1
+            else:
+                node.color_space = 'NONE'
+                count += 1
+        if count > 0:
+            self.report({'INFO'}, f"已切换 {count} 个贴图节点的颜色空间")
+        return {'FINISHED'}
+
+
+class MMY_OT_ToggleAlphaMode(bpy.types.Operator):
+    """切换选中贴图节点的 Alpha 模式（Straight ↔ Packed）"""
+    bl_idname = "mmy.toggle_alpha_mode"
+    bl_label = "切换 Alpha 模式"
+    bl_description = "切换选中贴图节点的 Alpha 模式（Straight ↔ Packed）"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        space = context.space_data
+        if not space or space.type != 'NODE_EDITOR':
+            return False
+        tree = getattr(space, 'node_tree', None) or getattr(space, 'edit_tree', None)
+        if not tree:
+            return False
+        for node in tree.nodes:
+            if node.select and node.type == 'IMAGE_TEXTURE' and node.image:
+                return True
+        return False
+
+    def execute(self, context):
+        space = context.space_data
+        tree = getattr(space, 'node_tree', None) or getattr(space, 'edit_tree', None)
+        if not tree:
+            return {'CANCELLED'}
+
+        count = 0
+        for node in tree.nodes:
+            if not (node.select and node.type == 'IMAGE_TEXTURE' and node.image):
+                continue
+            img = node.image
+            if img.alpha_mode == 'PREMUL':
+                img.alpha_mode = 'STRAIGHT'
+                count += 1
+            else:
+                img.alpha_mode = 'PREMUL'
+                count += 1
+        if count > 0:
+            self.report({'INFO'}, f"已切换 {count} 个贴图节点的 Alpha 模式")
+        return {'FINISHED'}
+
+
+_classes = (
+    MMY_OT_ToggleColorSpace,
+    MMY_OT_ToggleAlphaMode,
+)
 
 
 def register():
-    global _original_images_load, _original_add_image
+    for cls in _classes:
+        try:
+            bpy.utils.register_class(cls)
+        except ValueError:
+            try:
+                bpy.utils.unregister_class(cls)
+                bpy.utils.register_class(cls)
+            except:
+                pass
 
-    # 方式1：hook bpy.data.images.load（覆盖拖放、文件浏览器加载等）
-    if hasattr(bpy.data, 'images') and hasattr(bpy.data.images, 'load'):
-        _original_images_load = bpy.data.images.load
-        bpy.data.images.load = _wrapped_images_load
-
-    # 方式2：hook bpy.ops.node.add_image（覆盖 Shift+A 和菜单）
-    if hasattr(bpy.ops, 'node') and hasattr(bpy.ops.node, 'add_image'):
-        _original_add_image = bpy.ops.node.add_image
-        bpy.ops.node.add_image = _wrapped_add_image
+    # 挂载到着色器编辑器顶部菜单
+    try:
+        bpy.types.NODE_HT_header.append(_draw_shader_header_menu)
+    except:
+        pass
 
 
 def unregister():
-    global _original_images_load, _original_add_image
-    if _original_images_load is not None:
-        bpy.data.images.load = _original_images_load
-        _original_images_load = None
-    if _original_add_image is not None:
-        bpy.ops.node.add_image = _original_add_image
-        _original_add_image = None
+    # 移除菜单
+    try:
+        bpy.types.NODE_HT_header.remove(_draw_shader_header_menu)
+    except:
+        pass
+
+    for cls in reversed(_classes):
+        try:
+            bpy.utils.unregister_class(cls)
+        except:
+            pass
+
+
+def _draw_shader_header_menu(self, context):
+    """在着色器编辑器顶部菜单添加快捷按钮"""
+    space = context.space_data
+    if not space or space.type != 'NODE_EDITOR':
+        return
+    tree = getattr(space, 'node_tree', None) or getattr(space, 'edit_tree', None)
+    if not tree:
+        return
+
+    # 检查是否有选中的 IMAGE_TEXTURE 节点
+    has_selection = False
+    for node in tree.nodes:
+        if node.select and node.type == 'IMAGE_TEXTURE' and node.image:
+            has_selection = True
+            break
+    if not has_selection:
+        return
+
+    self.layout.separator()
+    row = self.layout.row(align=True)
+    row.operator("mmy.toggle_color_space", icon='COLOR')
+    row.operator("mmy.toggle_alpha_mode", icon='IMAGE_ALPHA')
