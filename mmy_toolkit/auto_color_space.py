@@ -1,8 +1,8 @@
 """自动检测法线贴图并设置 Non-Color 颜色空间
 
 实现方式：
-1. override bpy.ops.node.add_image — 拖放/Shift+A 添加图片时立即设置
-2. 定期 timer 扫描作为兜底
+1. 持续性 timer（每秒扫描一次）— 覆盖拖放等不走 operator 的路径
+2. hook bpy.ops.node.add_image — 覆盖 Shift+A 和菜单添加
 """
 
 import bpy
@@ -11,8 +11,8 @@ import os
 # 默认关键词列表
 DEFAULT_KEYWORDS = ["normal", "nrm", "normalmap", "nmap", "bump"]
 
-# 记录已处理的图像名 -> color_space，避免重复打印
-_done = {}
+# 记录已处理的图像
+_processed_images = set()
 
 
 def _get_keywords():
@@ -44,12 +44,13 @@ def _is_normal_map(image_name):
 
 
 def _scan_all():
-    """扫描所有材质节点树"""
-    print("[MMY] _scan_all 被调用了")
-    if not _is_enabled():
-        print("[MMY] 功能未启用")
-        return None
-    print(f"[MMY] 共检查 {len(bpy.data.materials)} 个材质")
+    """扫描所有材质节点树，返回下次执行间隔（持续运行）"""
+    try:
+        if not _is_enabled():
+            return 1.0
+    except:
+        return 1.0
+
     for mat in bpy.data.materials:
         if not mat.use_nodes or not mat.node_tree:
             continue
@@ -57,44 +58,51 @@ def _scan_all():
             if node.type != 'IMAGE_TEXTURE' or not node.image:
                 continue
             img_name = node.image.name
-            if node.color_space == 'NONE':
-                if img_name not in _done or _done[img_name] != 'NONE':
-                    _done[img_name] = 'NONE'
+            if img_name in _processed_images:
                 continue
-            print(f"[MMY] 检查节点: {img_name} color_space={node.color_space}")
-            if _is_normal_map(img_name):
+            if _is_normal_map(img_name) and node.color_space != 'NONE':
                 node.color_space = 'NONE'
-                _done[img_name] = 'NONE'
+                _processed_images.add(img_name)
                 print(f"[MMY] 自动设置 Non-Color: {img_name}")
-    return None
+    return 1.0
 
 
 _original_add_image = None
-_original_invoke = None
 
 
 def _wrapped_add_image(self, context, **kwargs):
     """包装 node.add_image 操作符"""
-    print("[MMY] _wrapped_add_image 被调用")
     result = _original_add_image(self, context, **kwargs)
-    bpy.app.timers.register(_scan_all, first_interval=0.0)
+    # 立即扫描（不依赖 timer）
+    try:
+        space = context.space_data
+        if space and space.type == 'NODE_EDITOR':
+            tree = getattr(space, 'node_tree', None) or getattr(space, 'edit_tree', None)
+            if tree:
+                for node in reversed(tree.nodes):
+                    if node.type == 'IMAGE_TEXTURE' and node.image:
+                        img_name = node.image.name
+                        if _is_normal_map(img_name) and node.color_space != 'NONE':
+                            node.color_space = 'NONE'
+                            _processed_images.add(img_name)
+                            print(f"[MMY] 自动设置 Non-Color: {img_name}")
+                        break
+    except:
+        pass
     return result
 
 
 def register():
     global _original_add_image
-    _done.clear()
-    print("[MMY] auto_color_space 注册开始")
+    _processed_images.clear()
+
     # 方式1：hook 操作符
     if hasattr(bpy.ops, 'node') and hasattr(bpy.ops.node, 'add_image'):
         _original_add_image = bpy.ops.node.add_image
         bpy.ops.node.add_image = _wrapped_add_image
-        print("[MMY] 已 hook bpy.ops.node.add_image")
-    else:
-        print("[MMY] bpy.ops.node.add_image 不存在")
-    # 方式2：定期 timer 扫描兜底
+
+    # 方式2：持续性 timer（每秒扫描一次）
     bpy.app.timers.register(_scan_all, first_interval=1.0)
-    print("[MMY] auto_color_space 注册完成")
 
 
 def unregister():
@@ -102,3 +110,4 @@ def unregister():
     if _original_add_image is not None:
         bpy.ops.node.add_image = _original_add_image
         _original_add_image = None
+    _processed_images.clear()
