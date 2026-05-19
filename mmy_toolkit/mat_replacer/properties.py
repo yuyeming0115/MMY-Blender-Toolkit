@@ -54,6 +54,11 @@ class MMY_MatReplacerProps(bpy.types.PropertyGroup):
 
     active_index: IntProperty(default=0)
 
+    # === 动画关联属性 ===
+    anim_file: StringProperty(subtype="FILE_PATH", default="", name="动画文件")
+    has_ani_collection: BoolProperty(default=False, name="存在Ani集合")
+    ani_collection_name: StringProperty(default="", name="Ani集合名")
+
 
 _classes = (
     MMY_MaterialMappingItem,

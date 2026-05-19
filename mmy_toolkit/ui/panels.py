@@ -138,6 +138,42 @@ class VIEW3D_PT_MMYMeshTools(bpy.types.Panel):
             box3.label(text="材质替换", icon='MATERIAL')
             box3.label(text=f"加载错误: {str(e)}", icon='ERROR')
 
+        # 动画关联区块
+        try:
+            self._draw_anim_linker(layout, context)
+        except Exception as e:
+            box4 = layout.box()
+            box4.label(text="关联动画", icon='ANIM_DATA')
+            box4.label(text=f"加载错误: {str(e)}", icon='ERROR')
+
+    def _draw_anim_linker(self, layout, context):
+        """绘制动画关联区块"""
+        if not hasattr(context.scene, 'mmy_mat_replacer'):
+            return
+
+        props = context.scene.mmy_mat_replacer
+
+        layout.separator()
+        box = layout.box()
+        box.label(text="关联动画", icon='ANIM_DATA')
+
+        # 选择动画文件
+        row = box.row(align=True)
+        row.operator("mmy.select_anim_file", text="选择动画文件", icon='FILE_FOLDER')
+
+        if props.anim_file:
+            import os
+            filename = os.path.basename(props.anim_file)
+            row.label(text=filename)
+
+            # 显示状态和关联按钮
+            if props.has_ani_collection:
+                row = box.row(align=True)
+                row.operator("mmy.link_animation", text="关联 Ani 集合", icon='LINK_BLEND')
+                row.label(text="✓ 找到 Ani", icon='CHECKMARK')
+            else:
+                box.label(text="文件中未找到 Ani 集合", icon='ERROR')
+
     def _draw_mat_replacer(self, layout, context):
         """绘制材质替换区块"""
         if not hasattr(context.scene, 'mmy_mat_replacer'):

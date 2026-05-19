@@ -279,11 +279,113 @@ class MMY_OT_ClearAll(bpy.types.Operator):
         return {'FINISHED'}
 
 
+# === 动画关联操作符 ===
+
+class MMY_OT_SelectAnimFile(bpy.types.Operator, ImportHelper):
+    """选择动画源文件"""
+    bl_idname = "mmy.select_anim_file"
+    bl_label = "选择动画文件"
+    bl_options = {'REGISTER'}
+
+    filename_ext = ".blend"
+    filter_glob: bpy.props.StringProperty(default="*.blend", options={'HIDDEN'})
+
+    def execute(self, context):
+        props = context.scene.mmy_mat_replacer
+        filepath = self.filepath
+
+        if not os.path.exists(filepath):
+            self.report({'ERROR'}, f"文件不存在: {filepath}")
+            return {'CANCELLED'}
+
+        props.anim_file = filepath
+
+        # 检查文件中是否存在 Ani 集合
+        try:
+            with bpy.data.libraries.load(filepath) as (data_from, data_to):
+                collections = list(data_from.collections)
+                has_ani = "Ani" in collections
+
+                props.has_ani_collection = has_ani
+                props.ani_collection_name = "Ani" if has_ani else ""
+
+                if has_ani:
+                    self.report({'INFO'}, f"找到 Ani 集合")
+                else:
+                    self.report({'WARNING'}, f"文件中未找到 Ani 集合")
+                    # 列出可用的集合供参考
+                    if collections:
+                        self.report({'INFO'}, f"可用集合: {', '.join(collections[:5])}")
+
+        except Exception as e:
+            self.report({'ERROR'}, f"读取失败: {str(e)}")
+            props.has_ani_collection = False
+            return {'CANCELLED'}
+
+        return {'FINISHED'}
+
+
+class MMY_OT_LinkAnimation(bpy.types.Operator):
+    """关联 Ani 集合到世界中心"""
+    bl_idname = "mmy.link_animation"
+    bl_label = "关联动画"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        props = context.scene.mmy_mat_replacer
+        return props.anim_file and props.has_ani_collection
+
+    def execute(self, context):
+        props = context.scene.mmy_mat_replacer
+        filepath = props.anim_file
+
+        if not os.path.exists(filepath):
+            self.report({'ERROR'}, f"文件不存在")
+            return {'CANCELLED'}
+
+        try:
+            # Link Ani 集合
+            with bpy.data.libraries.load(filepath, link=True) as (data_from, data_to):
+                data_to.collections = ["Ani"]
+
+            # 获取 Link 的集合
+            ani_collection = bpy.data.collections.get("Ani")
+            if not ani_collection:
+                self.report({'ERROR'}, "Link 失败：未找到 Ani 集合")
+                return {'CANCELLED'}
+
+            # 检查是否已存在同名实例
+            existing_instance = bpy.data.objects.get("Ani")
+            if existing_instance and existing_instance.instance_collection == ani_collection:
+                self.report({'WARNING'}, "Ani 集合已存在，跳过创建")
+                return {'FINISHED'}
+
+            # 创建集合实例并放入场景
+            instance = bpy.data.objects.new("Ani", None)
+            instance.empty_display_type = 'COLLECTION'
+            instance.instance_collection = ani_collection
+            instance.location = (0, 0, 0)  # 世界中心
+
+            # 链接到场景集合
+            context.scene.collection.objects.link(instance)
+
+            self.report({'INFO'}, f"已关联 Ani 集合到世界中心")
+
+        except Exception as e:
+            self.report({'ERROR'}, f"关联失败: {str(e)}")
+            return {'CANCELLED'}
+
+        return {'FINISHED'}
+
+
 _classes = (
     MMY_OT_SelectExternalFile,
     MMY_OT_LinkMaterials,
     MMY_OT_ExecuteReplace,
     MMY_OT_ClearAll,
+    MMY_OT_SelectAnimFile,
+    MMY_OT_LinkAnimation,
 )
 
 
