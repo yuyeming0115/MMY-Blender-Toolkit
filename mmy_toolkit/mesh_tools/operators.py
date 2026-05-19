@@ -171,21 +171,23 @@ class MMY_OT_ImportFBX(bpy.types.Operator):
 
     def _clear_transforms(self, new_objects):
         """应用变换：将物体的变换结构应用为自身数据"""
-        if not new_objects:
+        # set 转 list
+        obj_list = list(new_objects)
+        if not obj_list:
             return
 
         # 先选中所有新导入的对象
         bpy.ops.object.select_all(action='DESELECT')
-        for obj in new_objects:
+        for obj in obj_list:
             obj.select_set(True)
 
         # 设置第一个对象为活动对象
-        bpy.context.view_layer.objects.active = new_objects[0]
+        bpy.context.view_layer.objects.active = obj_list[0]
 
         # 应用变换（位移、旋转、缩放）
         bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
 
-        self.report({'INFO'}, f"已应用 {len(new_objects)} 个对象的变换")
+        self.report({'INFO'}, f"已应用 {len(obj_list)} 个对象的变换")
 
 
 class MMY_OT_BetterImportFBX(bpy.types.Operator):
