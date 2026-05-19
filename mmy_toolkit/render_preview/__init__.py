@@ -35,7 +35,7 @@ class MMY_OT_RenderPreview(bpy.types.Operator):
     temp_suffix_mode: EnumProperty(
         name="后缀处理",
         items=get_temp_suffix_mode_items,
-        default='default'
+        default=0  # Blender 5.x: 当 items 是函数时，default 必须是整数索引
     )
 
     custom_suffix: StringProperty(
