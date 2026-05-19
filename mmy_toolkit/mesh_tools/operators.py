@@ -170,18 +170,22 @@ class MMY_OT_ImportFBX(bpy.types.Operator):
             self.report({'INFO'}, f"已替换 {replaced_count} 个同名材质")
 
     def _clear_transforms(self, new_objects):
-        """清除导入对象的位移、缩放、旋转"""
-        cleared_count = 0
+        """应用变换：将物体的变换结构应用为自身数据"""
+        if not new_objects:
+            return
+
+        # 先选中所有新导入的对象
+        bpy.ops.object.select_all(action='DESELECT')
         for obj in new_objects:
-            # 清除位移
-            obj.location = (0, 0, 0)
-            # 清除旋转（使用欧拉角）
-            obj.rotation_euler = (0, 0, 0)
-            # 清除缩放
-            obj.scale = (1, 1, 1)
-            cleared_count += 1
-        if cleared_count > 0:
-            self.report({'INFO'}, f"已清零 {cleared_count} 个对象的变换")
+            obj.select_set(True)
+
+        # 设置第一个对象为活动对象
+        bpy.context.view_layer.objects.active = new_objects[0]
+
+        # 应用变换（位移、旋转、缩放）
+        bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+
+        self.report({'INFO'}, f"已应用 {len(new_objects)} 个对象的变换")
 
 
 class MMY_OT_BetterImportFBX(bpy.types.Operator):
