@@ -363,7 +363,8 @@ class MMY_OT_LinkAnimation(bpy.types.Operator):
 
             # 创建集合实例并放入场景
             instance = bpy.data.objects.new("Ani", None)
-            instance.empty_display_type = 'COLLECTION'
+            instance.empty_display_type = 'PLAIN_AXES'  # 显示为坐标轴
+            instance.instance_type = 'COLLECTION'  # 实例类型为集合
             instance.instance_collection = ani_collection
             instance.location = (0, 0, 0)  # 世界中心
 
