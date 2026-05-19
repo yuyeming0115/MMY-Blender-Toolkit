@@ -421,6 +421,7 @@ class MMY_OT_CreateScaleConstraint(bpy.types.Operator):
             constraint.use_x = True
             constraint.use_y = True
             constraint.use_z = True
+            constraint.use_offset = props.use_offset  # 使用偏移选项
             constraint.owner_space = 'LOCAL'
             constraint.target_space = 'LOCAL'
             self.report({'INFO'}, f"已给 {armature_name} 添加 Copy Scale 约束")

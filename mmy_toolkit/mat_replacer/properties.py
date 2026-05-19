@@ -56,6 +56,22 @@ def _update_scale_value(self, context):
         scale_obj.scale = (self.scale_value, self.scale_value, self.scale_value)
 
 
+def _update_constraint_offset(self, context):
+    """当偏移选项改变时，更新约束的offset设置"""
+    armature_name = decode_armature_id(self.target_armature_enum)
+    if not armature_name:
+        return
+
+    armature = bpy.data.objects.get(armature_name)
+    if not armature:
+        return
+
+    for c in armature.constraints:
+        if c.name == "MMY_Copy_Scale":
+            c.use_offset = self.use_offset
+            break
+
+
 class MMY_MaterialMappingItem(bpy.types.PropertyGroup):
     """材质映射项：场景材质 → Link材质选择"""
     source_mat_name: StringProperty(name="场景材质", default="")
@@ -108,6 +124,12 @@ class MMY_MatReplacerProps(bpy.types.PropertyGroup):
         soft_max=5.0,
         description="Scale空物体的缩放值",
         update=_update_scale_value
+    )
+    use_offset: BoolProperty(
+        name="偏移",
+        default=True,
+        description="约束叠加在原有缩放上，而不是直接覆盖",
+        update=_update_constraint_offset
     )
 
 

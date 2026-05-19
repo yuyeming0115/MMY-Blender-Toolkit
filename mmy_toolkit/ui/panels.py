@@ -173,14 +173,18 @@ class VIEW3D_PT_MMYMeshTools(bpy.types.Panel):
         if props.target_armature_enum != "none":
             row.operator("mmy.create_scale_constraint", text="创建约束", icon='CONSTRAINT')
 
-        # 缩放控制滑块（如果Scale物体存在）
+        # 缩放控制（如果Scale物体存在）
         scale_obj = bpy.data.objects.get("Scale")
         if scale_obj:
             layout.separator(factor=0.3)
             row = box.row(align=True)
             row.prop(props, "scale_value", text="缩放", slider=True)
-            # 显示当前Scale物体的实际缩放值
             row.label(text=f"({scale_obj.scale.x:.2f})")
+
+            # 偏移选项
+            row = box.row(align=True)
+            row.prop(props, "use_offset", text="偏移")
+            row.label(text="叠加原有缩放", icon='INFO')
 
     def _draw_anim_linker(self, layout, context):
         """绘制动画关联区块"""
