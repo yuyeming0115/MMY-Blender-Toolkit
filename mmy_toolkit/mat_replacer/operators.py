@@ -133,7 +133,7 @@ class MMY_OT_LinkMaterials(bpy.types.Operator):
                 item = props.linked_materials.add()
                 item.name = name
 
-            # 自动生成映射列表（场景材质 → 待选择）
+            # 自动生成映射列表
             self._build_mapping_list(context)
 
             linked_count = len(bpy.data.materials) - before_count
@@ -146,14 +146,13 @@ class MMY_OT_LinkMaterials(bpy.types.Operator):
         return {'FINISHED'}
 
     def _build_mapping_list(self, context):
-        """构建映射列表：左侧场景材质，右侧下拉选择框"""
+        """构建映射列表"""
         props = context.scene.mmy_mat_replacer
         props.mappings.clear()
 
         scene_mats = get_scene_materials()
         linked_mats = get_linked_material_names()
 
-        # 解析材质名用于自动匹配
         scene_parsed = {mat: parse_material_name(mat) for mat in scene_mats}
         linked_parsed = {}
         for mat in linked_mats:
@@ -209,14 +208,13 @@ class MMY_OT_ExecuteReplace(bpy.types.Operator):
         print(f"[MMY] === 开始替换 ===")
         print(f"[MMY] 映射数量: {len(props.mappings)}")
 
-        # 构建映射字典：源材质名 → Link材质对象（通过library区分）
+        # 构建映射字典
         mapping_dict = {}
         for m in props.mappings:
             target_name = decode_target_mat_id(m.target_mat_id)
             print(f"[MMY] 映射项: 源={m.source_mat_name}, 解码={target_name}")
 
             if target_name:
-                # 关键：通过 library 属性找到 Link 材质，而不是本地同名材质
                 target_mat = None
                 for mat in bpy.data.materials:
                     if mat.name == target_name and mat.library is not None:
@@ -225,29 +223,26 @@ class MMY_OT_ExecuteReplace(bpy.types.Operator):
 
                 if target_mat:
                     mapping_dict[m.source_mat_name] = target_mat
-                    print(f"[MMY] 找到Link材质: {target_mat.name} (库: {target_mat.library.name})")
+                    print(f"[MMY] 找到Link材质: {target_mat.name}")
                 else:
                     print(f"[MMY] 未找到Link材质: {target_name}")
 
-        print(f"[MMY] 映射字典keys: {list(mapping_dict.keys())}")
-
-        # 遍历场景所有对象，替换材质
+        # 遍历场景对象替换材质
         for obj in bpy.context.scene.objects:
             if hasattr(obj, 'material_slots'):
                 for i, slot in enumerate(obj.material_slots):
                     old_mat = slot.material
                     if old_mat:
-                        print(f"[MMY] 对象 {obj.name} 槽 {i}: 材质={old_mat.name}, library={old_mat.library}")
+                        print(f"[MMY] 对象 {obj.name} 槽 {i}: 材质={old_mat.name}")
 
                         if old_mat.name in mapping_dict:
                             new_mat = mapping_dict[old_mat.name]
-                            # 检查是否是同一个对象（通过比较对象引用，不是名字）
                             if old_mat != new_mat:
                                 slot.material = new_mat
                                 replaced_count += 1
-                                print(f"[MMY] 替换: {old_mat.name} → {new_mat.name} (Link)")
+                                print(f"[MMY] 替换: {old_mat.name} → {new_mat.name}")
                             else:
-                                print(f"[MMY] 已是同一材质对象，跳过")
+                                print(f"[MMY] 已是同一材质，跳过")
                         else:
                             print(f"[MMY] 材质 {old_mat.name} 不在映射字典中")
 
@@ -265,7 +260,6 @@ class MMY_OT_ClearAll(bpy.types.Operator):
     def execute(self, context):
         props = context.scene.mmy_mat_replacer
 
-        # 移除Link材质
         for mat in bpy.data.materials:
             if mat.library is not None and mat.users == 0:
                 bpy.data.materials.remove(mat)
@@ -300,7 +294,6 @@ class MMY_OT_SelectAnimFile(bpy.types.Operator, ImportHelper):
 
         props.anim_file = filepath
 
-        # 检查文件中是否存在 Ani 集合
         try:
             with bpy.data.libraries.load(filepath) as (data_from, data_to):
                 collections = list(data_from.collections)
@@ -313,7 +306,6 @@ class MMY_OT_SelectAnimFile(bpy.types.Operator, ImportHelper):
                     self.report({'INFO'}, f"找到 Ani 集合")
                 else:
                     self.report({'WARNING'}, f"文件中未找到 Ani 集合")
-                    # 列出可用的集合供参考
                     if collections:
                         self.report({'INFO'}, f"可用集合: {', '.join(collections[:5])}")
 
@@ -345,30 +337,25 @@ class MMY_OT_LinkAnimation(bpy.types.Operator):
             return {'CANCELLED'}
 
         try:
-            # Link Ani 集合
             with bpy.data.libraries.load(filepath, link=True) as (data_from, data_to):
                 data_to.collections = ["Ani"]
 
-            # 获取 Link 的集合
             ani_collection = bpy.data.collections.get("Ani")
             if not ani_collection:
                 self.report({'ERROR'}, "Link 失败：未找到 Ani 集合")
                 return {'CANCELLED'}
 
-            # 检查是否已存在同名实例
             existing_instance = bpy.data.objects.get("Ani")
             if existing_instance and existing_instance.instance_collection == ani_collection:
                 self.report({'WARNING'}, "Ani 集合已存在，跳过创建")
                 return {'FINISHED'}
 
-            # 创建集合实例并放入场景
             instance = bpy.data.objects.new("Ani", None)
-            instance.empty_display_type = 'PLAIN_AXES'  # 显示为坐标轴
-            instance.instance_type = 'COLLECTION'  # 实例类型为集合
+            instance.empty_display_type = 'PLAIN_AXES'
+            instance.instance_type = 'COLLECTION'
             instance.instance_collection = ani_collection
-            instance.location = (0, 0, 0)  # 世界中心
+            instance.location = (0, 0, 0)
 
-            # 链接到场景集合
             context.scene.collection.objects.link(instance)
 
             self.report({'INFO'}, f"已关联 Ani 集合到世界中心")
@@ -396,7 +383,6 @@ class MMY_OT_CreateScaleConstraint(bpy.types.Operator):
     def execute(self, context):
         props = context.scene.mmy_mat_replacer
 
-        # 解码骨骼名称
         from .properties import decode_armature_id
         armature_name = decode_armature_id(props.target_armature_enum)
 
@@ -409,7 +395,6 @@ class MMY_OT_CreateScaleConstraint(bpy.types.Operator):
             self.report({'ERROR'}, f"未找到骨骼: {armature_name}")
             return {'CANCELLED'}
 
-        # 创建或获取Scale空物体
         scale_obj = bpy.data.objects.get("Scale")
         if not scale_obj:
             scale_obj = bpy.data.objects.new("Scale", None)
@@ -421,7 +406,6 @@ class MMY_OT_CreateScaleConstraint(bpy.types.Operator):
         else:
             self.report({'INFO'}, "复用已存在的 Scale 空物体")
 
-        # 检查是否已有同名约束
         existing_constraint = None
         for c in armature.constraints:
             if c.name == "MMY_Copy_Scale":
@@ -431,7 +415,6 @@ class MMY_OT_CreateScaleConstraint(bpy.types.Operator):
         if existing_constraint:
             self.report({'WARNING'}, "骨骼已有缩放约束，跳过添加")
         else:
-            # 添加Copy Scale约束
             constraint = armature.constraints.new('COPY_SCALE')
             constraint.name = "MMY_Copy_Scale"
             constraint.target = scale_obj
@@ -442,55 +425,9 @@ class MMY_OT_CreateScaleConstraint(bpy.types.Operator):
             constraint.target_space = 'LOCAL'
             self.report({'INFO'}, f"已给 {armature_name} 添加 Copy Scale 约束")
 
-        # 同步缩放值到属性
         props.scale_value = scale_obj.scale.x
 
         return {'FINISHED'}
-
-
-_classes = (
-    MMY_OT_SelectExternalFile,
-    MMY_OT_LinkMaterials,
-    MMY_OT_ExecuteReplace,
-    MMY_OT_ClearAll,
-    MMY_OT_SelectAnimFile,
-    MMY_OT_LinkAnimation,
-    MMY_OT_CreateScaleConstraint,
-)
-
-
-def register():
-    for cls in _classes:
-        bpy.utils.register_class(cls)
-
-
-def unregister():
-    for cls in reversed(_classes):
-        try:
-            bpy.utils.unregister_class(cls)
-        except:
-            pass
-                    break
-
-            if existing_constraint:
-                self.report({'WARNING'}, "骨骼已有缩放约束，跳过添加")
-            else:
-                # 添加Copy Scale约束
-                constraint = armature.constraints.new('COPY_SCALE')
-                constraint.name = "MMY_Copy_Scale"
-                constraint.target = scale_obj
-                constraint.use_x = True
-                constraint.use_y = True
-                constraint.use_z = True
-                constraint.owner_space = 'LOCAL'
-                constraint.target_space = 'LOCAL'
-
-                self.report({'INFO'}, f"已给 {armature_name} 添加 Copy Scale 约束")
-
-            # 同步缩放值到属性
-            props.scale_value = scale_obj.scale.x
-
-            return {'FINISHED'}
 
 
 _classes = (
