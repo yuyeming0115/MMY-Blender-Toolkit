@@ -1,6 +1,7 @@
 import bpy
 import os
 from bpy_extras.io_utils import ExportHelper
+from bpy.props import StringProperty, EnumProperty
 
 from ..config import (
     add_recent_asset_path,
@@ -9,7 +10,7 @@ from ..config import (
     get_recent_asset_paths,
     get_favorite_paths,
 )
-from ..asset_browser.properties import _unsafe_enum_id
+from ..asset_browser.properties import _unsafe_enum_id, MMY_RefreshPreviewFileItem
 
 
 class MMY_OT_CreateAsset(bpy.types.Operator):
@@ -607,6 +608,460 @@ class MMY_OT_RefreshRecentPaths(bpy.types.Operator):
         return {'FINISHED'}
 
 
+class MMY_OT_ScanPreviewFiles(bpy.types.Operator):
+    """扫描目录下的 .blend 文件"""
+    bl_idname = "mmy.scan_preview_files"
+    bl_label = "扫描目录"
+    bl_options = {'REGISTER'}
+
+    @classmethod
+    def poll(cls, context):
+        props = context.scene.mmy_asset_creator
+        return bool(props.asset_path)
+
+    def execute(self, context):
+        props = context.scene.mmy_asset_creator
+        target_dir = props.asset_path
+
+        if not os.path.exists(target_dir):
+            self.report({'ERROR'}, f"目录不存在: {target_dir}")
+            return {'CANCELLED'}
+
+        # 清空现有列表
+        props.refresh_preview_files.clear()
+
+        # 收集所有 .blend 文件
+        try:
+            blend_files = [
+                f for f in os.listdir(target_dir)
+                if f.lower().endswith('.blend')
+            ]
+        except PermissionError:
+            self.report({'ERROR'}, f"无法访问目录: {target_dir}")
+            return {'CANCELLED'}
+
+        if not blend_files:
+            self.report({'WARNING'}, f"目录下没有 .blend 文件")
+            return {'CANCELLED'}
+
+        # 添加到列表
+        for blend_name in sorted(blend_files):
+            asset_name = os.path.splitext(blend_name)[0]
+            blend_path = os.path.join(target_dir, blend_name)
+
+            # 查找预览图
+            preview_path = None
+            for ext in ['.png', '.jpg', '.jpeg', '.PNG', '.JPG', '.JPEG']:
+                test_path = os.path.join(target_dir, f"{asset_name}{ext}")
+                if os.path.exists(test_path):
+                    preview_path = test_path
+                    break
+
+            item = props.refresh_preview_files.add()
+            item.filepath = blend_path
+            item.filename = blend_name
+            item.has_preview = preview_path is not None
+            item.preview_path = preview_path or ""
+            item.is_selected = True  # 默认选中
+
+        self.report({'INFO'}, f"找到 {len(blend_files)} 个文件")
+        return {'FINISHED'}
+
+
+class MMY_OT_ClearPreviewList(bpy.types.Operator):
+    """清空预览图文件列表"""
+    bl_idname = "mmy.clear_preview_list"
+    bl_label = "清空列表"
+    bl_options = {'REGISTER'}
+
+    def execute(self, context):
+        props = context.scene.mmy_asset_creator
+        props.refresh_preview_files.clear()
+        return {'FINISHED'}
+
+
+class MMY_OT_SelectAllPreviewFiles(bpy.types.Operator):
+    """全选/取消全选"""
+    bl_idname = "mmy.select_all_preview_files"
+    bl_label = "全选"
+    bl_options = {'REGISTER'}
+
+    def execute(self, context):
+        props = context.scene.mmy_asset_creator
+
+        # 检查当前是否全部选中
+        all_selected = all(item.is_selected for item in props.refresh_preview_files)
+
+        # 切换：全选则取消，不全选则全选
+        new_state = not all_selected
+        for item in props.refresh_preview_files:
+            item.is_selected = new_state
+
+        return {'FINISHED'}
+
+
+class MMY_OT_SelectWithPreview(bpy.types.Operator):
+    """只选中有预览图的文件"""
+    bl_idname = "mmy.select_with_preview"
+    bl_label = "有预览"
+    bl_options = {'REGISTER'}
+
+    def execute(self, context):
+        props = context.scene.mmy_asset_creator
+        for item in props.refresh_preview_files:
+            item.is_selected = item.has_preview
+        return {'FINISHED'}
+
+
+class MMY_OT_SelectNonePreview(bpy.types.Operator):
+    """只选中无预览图的文件"""
+    bl_idname = "mmy.select_none_preview"
+    bl_label = "无预览"
+    bl_options = {'REGISTER'}
+
+    def execute(self, context):
+        props = context.scene.mmy_asset_creator
+        for item in props.refresh_preview_files:
+            item.is_selected = not item.has_preview
+        return {'FINISHED'}
+
+
+class MMY_OT_ManageExcludedFiles(bpy.types.Operator):
+    """管理排除文件列表"""
+    bl_idname = "mmy.manage_excluded_files"
+    bl_label = "管理排除文件"
+    bl_options = {'REGISTER'}
+
+    filename: StringProperty(name="文件名", default="")
+    action: EnumProperty(
+        name="操作",
+        items=[
+            ('add', "添加到排除列表", ""),
+            ('remove', "从排除列表移除", ""),
+            ('clear', "清空排除列表", ""),
+            ('show', "显示排除列表", ""),
+        ],
+        default='show'
+    )
+
+    def invoke(self, context, event):
+        if self.action == 'show':
+            return context.window_manager.invoke_props_dialog(self, width=400)
+        return self.execute(context)
+
+    def draw(self, context):
+        layout = self.layout
+        props = context.scene.mmy_asset_creator
+
+        if self.action == 'show':
+            layout.label(text="当前排除列表:")
+            if len(props.excluded_files) == 0:
+                layout.label(text="  (空)")
+            else:
+                for item in props.excluded_files:
+                    row = layout.row(align=True)
+                    row.label(text=item.path)
+                    op = row.operator("mmy.manage_excluded_files", text="", icon='X')
+                    op.action = 'remove'
+                    op.filename = item.path
+
+            layout.separator()
+            # 添加当前选中的文件到排除列表
+            selected_not_excluded = [
+                item.filename for item in props.refresh_preview_files
+                if item.is_selected and item.filename not in props.excluded_files
+            ]
+            if selected_not_excluded:
+                row = layout.row()
+                row.label(text=f"将选中 ({len(selected_not_excluded)}) 个文件加入排除:")
+            else:
+                layout.label(text="勾选文件后可加入排除列表")
+
+            # 清空按钮
+            if len(props.excluded_files) > 0:
+                layout.separator()
+                layout.operator("mmy.manage_excluded_files", text="清空排除列表").action = 'clear'
+
+    def execute(self, context):
+        props = context.scene.mmy_asset_creator
+
+        if self.action == 'add':
+            # 添加当前选中的文件到排除列表
+            for item in props.refresh_preview_files:
+                if item.is_selected and item.filename not in props.excluded_files:
+                    excluded_item = props.excluded_files.add()
+                    excluded_item.path = item.filename
+            # 自动取消选中已排除的文件
+            for item in props.refresh_preview_files:
+                if item.filename in props.excluded_files:
+                    item.is_selected = False
+            self.report({'INFO'}, f"已添加到排除列表")
+
+        elif self.action == 'remove':
+            # 从排除列表移除
+            for i, item in enumerate(props.excluded_files):
+                if item.path == self.filename:
+                    props.excluded_files.remove(i)
+                    break
+            self.report({'INFO'}, f"已移除: {self.filename}")
+
+        elif self.action == 'clear':
+            props.excluded_files.clear()
+            self.report({'INFO'}, "排除列表已清空")
+
+        elif self.action == 'show':
+            # 添加所有选中文件到排除列表
+            for item in props.refresh_preview_files:
+                if item.is_selected and item.filename not in props.excluded_files:
+                    excluded_item = props.excluded_files.add()
+                    excluded_item.path = item.filename
+            # 自动取消选中已排除的文件
+            for item in props.refresh_preview_files:
+                if item.filename in props.excluded_files:
+                    item.is_selected = False
+            if len(props.excluded_files) > 0:
+                self.report({'INFO'}, f"排除列表已更新，共 {len(props.excluded_files)} 个文件")
+
+        return {'FINISHED'}
+
+
+class MMY_OT_RefreshSelectedPreviews(bpy.types.Operator):
+    """刷新选中资产的预览图"""
+    bl_idname = "mmy.refresh_selected_previews"
+    bl_label = "刷新选中预览图"
+    bl_options = {'REGISTER'}
+
+    # 用于 timer 链式执行的状态
+    _selected_files = []
+    _original_filepath = ""
+    _current_index = 0
+    _success_count = 0
+    _skip_count = 0
+    _fail_count = 0
+    _error_details = []
+
+    @classmethod
+    def poll(cls, context):
+        props = context.scene.mmy_asset_creator
+        # 检查是否有选中的文件
+        for item in props.refresh_preview_files:
+            if item.is_selected and item.has_preview:
+                return True
+        return False
+
+    def invoke(self, context, event):
+        # 统计选中数量
+        selected_count = sum(
+            1 for item in context.scene.mmy_asset_creator.refresh_preview_files
+            if item.is_selected
+        )
+        return context.window_manager.invoke_confirm(
+            self,
+            event,
+            title="刷新选中预览图",
+            message=f"将刷新 {selected_count} 个选中资产的预览图，确认继续？"
+        )
+
+    def execute(self, context):
+        props = context.scene.mmy_asset_creator
+
+        # 收集选中的、有预览图的文件
+        selected_files = []
+        for item in props.refresh_preview_files:
+            if item.is_selected and item.has_preview:
+                selected_files.append({
+                    'filepath': item.filepath,
+                    'filename': item.filename,
+                    'preview_path': item.preview_path,
+                })
+
+        if not selected_files:
+            self.report({'WARNING'}, "没有选中任何有预览图的文件")
+            return {'CANCELLED'}
+
+        # 初始化状态
+        MMY_OT_RefreshSelectedPreviews._selected_files = selected_files
+        MMY_OT_RefreshSelectedPreviews._original_filepath = bpy.data.filepath
+        MMY_OT_RefreshSelectedPreviews._current_index = 0
+        MMY_OT_RefreshSelectedPreviews._success_count = 0
+        MMY_OT_RefreshSelectedPreviews._skip_count = 0
+        MMY_OT_RefreshSelectedPreviews._fail_count = 0
+        MMY_OT_RefreshSelectedPreviews._error_details = []
+
+        # 启动处理
+        self._process_next_file()
+
+        return {'RUNNING_MODAL'}
+
+    def _process_next_file(self):
+        """处理下一个文件"""
+        cls = MMY_OT_RefreshSelectedPreviews
+
+        if cls._current_index >= len(cls._selected_files):
+            self._finish_processing()
+            return
+
+        file_info = cls._selected_files[cls._current_index]
+        blend_path = file_info['filepath']
+        blend_name = file_info['filename']
+        preview_path = file_info['preview_path']
+
+        try:
+            # 打开目标 .blend 文件
+            bpy.ops.wm.open_mainfile(filepath=blend_path)
+
+            # 刷新 UI
+            for window in bpy.context.window_manager.windows:
+                for area in window.screen.areas:
+                    area.tag_redraw()
+                window.screen.areas.update()
+
+            # 查找被标记为资产的数据块
+            asset_id = None
+            for collection in bpy.data.collections:
+                if collection.asset_data is not None:
+                    asset_id = collection
+                    break
+            if asset_id is None:
+                for obj in bpy.data.objects:
+                    if obj.asset_data is not None:
+                        asset_id = obj
+                        break
+
+            if asset_id is None:
+                cls._skip_count += 1
+                print(f"[MMY] 跳过 {blend_name}: 未找到已标记的资产")
+                cls._current_index += 1
+                self._process_next_file()
+                return
+
+            # 设置资产预览图
+            if not self._set_preview_correct(asset_id, preview_path):
+                cls._fail_count += 1
+                cls._error_details.append(f"{blend_name}: 预览图设置失败")
+                cls._current_index += 1
+                self._process_next_file()
+                return
+
+            # 切换 3D 视窗到材质预览模式
+            self._setup_viewport_for_preview()
+
+            # 注册 timer，延迟保存
+            bpy.app.timers.register(
+                self._delayed_save,
+                first_interval=0.5
+            )
+
+        except Exception as e:
+            import traceback
+            cls._fail_count += 1
+            cls._error_details.append(f"{blend_name}: {e}")
+            print(f"[MMY] 处理失败 {blend_name}: {traceback.format_exc()}")
+            cls._current_index += 1
+            self._process_next_file()
+
+    def _delayed_save(self):
+        """timer 回调：保存当前文件并继续"""
+        cls = MMY_OT_RefreshSelectedPreviews
+
+        file_info = cls._selected_files[cls._current_index]
+        blend_path = file_info['filepath']
+        blend_name = file_info['filename']
+
+        try:
+            bpy.ops.wm.save_mainfile(filepath=blend_path)
+            cls._success_count += 1
+            print(f"[MMY] 已刷新: {blend_name}")
+        except Exception as e:
+            cls._fail_count += 1
+            cls._error_details.append(f"{blend_name}: 保存失败 {e}")
+
+        cls._current_index += 1
+
+        if cls._current_index < len(cls._selected_files):
+            bpy.app.timers.register(
+                self._process_next_file_wrapper,
+                first_interval=0.2
+            )
+        else:
+            self._finish_processing()
+
+        return None
+
+    def _process_next_file_wrapper(self):
+        self._process_next_file()
+        return None
+
+    def _finish_processing(self):
+        """完成处理，返回原文件"""
+        cls = MMY_OT_RefreshSelectedPreviews
+
+        original_filepath = cls._original_filepath
+        if original_filepath and os.path.exists(original_filepath):
+            bpy.ops.wm.open_mainfile(filepath=original_filepath)
+        else:
+            bpy.ops.wm.read_homefile()
+
+        msg = f"完成: {cls._success_count} 成功, {cls._skip_count} 跳过, {cls._fail_count} 失败"
+        if cls._error_details:
+            msg += " | " + "; ".join(cls._error_details[:3])
+        print(f"[MMY] {msg}")
+
+        cls._selected_files = []
+        cls._current_index = 0
+
+    def _setup_viewport_for_preview(self):
+        """切换 3D 视窗到材质预览模式"""
+        try:
+            if bpy.context.mode != 'OBJECT':
+                bpy.ops.object.mode_set(mode='OBJECT')
+
+            for obj in bpy.data.objects:
+                if obj.visible_get():
+                    obj.select_set(True)
+            visible_objs = [obj for obj in bpy.data.objects if obj.visible_get()]
+            if visible_objs:
+                bpy.context.view_layer.objects.active = visible_objs[0]
+
+            for window in bpy.context.window_manager.windows:
+                for area in window.screen.areas:
+                    if area.type == 'VIEW_3D':
+                        space = area.spaces.active
+                        region = None
+                        for r in area.regions:
+                            if r.type == 'WINDOW':
+                                region = r
+                                break
+
+                        if space and hasattr(space, 'shading'):
+                            space.shading.type = 'MATERIAL'
+
+                        if space and region:
+                            with bpy.context.temp_override(window=window, area=area, region=region, space_data=space):
+                                bpy.ops.view3d.view_selected()
+                                bpy.ops.screen.screen_full_area(use_hide_panels=True)
+
+                        for r in area.regions:
+                            r.tag_redraw()
+                        return
+
+        except Exception as e:
+            print(f"[MMY] 切换视窗失败: {e}")
+
+    def _set_preview_correct(self, asset_id, preview_path):
+        """设置资产预览图"""
+        try:
+            if not os.path.exists(preview_path):
+                return False
+
+            with bpy.context.temp_override(id=asset_id):
+                bpy.ops.ed.lib_id_load_custom_preview(filepath=preview_path)
+            return True
+        except Exception as e:
+            print(f"[MMY] 设置预览图失败: {e}")
+            return False
+
+
 _classes = (
     MMY_OT_CreateAsset,
     MMY_OT_SelectAssetPath,
@@ -614,6 +1069,9 @@ _classes = (
     MMY_OT_RemoveFavoritePath,
     MMY_OT_SetPathFromHistory,
     MMY_OT_RefreshRecentPaths,
+    MMY_OT_ScanPreviewFiles,
+    MMY_OT_ClearPreviewList,
+    MMY_OT_RefreshSelectedPreviews,
     MMY_OT_RefreshAllPreviews,
 )
 

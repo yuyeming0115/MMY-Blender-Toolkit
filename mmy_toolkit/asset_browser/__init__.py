@@ -12,6 +12,7 @@ from ..config import (
 _classes = (
     properties.MMY_RecentPath,
     properties.MMY_FavoritePath,
+    properties.MMY_RefreshPreviewFileItem,  # 必须在 MMY_AssetCreatorProps 之前注册
     properties.MMY_AssetCreatorProps,
     operators.MMY_OT_CreateAsset,
     operators.MMY_OT_SelectAssetPath,
@@ -19,6 +20,13 @@ _classes = (
     operators.MMY_OT_RemoveFavoritePath,
     operators.MMY_OT_SetPathFromHistory,
     operators.MMY_OT_RefreshRecentPaths,
+    operators.MMY_OT_ScanPreviewFiles,
+    operators.MMY_OT_ClearPreviewList,
+    operators.MMY_OT_SelectAllPreviewFiles,
+    operators.MMY_OT_SelectWithPreview,
+    operators.MMY_OT_SelectNonePreview,
+    operators.MMY_OT_ManageExcludedFiles,
+    operators.MMY_OT_RefreshSelectedPreviews,
     operators.MMY_OT_RefreshAllPreviews,
 )
 

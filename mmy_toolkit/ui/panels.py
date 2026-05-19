@@ -122,9 +122,58 @@ class VIEW3D_PT_MMYMeshTools(bpy.types.Panel):
         # === 批量刷新预览图 ===
         if props.asset_path:
             layout.separator(factor=0.5)
-            row = layout.row()
-            row.scale_y = 1.2
-            row.operator("mmy.refresh_all_previews", text="批量刷新预览图", icon='FILE_REFRESH')
+            box = layout.box()
+            box.label(text="刷新预览图", icon='FILE_REFRESH')
+
+            # 扫描按钮
+            row = box.row(align=True)
+            row.operator("mmy.scan_preview_files", text="扫描目录", icon='VIEWZOOM')
+            if len(props.refresh_preview_files) > 0:
+                row.operator("mmy.clear_preview_list", text="清空", icon='X')
+
+            # 文件列表
+            if len(props.refresh_preview_files) > 0:
+                # 快捷选择按钮
+                row = box.row(align=True)
+                row.operator("mmy.select_all_preview_files", text="全选", icon='CHECKMARK')
+                row.operator("mmy.select_with_preview", text="有预览", icon='FILE_IMAGE')
+                row.operator("mmy.select_none_preview", text="无预览", icon='ERROR')
+                row.operator("mmy.manage_excluded_files", text="排除", icon='CANCEL')
+
+                # 显示文件列表（带勾选）
+                for item in props.refresh_preview_files:
+                    row = box.row(align=True)
+                    row.prop(item, "is_selected", text="")
+                    # 检查是否被排除
+                    is_excluded = item.filename in props.excluded_files
+                    if is_excluded:
+                        row.label(text=item.filename, icon='CANCEL')
+                        row.label(text="已排除", icon='X')
+                    elif item.has_preview:
+                        row.label(text=item.filename, icon='FILE_BLEND')
+                        row.label(text="有预览", icon='CHECKMARK')
+                    else:
+                        # 无预览用红色标注
+                        row.alert = True
+                        row.label(text=item.filename, icon='FILE_BLEND')
+                        row.label(text="无预览", icon='X')
+                        row.alert = False
+
+                # 统计选中数量（排除已排除的文件）
+                selected_with_preview = sum(
+                    1 for item in props.refresh_preview_files
+                    if item.is_selected and item.has_preview
+                    and item.filename not in props.excluded_files
+                )
+
+                # 刷新按钮
+                row = box.row()
+                row.scale_y = 1.2
+                if selected_with_preview > 0:
+                    row.operator("mmy.refresh_selected_previews",
+                                 text=f"刷新选中 ({selected_with_preview})", icon='PLAY')
+                else:
+                    row.label(text="请选中有预览图的文件", icon='ERROR')
 
         # 显示选中对象数量
         selected_count = len(context.selected_objects)

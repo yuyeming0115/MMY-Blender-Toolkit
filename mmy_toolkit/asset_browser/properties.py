@@ -41,6 +41,15 @@ class MMY_FavoritePath(bpy.types.PropertyGroup):
     alias: StringProperty(name="别名", default="")
 
 
+class MMY_RefreshPreviewFileItem(bpy.types.PropertyGroup):
+    """刷新预览图文件项"""
+    filepath: StringProperty(name="文件路径", default="")
+    filename: StringProperty(name="文件名", default="")
+    has_preview: BoolProperty(name="有预览图", default=False)
+    preview_path: StringProperty(name="预览图路径", default="")
+    is_selected: BoolProperty(name="选中", default=True)  # 默认选中
+
+
 # ── 模块级缓存：Blender C 端要求 Python 端保持对 items 列表的持久引用，
 # 否则非 ASCII 字符会因引用丢失而显示乱码。
 _CATALOG_ITEMS_CACHE = []
@@ -212,10 +221,24 @@ class MMY_AssetCreatorProps(bpy.types.PropertyGroup):
         default=True
     )
 
+    # === 刷新预览图 ===
+    refresh_preview_files: CollectionProperty(
+        type=MMY_RefreshPreviewFileItem,
+        name="刷新预览图文件列表"
+    )
+    refresh_preview_index: IntProperty(default=0)
+
+    # === 排除文件列表（持久化存储）===
+    excluded_files: CollectionProperty(
+        type=MMY_RecentPath,  # 复用 MMY_RecentPath 作为简单字符串存储
+        name="排除刷新的文件"
+    )
+
 
 _classes = (
     MMY_RecentPath,
     MMY_FavoritePath,
+    MMY_RefreshPreviewFileItem,
     MMY_AssetCreatorProps,
 )
 
