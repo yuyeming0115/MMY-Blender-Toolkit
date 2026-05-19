@@ -120,6 +120,7 @@ class MMY_OT_ImportFBX(bpy.types.Operator):
     def execute(self, context):
         use_anim = context.scene.mmy_import_anim
         reuse_materials = context.scene.mmy_reuse_materials
+        clear_transforms = context.scene.mmy_clear_transforms
 
         try:
             # 导入前记录当前场景中的对象
@@ -134,6 +135,10 @@ class MMY_OT_ImportFBX(bpy.types.Operator):
             # 如果勾选了引用已有材质
             if reuse_materials and new_objs:
                 self._reuse_existing_materials(new_objs)
+
+            # 如果勾选了清零变换
+            if clear_transforms and new_objs:
+                self._clear_transforms(new_objs)
 
             self.report({'INFO'}, f"已导入: {self.filepath}")
         except Exception as e:
@@ -163,6 +168,20 @@ class MMY_OT_ImportFBX(bpy.types.Operator):
                             replaced_count += 1
         if replaced_count > 0:
             self.report({'INFO'}, f"已替换 {replaced_count} 个同名材质")
+
+    def _clear_transforms(self, new_objects):
+        """清除导入对象的位移、缩放、旋转"""
+        cleared_count = 0
+        for obj in new_objects:
+            # 清除位移
+            obj.location = (0, 0, 0)
+            # 清除旋转（使用欧拉角）
+            obj.rotation_euler = (0, 0, 0)
+            # 清除缩放
+            obj.scale = (1, 1, 1)
+            cleared_count += 1
+        if cleared_count > 0:
+            self.report({'INFO'}, f"已清零 {cleared_count} 个对象的变换")
 
 
 class MMY_OT_BetterImportFBX(bpy.types.Operator):

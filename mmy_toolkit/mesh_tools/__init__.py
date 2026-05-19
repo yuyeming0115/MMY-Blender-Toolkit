@@ -20,6 +20,11 @@ def register():
         description="导入FBX时，如果场景中已有同名材质则使用现有材质",
         default=True
     )
+    bpy.types.Scene.mmy_clear_transforms = bpy.props.BoolProperty(
+        name="清零变换",
+        description="导入后清除模型的位移、缩放、旋转",
+        default=True
+    )
 
     for cls in _classes:
         try:
@@ -36,6 +41,7 @@ def unregister():
     # 删除场景属性
     del bpy.types.Scene.mmy_import_anim
     del bpy.types.Scene.mmy_reuse_materials
+    del bpy.types.Scene.mmy_clear_transforms
 
     for cls in reversed(_classes):
         try:
