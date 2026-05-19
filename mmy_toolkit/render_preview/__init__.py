@@ -3,7 +3,20 @@ import os
 import subprocess
 import sys
 
-from bpy.props import BoolProperty
+from bpy.props import BoolProperty, StringProperty, EnumProperty
+
+
+# ── 模块级缓存：EnumProperty items 列表需要持久引用 ──
+_TEMP_SUFFIX_MODE_CACHE = []
+
+
+def get_temp_suffix_mode_items(self, context):
+    """动态获取临时后缀处理模式选项"""
+    _TEMP_SUFFIX_MODE_CACHE.clear()
+    _TEMP_SUFFIX_MODE_CACHE.append(('default', "使用配置", "使用偏好设置中的后缀去除列表"))
+    _TEMP_SUFFIX_MODE_CACHE.append(('none', "不去除", "保留原始文件名，不去除任何后缀"))
+    _TEMP_SUFFIX_MODE_CACHE.append(('custom', "自定义", "指定要去除的后缀"))
+    return _TEMP_SUFFIX_MODE_CACHE
 
 
 class MMY_OT_RenderPreview(bpy.types.Operator):
@@ -16,6 +29,19 @@ class MMY_OT_RenderPreview(bpy.types.Operator):
         name="自动打开文件夹",
         description="渲染完成后自动打开 Render 文件夹",
         default=True
+    )
+
+    # 临时后缀处理模式（用于下拉菜单选项）
+    temp_suffix_mode: EnumProperty(
+        name="后缀处理",
+        items=get_temp_suffix_mode_items,
+        default='default'
+    )
+
+    custom_suffix: StringProperty(
+        name="自定义后缀",
+        description="指定要去除的后缀",
+        default="_Render"
     )
 
     @classmethod
@@ -34,11 +60,8 @@ class MMY_OT_RenderPreview(bpy.types.Operator):
         blend_dir = os.path.dirname(blend_path)
         blend_name = os.path.splitext(os.path.basename(blend_path))[0]
 
-        # 去掉 _Render 后缀
-        if blend_name.endswith("_Render"):
-            output_name = blend_name[:-7]
-        else:
-            output_name = blend_name
+        # 根据模式处理后缀去除
+        output_name = self._process_suffix(blend_name, context)
 
         # 构建 Render 目录
         render_dir = os.path.join(blend_dir, "Render")
@@ -50,8 +73,13 @@ class MMY_OT_RenderPreview(bpy.types.Operator):
         # 设置渲染参数
         scene = context.scene
         original_filepath = scene.render.filepath
-        original_format = scene.render.file_format
         original_color_mode = scene.render.image_settings.color_mode
+
+        # Blender 5.x: file_format 在 image_settings 下
+        try:
+            original_format = scene.render.image_settings.file_format
+        except AttributeError:
+            original_format = None
 
         # 保存原始帧号
         original_frame = scene.frame_current
@@ -62,7 +90,7 @@ class MMY_OT_RenderPreview(bpy.types.Operator):
 
             # 设置输出参数
             scene.render.filepath = output_path
-            scene.render.file_format = 'PNG'
+            scene.render.image_settings.file_format = 'PNG'
             scene.render.image_settings.color_mode = 'RGBA'
 
             # 执行渲染
@@ -80,11 +108,33 @@ class MMY_OT_RenderPreview(bpy.types.Operator):
         finally:
             # 恢复原始设置
             scene.render.filepath = original_filepath
-            scene.render.file_format = original_format
+            if original_format:
+                scene.render.image_settings.file_format = original_format
             scene.render.image_settings.color_mode = original_color_mode
             scene.frame_set(original_frame)
 
         return {'FINISHED'}
+
+    def _process_suffix(self, blend_name, context):
+        """根据配置处理文件名后缀"""
+        if self.temp_suffix_mode == 'none':
+            # 不去除任何后缀
+            return blend_name
+
+        elif self.temp_suffix_mode == 'custom':
+            # 使用自定义后缀
+            if blend_name.endswith(self.custom_suffix):
+                return blend_name[:-len(self.custom_suffix)]
+            return blend_name
+
+        else:  # 'default' - 使用偏好设置中的列表
+            addon = context.preferences.addons.get("mmy_toolkit")
+            if addon and addon.preferences:
+                suffixes = [item.name for item in addon.preferences.render_remove_suffixes]
+                for suffix in suffixes:
+                    if blend_name.endswith(suffix):
+                        return blend_name[:-len(suffix)]
+            return blend_name
 
     def _crop_transparent_border(self, image_path):
         """裁剪图片的透明边缘"""
@@ -190,18 +240,88 @@ class MMY_OT_RenderPreview(bpy.types.Operator):
             print(f"[MMY] 打开文件夹失败: {e}")
 
 
+class MMY_OT_RenderPreviewNoSuffix(bpy.types.Operator):
+    """渲染预览图（不去除后缀）"""
+    bl_idname = "mmy.render_preview_no_suffix"
+    bl_label = "不去除后缀"
+    bl_options = {'REGISTER'}
+
+    def execute(self, context):
+        # 调用主 Operator，设置模式为 'none'
+        bpy.ops.mmy.render_preview(temp_suffix_mode='none')
+        return {'FINISHED'}
+
+
+class MMY_OT_RenderPreviewCustomSuffix(bpy.types.Operator):
+    """渲染预览图（自定义后缀）"""
+    bl_idname = "mmy.render_preview_custom_suffix"
+    bl_label = "自定义后缀"
+    bl_options = {'REGISTER'}
+
+    custom_suffix: StringProperty(
+        name="要去除的后缀",
+        default="_Render"
+    )
+
+    def invoke(self, context, event):
+        return context.window_manager.invoke_props_dialog(self, width=200)
+
+    def draw(self, context):
+        layout = self.layout
+        layout.prop(self, "custom_suffix")
+
+    def execute(self, context):
+        bpy.ops.mmy.render_preview(temp_suffix_mode='custom', custom_suffix=self.custom_suffix)
+        return {'FINISHED'}
+
+
+class MMY_MT_RenderPreviewMenu(bpy.types.Menu):
+    """渲染预览图下拉菜单"""
+    bl_idname = "MMY_MT_render_preview_menu"
+    bl_label = "渲染预览图选项"
+
+    def draw(self, context):
+        layout = self.layout
+
+        # 默认：使用配置
+        layout.operator("mmy.render_preview", text="使用配置", icon='CHECKMARK').temp_suffix_mode = 'default'
+
+        # 不去除后缀
+        layout.operator("mmy.render_preview_no_suffix", text="不去除后缀", icon='X')
+
+        # 自定义后缀
+        layout.operator("mmy.render_preview_custom_suffix", text="自定义后缀...", icon='EDIT')
+
+        layout.separator()
+
+        # 显示当前配置的后缀列表
+        addon = context.preferences.addons.get("mmy_toolkit")
+        if addon and addon.preferences:
+            suffixes = [item.name for item in addon.preferences.render_remove_suffixes]
+            if suffixes:
+                layout.label(text="当前去除列表:")
+                for suffix in suffixes:
+                    layout.label(text=f"  {suffix}", icon='DOT')
+
+
 _classes = (
     MMY_OT_RenderPreview,
+    MMY_OT_RenderPreviewNoSuffix,
+    MMY_OT_RenderPreviewCustomSuffix,
+    MMY_MT_RenderPreviewMenu,
 )
 
 
 def _append_render_button(self, context):
-    """在 3D 视图 Header 添加渲染按钮"""
+    """在 3D 视图 Header 添加渲染按钮和下拉菜单"""
     layout = self.layout
     # 只在对象模式下显示
     if context.mode == 'OBJECT':
         layout.separator()
-        layout.operator("mmy.render_preview", text="", icon='RENDER_STILL')
+        # 主按钮 + 下拉菜单
+        row = layout.row(align=True)
+        row.operator("mmy.render_preview", text="", icon='RENDER_STILL')
+        row.menu("MMY_MT_render_preview_menu", text="", icon='DOWNARROW_HLT')
 
 
 def register():

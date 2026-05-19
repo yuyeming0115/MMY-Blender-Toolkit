@@ -168,6 +168,31 @@ class MMY_OT_RemoveSuffix(bpy.types.Operator):
         return {"FINISHED"}
 
 
+class MMY_OT_AddRenderSuffix(bpy.types.Operator):
+    """添加渲染后缀去除项"""
+    bl_idname = "mmy.add_render_suffix"
+    bl_label = "添加后缀"
+
+    def execute(self, context):
+        prefs = context.preferences.addons["mmy_toolkit"].preferences
+        item = prefs.render_remove_suffixes.add()
+        item.name = "_New"
+        return {"FINISHED"}
+
+
+class MMY_OT_RemoveRenderSuffix(bpy.types.Operator):
+    """删除渲染后缀去除项"""
+    bl_idname = "mmy.remove_render_suffix"
+    bl_label = "删除后缀"
+
+    index: bpy.props.IntProperty()
+
+    def execute(self, context):
+        prefs = context.preferences.addons["mmy_toolkit"].preferences
+        prefs.render_remove_suffixes.remove(self.index)
+        return {"FINISHED"}
+
+
 class MMY_OT_SavePreset(bpy.types.Operator):
     bl_idname = "mmy.save_preset"
     bl_label = "保存为预设"
@@ -259,6 +284,9 @@ class MMY_Preferences(bpy.types.AddonPreferences):
     bl_idname = "mmy_toolkit"
 
     current_suffixes: bpy.props.CollectionProperty(type=MMY_SuffixItem)
+
+    # === 渲染预览图后缀去除列表 ===
+    render_remove_suffixes: bpy.props.CollectionProperty(type=MMY_SuffixItem)
 
     # 自动备份属性
     enabled_backup: bpy.props.BoolProperty(
@@ -355,6 +383,22 @@ class MMY_Preferences(bpy.types.AddonPreferences):
         # 提示
         layout.separator()
         layout.label(text="预设文件: presets/suffix_presets.json（可迁移）")
+
+        layout.separator()
+
+        # === 渲染预览图后缀去除配置 ===
+        layout.label(text="渲染预览图后缀去除:", icon='RENDER_STILL')
+        box = layout.box()
+        row = box.row()
+        row.label(text="渲染时自动去掉以下后缀:")
+        for i, item in enumerate(self.render_remove_suffixes):
+            r = box.row(align=True)
+            r.prop(item, "name", text="")
+            op = r.operator("mmy.remove_render_suffix", text="", icon="X")
+            op.index = i
+        r = box.row(align=True)
+        r.operator("mmy.add_render_suffix", text="添加后缀", icon="ADD")
+        r.label(text="示例: Model_Render.blend → Model.png")
 
         layout.separator()
 
@@ -476,6 +520,8 @@ _classes = (
     MMY_OT_SelectPreset,
     MMY_OT_AddSuffix,
     MMY_OT_RemoveSuffix,
+    MMY_OT_AddRenderSuffix,
+    MMY_OT_RemoveRenderSuffix,
     MMY_OT_SavePreset,
     MMY_OT_DeletePreset,
     MMY_OT_OpenPrefs,
@@ -578,6 +624,13 @@ def register():
         if len(addon.preferences.current_suffixes) == 0:
             for suffix in get_current_suffixes():
                 item = addon.preferences.current_suffixes.add()
+                item.name = suffix
+
+        # 初始化默认渲染后缀去除列表
+        if len(addon.preferences.render_remove_suffixes) == 0:
+            default_render_suffixes = ["_Render", "_Preview", "_Test"]
+            for suffix in default_render_suffixes:
+                item = addon.preferences.render_remove_suffixes.add()
                 item.name = suffix
 
     # 启动自动备份定时器（类注册后）
