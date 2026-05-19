@@ -165,13 +165,25 @@ class VIEW3D_PT_MMYMeshTools(bpy.types.Panel):
         box = layout.box()
         box.label(text="骨骼缩放", icon='ARMATURE_DATA')
 
-        # 选择目标骨骼
+        # 选择目标骨骼 + 创建约束 + 启用开关
         row = box.row(align=True)
         row.prop(props, "target_armature_enum", text="骨骼")
 
         # 创建约束按钮
         if props.target_armature_enum != "none":
             row.operator("mmy.create_scale_constraint", text="创建约束", icon='CONSTRAINT')
+
+            # 如果约束已存在，显示启用开关
+            armature_name = props.target_armature_enum
+            if armature_name != "none":
+                # 解码骨骼名
+                from ..mat_replacer.properties import decode_armature_id
+                real_name = decode_armature_id(armature_name)
+                armature = bpy.data.objects.get(real_name) if real_name else None
+                if armature:
+                    has_constraint = any(c.name == "MMY_Copy_Scale" for c in armature.constraints)
+                    if has_constraint:
+                        row.prop(props, "constraint_enabled", text="", icon='CHECKMARK' if props.constraint_enabled else 'X')
 
         # 缩放控制（如果Scale物体存在）
         scale_obj = bpy.data.objects.get("Scale")

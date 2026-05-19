@@ -414,6 +414,8 @@ class MMY_OT_CreateScaleConstraint(bpy.types.Operator):
 
         if existing_constraint:
             self.report({'WARNING'}, "骨骼已有缩放约束，跳过添加")
+            # 同步约束状态到属性
+            props.constraint_enabled = not existing_constraint.mute
         else:
             constraint = armature.constraints.new('COPY_SCALE')
             constraint.name = "MMY_Copy_Scale"
@@ -421,9 +423,10 @@ class MMY_OT_CreateScaleConstraint(bpy.types.Operator):
             constraint.use_x = True
             constraint.use_y = True
             constraint.use_z = True
-            constraint.use_offset = props.use_offset  # 使用偏移选项
+            constraint.use_offset = props.use_offset
             constraint.owner_space = 'LOCAL'
             constraint.target_space = 'LOCAL'
+            constraint.mute = not props.constraint_enabled  # 根据属性设置启用状态
             self.report({'INFO'}, f"已给 {armature_name} 添加 Copy Scale 约束")
 
         props.scale_value = scale_obj.scale.x
