@@ -157,7 +157,15 @@ class VIEW3D_PT_MMYMeshTools(bpy.types.Panel):
             filename = os.path.basename(props.external_file)
             row.label(text=filename)
 
-        # Step 2: 勾选要Link的材质 + 映射列表（双列）
+        # Step 2: Link按钮 + 替换按钮（同一行）
+        if len(props.external_materials) > 0:
+            row = box.row(align=True)
+            row.operator("mmy.link_materials", text="Link并生成映射", icon='LINK_BLEND')
+            if len(props.mappings) > 0:
+                row.operator("mmy.execute_replace", text="替换", icon='PLAY')
+            row.operator("mmy.clear_all", text="清除", icon='X')
+
+        # 双列布局：外部材质勾选 + 映射列表
         if len(props.external_materials) > 0:
             split = box.split(factor=0.35)
 
@@ -170,29 +178,16 @@ class VIEW3D_PT_MMYMeshTools(bpy.types.Panel):
                 short = item.name[:18] + ".." if len(item.name) > 18 else item.name
                 row.label(text=short)
 
-            # 右列：映射列表（场景材质 → 下拉选择）
+            # 右列：映射列表
             right = split.column()
             right.label(text="映射:", icon='MATERIAL')
 
             if len(props.mappings) > 0:
                 for mapping in props.mappings:
                     row = right.row(align=True)
-                    # 源材质名
                     src_short = mapping.source_mat_name[:12] + ".." if len(mapping.source_mat_name) > 12 else mapping.source_mat_name
                     row.label(text=src_short)
-                    # 下拉选择框
                     row.prop(mapping, "target_mat_id", text="")
-
-                # 执行按钮
-                row = right.row(align=True)
-                row.operator("mmy.execute_replace", text="替换", icon='PLAY')
-            else:
-                right.label(text="(点击Link生成映射)")
-
-            # 底部：Link按钮
-            row = box.row(align=True)
-            row.operator("mmy.link_materials", text="Link并生成映射", icon='LINK_BLEND')
-            row.operator("mmy.clear_all", text="清除", icon='X')
 
 
 _classes = (
