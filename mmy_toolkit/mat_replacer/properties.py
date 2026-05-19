@@ -72,6 +72,22 @@ def _update_constraint_offset(self, context):
             break
 
 
+def _update_constraint_enabled(self, context):
+    """当启用状态改变时，更新约束的mute设置"""
+    armature_name = decode_armature_id(self.target_armature_enum)
+    if not armature_name:
+        return
+
+    armature = bpy.data.objects.get(armature_name)
+    if not armature:
+        return
+
+    for c in armature.constraints:
+        if c.name == "MMY_Copy_Scale":
+            c.mute = not self.constraint_enabled
+            break
+
+
 class MMY_MaterialMappingItem(bpy.types.PropertyGroup):
     """材质映射项：场景材质 → Link材质选择"""
     source_mat_name: StringProperty(name="场景材质", default="")
@@ -137,22 +153,6 @@ class MMY_MatReplacerProps(bpy.types.PropertyGroup):
         description="启用/禁用缩放约束",
         update=_update_constraint_enabled
     )
-
-
-def _update_constraint_enabled(self, context):
-    """当启用状态改变时，更新约束的mute设置"""
-    armature_name = decode_armature_id(self.target_armature_enum)
-    if not armature_name:
-        return
-
-    armature = bpy.data.objects.get(armature_name)
-    if not armature:
-        return
-
-    for c in armature.constraints:
-        if c.name == "MMY_Copy_Scale":
-            c.mute = not self.constraint_enabled
-            break
 
 
 _classes = (
