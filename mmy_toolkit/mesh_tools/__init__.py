@@ -18,7 +18,7 @@ def register():
     bpy.types.Scene.mmy_reuse_materials = bpy.props.BoolProperty(
         name="引用已有材质",
         description="导入FBX时，如果场景中已有同名材质则使用现有材质",
-        default=False
+        default=True
     )
 
     for cls in _classes:
