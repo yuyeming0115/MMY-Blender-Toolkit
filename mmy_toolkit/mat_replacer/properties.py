@@ -1,10 +1,10 @@
 """材质替换器属性定义"""
 
 import bpy
-from bpy.props import StringProperty, CollectionProperty, IntProperty, BoolProperty, EnumProperty
+from bpy.props import StringProperty, CollectionProperty, IntProperty, BoolProperty, EnumProperty, FloatProperty
 
 
-# 目标材质枚举缓存
+# === 材质枚举缓存 ===
 _TARGET_MAT_CACHE = []
 
 def get_target_mat_items(self, context):
@@ -12,7 +12,6 @@ def get_target_mat_items(self, context):
     _TARGET_MAT_CACHE.clear()
     _TARGET_MAT_CACHE.append(("none", "不替换", ""))
 
-    # 从 bpy.data.materials 获取 Link 材质
     for mat in bpy.data.materials:
         if mat.library is not None:
             display = mat.name.split('@')[0] if '@' in mat.name else mat.name
@@ -20,6 +19,41 @@ def get_target_mat_items(self, context):
             _TARGET_MAT_CACHE.append((safe_id, display, ""))
 
     return _TARGET_MAT_CACHE
+
+
+# === 骨骼对象枚举缓存 ===
+_ARMATURE_CACHE = []
+
+def get_armature_items(self, context):
+    """获取场景中的Armature类型对象列表"""
+    _ARMATURE_CACHE.clear()
+    _ARMATURE_CACHE.append(("none", "未选择", ""))
+
+    for obj in bpy.data.objects:
+        if obj.type == 'ARMATURE':
+            safe_id = 'c' + obj.name.encode('utf-8').hex()
+            _ARMATURE_CACHE.append((safe_id, obj.name, ""))
+
+    return _ARMATURE_CACHE
+
+
+def decode_armature_id(safe_id):
+    """解码安全枚举ID，返回骨骼名"""
+    if safe_id == "none":
+        return None
+    if safe_id.startswith('c'):
+        try:
+            return bytes.fromhex(safe_id[1:]).decode('utf-8')
+        except:
+            return safe_id
+    return safe_id
+
+
+def _update_scale_value(self, context):
+    """当缩放值改变时，更新Scale空物体的缩放"""
+    scale_obj = bpy.data.objects.get("Scale")
+    if scale_obj:
+        scale_obj.scale = (self.scale_value, self.scale_value, self.scale_value)
 
 
 class MMY_MaterialMappingItem(bpy.types.PropertyGroup):
@@ -58,6 +92,23 @@ class MMY_MatReplacerProps(bpy.types.PropertyGroup):
     anim_file: StringProperty(subtype="FILE_PATH", default="", name="动画文件")
     has_ani_collection: BoolProperty(default=False, name="存在Ani集合")
     ani_collection_name: StringProperty(default="", name="Ani集合名")
+
+    # === 骨骼缩放控制属性 ===
+    target_armature_enum: EnumProperty(
+        items=get_armature_items,
+        name="目标骨骼",
+        description="选择要添加缩放约束的骨骼对象"
+    )
+    scale_value: FloatProperty(
+        name="缩放值",
+        default=1.0,
+        min=0.01,
+        max=10.0,
+        soft_min=0.1,
+        soft_max=5.0,
+        description="Scale空物体的缩放值",
+        update=_update_scale_value
+    )
 
 
 _classes = (

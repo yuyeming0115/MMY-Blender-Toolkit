@@ -380,6 +380,74 @@ class MMY_OT_LinkAnimation(bpy.types.Operator):
         return {'FINISHED'}
 
 
+# === 骨骼缩放约束操作符 ===
+
+class MMY_OT_CreateScaleConstraint(bpy.types.Operator):
+    """创建Scale空物体并给骨骼添加Copy Scale约束"""
+    bl_idname = "mmy.create_scale_constraint"
+    bl_label = "创建缩放约束"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        props = context.scene.mmy_mat_replacer
+        return props.target_armature_enum != "none"
+
+    def execute(self, context):
+        props = context.scene.mmy_mat_replacer
+
+        # 解码骨骼名称
+        from .properties import decode_armature_id
+        armature_name = decode_armature_id(props.target_armature_enum)
+
+        if not armature_name:
+            self.report({'ERROR'}, "请选择目标骨骼")
+            return {'CANCELLED'}
+
+        armature = bpy.data.objects.get(armature_name)
+        if not armature:
+            self.report({'ERROR'}, f"未找到骨骼: {armature_name}")
+            return {'CANCELLED'}
+
+        # 创建或获取Scale空物体
+        scale_obj = bpy.data.objects.get("Scale")
+        if not scale_obj:
+            scale_obj = bpy.data.objects.new("Scale", None)
+            scale_obj.empty_display_type = 'PLAIN_AXES'
+            scale_obj.location = (0, 0, 0)
+            scale_obj.scale = (1.0, 1.0, 1.0)
+            context.scene.collection.objects.link(scale_obj)
+            self.report({'INFO'}, "已创建 Scale 空物体")
+        else:
+            self.report({'INFO'}, "复用已存在的 Scale 空物体")
+
+        # 检查是否已有同名约束
+        existing_constraint = None
+        for c in armature.constraints:
+            if c.name == "MMY_Copy_Scale":
+                existing_constraint = c
+                break
+
+        if existing_constraint:
+            self.report({'WARNING'}, "骨骼已有缩放约束，跳过添加")
+        else:
+            # 添加Copy Scale约束
+            constraint = armature.constraints.new('COPY_SCALE')
+            constraint.name = "MMY_Copy_Scale"
+            constraint.target = scale_obj
+            constraint.use_x = True
+            constraint.use_y = True
+            constraint.use_z = True
+            constraint.owner_space = 'LOCAL'
+            constraint.target_space = 'LOCAL'
+            self.report({'INFO'}, f"已给 {armature_name} 添加 Copy Scale 约束")
+
+        # 同步缩放值到属性
+        props.scale_value = scale_obj.scale.x
+
+        return {'FINISHED'}
+
+
 _classes = (
     MMY_OT_SelectExternalFile,
     MMY_OT_LinkMaterials,
@@ -387,6 +455,52 @@ _classes = (
     MMY_OT_ClearAll,
     MMY_OT_SelectAnimFile,
     MMY_OT_LinkAnimation,
+    MMY_OT_CreateScaleConstraint,
+)
+
+
+def register():
+    for cls in _classes:
+        bpy.utils.register_class(cls)
+
+
+def unregister():
+    for cls in reversed(_classes):
+        try:
+            bpy.utils.unregister_class(cls)
+        except:
+            pass
+                    break
+
+            if existing_constraint:
+                self.report({'WARNING'}, "骨骼已有缩放约束，跳过添加")
+            else:
+                # 添加Copy Scale约束
+                constraint = armature.constraints.new('COPY_SCALE')
+                constraint.name = "MMY_Copy_Scale"
+                constraint.target = scale_obj
+                constraint.use_x = True
+                constraint.use_y = True
+                constraint.use_z = True
+                constraint.owner_space = 'LOCAL'
+                constraint.target_space = 'LOCAL'
+
+                self.report({'INFO'}, f"已给 {armature_name} 添加 Copy Scale 约束")
+
+            # 同步缩放值到属性
+            props.scale_value = scale_obj.scale.x
+
+            return {'FINISHED'}
+
+
+_classes = (
+    MMY_OT_SelectExternalFile,
+    MMY_OT_LinkMaterials,
+    MMY_OT_ExecuteReplace,
+    MMY_OT_ClearAll,
+    MMY_OT_SelectAnimFile,
+    MMY_OT_LinkAnimation,
+    MMY_OT_CreateScaleConstraint,
 )
 
 

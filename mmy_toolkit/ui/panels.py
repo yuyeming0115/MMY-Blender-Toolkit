@@ -146,6 +146,42 @@ class VIEW3D_PT_MMYMeshTools(bpy.types.Panel):
             box4.label(text="关联动画", icon='ANIM_DATA')
             box4.label(text=f"加载错误: {str(e)}", icon='ERROR')
 
+        # 骨骼缩放控制区块
+        try:
+            self._draw_armature_scale(layout, context)
+        except Exception as e:
+            box5 = layout.box()
+            box5.label(text="骨骼缩放", icon='ARMATURE_DATA')
+            box5.label(text=f"加载错误: {str(e)}", icon='ERROR')
+
+    def _draw_armature_scale(self, layout, context):
+        """绘制骨骼缩放控制区块"""
+        if not hasattr(context.scene, 'mmy_mat_replacer'):
+            return
+
+        props = context.scene.mmy_mat_replacer
+
+        layout.separator()
+        box = layout.box()
+        box.label(text="骨骼缩放", icon='ARMATURE_DATA')
+
+        # 选择目标骨骼
+        row = box.row(align=True)
+        row.prop(props, "target_armature_enum", text="骨骼")
+
+        # 创建约束按钮
+        if props.target_armature_enum != "none":
+            row.operator("mmy.create_scale_constraint", text="创建约束", icon='CONSTRAINT')
+
+        # 缩放控制滑块（如果Scale物体存在）
+        scale_obj = bpy.data.objects.get("Scale")
+        if scale_obj:
+            layout.separator(factor=0.3)
+            row = box.row(align=True)
+            row.prop(props, "scale_value", text="缩放", slider=True)
+            # 显示当前Scale物体的实际缩放值
+            row.label(text=f"({scale_obj.scale.x:.2f})")
+
     def _draw_anim_linker(self, layout, context):
         """绘制动画关联区块"""
         if not hasattr(context.scene, 'mmy_mat_replacer'):
