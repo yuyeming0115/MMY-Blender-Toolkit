@@ -492,6 +492,7 @@ from . import asset_browser
 from . import auto_color_space
 from . import camera_tools
 from . import auto_backup
+from . import mat_replacer
 
 
 # ============ 快捷键注册 ============
@@ -538,6 +539,7 @@ def register():
     auto_color_space.register()
     camera_tools.register()
     auto_backup.register()
+    mat_replacer.register()
 
     # 注册所有类
     for cls in _classes:
@@ -585,6 +587,7 @@ def unregister():
     _unregister_keymaps()
 
     # 注销子模块
+    mat_replacer.unregister()
     auto_backup.unregister()
     camera_tools.unregister()
     auto_color_space.unregister()

@@ -130,6 +130,70 @@ class VIEW3D_PT_MMYMeshTools(bpy.types.Panel):
         else:
             layout.label(text="请选择要转为资产的对象", icon='ERROR')
 
+        # 材质替换区块
+        try:
+            self._draw_mat_replacer(layout, context)
+        except Exception as e:
+            box3 = layout.box()
+            box3.label(text="材质替换", icon='MATERIAL')
+            box3.label(text=f"加载错误: {str(e)}", icon='ERROR')
+
+    def _draw_mat_replacer(self, layout, context):
+        """绘制材质替换区块"""
+        if not hasattr(context.scene, 'mmy_mat_replacer'):
+            return
+
+        props = context.scene.mmy_mat_replacer
+
+        layout.separator()
+        box = layout.box()
+        box.label(text="材质替换", icon='MATERIAL')
+
+        # Step 1: 选择外部文件
+        row = box.row(align=True)
+        row.operator("mmy.select_external_file", text="选择外部文件", icon='FILE_FOLDER')
+        if props.external_file:
+            import os
+            filename = os.path.basename(props.external_file)
+            row.label(text=filename)
+
+        # Step 2: 勾选要Link的材质 + 映射列表（双列）
+        if len(props.external_materials) > 0:
+            split = box.split(factor=0.35)
+
+            # 左列：外部材质勾选
+            left = split.column()
+            left.label(text="外部材质:", icon='LINKED')
+            for item in props.external_materials:
+                row = left.row(align=True)
+                row.prop(item, "is_selected", text="")
+                short = item.name[:18] + ".." if len(item.name) > 18 else item.name
+                row.label(text=short)
+
+            # 右列：映射列表（场景材质 → 下拉选择）
+            right = split.column()
+            right.label(text="映射:", icon='MATERIAL')
+
+            if len(props.mappings) > 0:
+                for mapping in props.mappings:
+                    row = right.row(align=True)
+                    # 源材质名
+                    src_short = mapping.source_mat_name[:12] + ".." if len(mapping.source_mat_name) > 12 else mapping.source_mat_name
+                    row.label(text=src_short)
+                    # 下拉选择框
+                    row.prop(mapping, "target_mat_id", text="")
+
+                # 执行按钮
+                row = right.row(align=True)
+                row.operator("mmy.execute_replace", text="替换", icon='PLAY')
+            else:
+                right.label(text="(点击Link生成映射)")
+
+            # 底部：Link按钮
+            row = box.row(align=True)
+            row.operator("mmy.link_materials", text="Link并生成映射", icon='LINK_BLEND')
+            row.operator("mmy.clear_all", text="清除", icon='X')
+
 
 _classes = (
     MMY_MT_FavoritePathMenu,
