@@ -260,6 +260,48 @@ class MMY_Preferences(bpy.types.AddonPreferences):
 
     current_suffixes: bpy.props.CollectionProperty(type=MMY_SuffixItem)
 
+    # 自动备份属性
+    enabled_backup: bpy.props.BoolProperty(
+        name="启用自动备份",
+        description="开启定时自动备份功能",
+        default=True
+    )
+    minor_interval_backup: bpy.props.IntProperty(
+        name="小版本间隔（分钟）",
+        description="小版本备份的时间间隔",
+        default=2,
+        min=1,
+        max=60
+    )
+    major_interval_backup: bpy.props.IntProperty(
+        name="大版本间隔（分钟）",
+        description="大版本备份的时间间隔",
+        default=30,
+        min=5,
+        max=120
+    )
+    daily_max_backups: bpy.props.IntProperty(
+        name="每日最大备份数",
+        description="每个日期文件夹内每种类型的最大备份数量",
+        default=20,
+        min=5,
+        max=100
+    )
+    keep_days_backup: bpy.props.IntProperty(
+        name="保留天数",
+        description="保留最近多少天的备份文件夹",
+        default=7,
+        min=1,
+        max=30
+    )
+    capacity_threshold_mb: bpy.props.IntProperty(
+        name="容量警告阈值（MB）",
+        description="超过此容量时在状态栏显示警告",
+        default=500,
+        min=100,
+        max=5000
+    )
+
     def draw(self, context):
         layout = self.layout
 
@@ -314,6 +356,58 @@ class MMY_Preferences(bpy.types.AddonPreferences):
         layout.separator()
         layout.label(text="预设文件: presets/suffix_presets.json（可迁移）")
 
+        layout.separator()
+
+        # === 自动备份设置 ===
+        layout.label(text="自动备份设置:", icon='FILE_BACKUP')
+        box = layout.box()
+
+        # 启用开关
+        row = box.row()
+        row.prop(self, "enabled_backup", text="启用自动备份")
+
+        try:
+            enabled = bool(self.enabled_backup)
+        except:
+            enabled = True
+
+        if enabled:
+            # 间隔设置
+            col = box.column(align=True)
+            col.prop(self, "minor_interval_backup", text="小版本间隔")
+            col.prop(self, "major_interval_backup", text="大版本间隔")
+
+            # 数量限制
+            col = box.column(align=True)
+            col.prop(self, "daily_max_backups", text="每日最大备份数")
+            col.prop(self, "keep_days_backup", text="保留天数")
+
+            # 容量阈值
+            box.prop(self, "capacity_threshold_mb", text="容量警告阈值(MB)")
+
+            # 备份目录显示
+            import os
+            try:
+                temp_dir = context.preferences.filepaths.temporary_directory
+                if not temp_dir:
+                    temp_dir = os.environ.get('TEMP', os.environ.get('TMP', ''))
+                backup_dir = os.path.join(temp_dir, "MMY_Backups")
+                box.label(text=f"备份目录: {backup_dir}")
+            except:
+                box.label(text="备份目录: (系统临时目录)")
+
+            # 状态信息
+            from .auto_backup import get_status, get_next_save_time
+            status = get_status()
+            layout.separator()
+            stat_box = layout.box()
+            stat_box.label(text=f"当前容量: {status['capacity_mb']:.1f}MB | 备份数: {status['backup_count']}个")
+            stat_box.label(text=f"下次备份: {get_next_save_time()}")
+
+            # 容量警告
+            if status['warning']:
+                stat_box.label(text="⚠️ 容量超过阈值，请清理备份目录", icon='ERROR')
+
 
 # ============ 绘制函数 ============
 def draw_suffix_menu(self, context):
@@ -348,6 +442,33 @@ def draw_suffix_menu(self, context):
     row.menu("MMY_MT_preset_menu", text="", icon="DOWNARROW_HLT")
 
 
+def draw_statusbar_backup(self, context):
+    """状态栏显示自动备份状态"""
+    addon = context.preferences.addons.get("mmy_toolkit")
+    if not addon or not addon.preferences:
+        return
+
+    prefs = addon.preferences
+    try:
+        if not bool(prefs.enabled_backup):
+            return
+    except:
+        return
+
+    from .auto_backup import get_status, get_next_save_time
+    status = get_status()
+
+    layout = self.layout
+    row = layout.row(align=True)
+
+    # 容量警告时显示红色
+    if status['warning']:
+        row.alert = True
+        row.label(text=f"[MMY备份] ⚠️ {status['capacity_mb']:.0f}MB | 请清理")
+    else:
+        row.label(text=f"[MMY备份] {status['capacity_mb']:.0f}MB | 下次: {get_next_save_time()}")
+
+
 # ============ 所有类 ============
 _classes = (
     MMY_SuffixItem,
@@ -370,6 +491,7 @@ from . import ui
 from . import asset_browser
 from . import auto_color_space
 from . import camera_tools
+from . import auto_backup
 
 
 # ============ 快捷键注册 ============
@@ -415,6 +537,7 @@ def register():
     asset_browser.register()
     auto_color_space.register()
     camera_tools.register()
+    auto_backup.register()
 
     # 注册所有类
     for cls in _classes:
@@ -439,6 +562,12 @@ def register():
         except:
             pass
 
+    # 挂载状态栏备份状态显示
+    try:
+        bpy.types.STATUSBAR_HT_header.append(draw_statusbar_backup)
+    except:
+        pass
+
     # 初始化默认后缀
     addon = bpy.context.preferences.addons.get("mmy_toolkit")
     if addon and addon.preferences:
@@ -447,12 +576,16 @@ def register():
                 item = addon.preferences.current_suffixes.add()
                 item.name = suffix
 
+    # 启动自动备份定时器（类注册后）
+    auto_backup.start_backup_if_enabled()
+
 
 def unregister():
     # 注销快捷键
     _unregister_keymaps()
 
     # 注销子模块
+    auto_backup.unregister()
     camera_tools.unregister()
     auto_color_space.unregister()
     asset_browser.unregister()
@@ -466,6 +599,10 @@ def unregister():
         pass
     try:
         bpy.types.FILEBROWSER_HT_header.remove(draw_suffix_menu)
+    except:
+        pass
+    try:
+        bpy.types.STATUSBAR_HT_header.remove(draw_statusbar_backup)
     except:
         pass
 
