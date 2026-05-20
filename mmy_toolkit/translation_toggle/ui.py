@@ -23,18 +23,6 @@ HEADER_LOCATIONS = None
 def _init_header_locations():
     """初始化 Header 位置配置（在 register 时调用）"""
     global HEADER_LOCATIONS
-    print("[MMY] _init_header_locations 开始")
-
-    try:
-        print(f"[MMY] TOPBAR_MT_editor_menus: {bpy.types.TOPBAR_MT_editor_menus}")
-    except Exception as e:
-        print(f"[MMY] TOPBAR_MT_editor_menus 不存在: {e}")
-
-    try:
-        print(f"[MMY] NODE_HT_header: {bpy.types.NODE_HT_header}")
-    except Exception as e:
-        print(f"[MMY] NODE_HT_header 不存在: {e}")
-
     HEADER_LOCATIONS = [
         {
             'menu': bpy.types.TOPBAR_MT_editor_menus,
@@ -61,7 +49,6 @@ def _init_header_locations():
             'default_show': False
         },
     ]
-    print(f"[MMY] HEADER_LOCATIONS 已初始化: {len(HEADER_LOCATIONS)} 项")
     return HEADER_LOCATIONS
 
 
