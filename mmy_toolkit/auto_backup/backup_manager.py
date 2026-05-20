@@ -107,8 +107,7 @@ def create_backup(is_major=False):
             compress=False
         )
         return backup_path
-    except Exception as e:
-        print(f"[MMY备份] 备份失败: {e}")
+    except:
         return None
 
 
@@ -140,9 +139,8 @@ def cleanup_old_backups(today_dir, max_count, is_major=False):
         oldest = files.pop(0)
         try:
             os.remove(oldest)
-            print(f"[MMY备份] 删除旧备份: {oldest}")
-        except Exception as e:
-            print(f"[MMY备份] 删除失败: {e}")
+        except:
+            pass
 
 
 def cleanup_old_date_folders():
@@ -173,9 +171,8 @@ def cleanup_old_date_folders():
         oldest = date_folders.pop(0)
         try:
             shutil.rmtree(oldest)
-            print(f"[MMY备份] 删除旧日期文件夹: {oldest}")
-        except Exception as e:
-            print(f"[MMY备份] 删除文件夹失败: {e}")
+        except:
+            pass
 
 
 def calculate_capacity():

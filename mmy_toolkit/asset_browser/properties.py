@@ -105,10 +105,9 @@ def get_catalog_enum_items(self, context):
                                         seen_ids.add(catalog_uuid)
                                         safe_id = _safe_enum_id(catalog_uuid)
                                         _CATALOG_ITEMS_CACHE.append((safe_id, catalog_simple, ""))
-                    except Exception as e:
-                        print(f"[MMY] 读取catalog文件失败: {catalog_file}, 错误: {e}")
+                    except:
+                        pass
 
-    print(f"[MMY] 最终Catalog列表: {len(_CATALOG_ITEMS_CACHE)} 项")
     return _CATALOG_ITEMS_CACHE
 
 
@@ -128,7 +127,6 @@ def _try_get_builtin_catalog_tree(context):
                         if params and hasattr(params, 'asset_library_catalogs'):
                             tree = params.asset_library_catalogs
                             if tree is not None:
-                                print(f"[MMY] 从FILE_BROWSER空间获取到CatalogTree")
                                 return tree
 
     # ── 尝试 B：通过 bpy.asset 模块获取全局 catalog tree ──
@@ -149,7 +147,6 @@ def _try_get_builtin_catalog_tree(context):
                     found = False
                     break
             if found and obj is not None:
-                print(f"[MMY] 从bpy.asset.{ '.'.join(attr_chain) }获取到CatalogTree")
                 return obj
 
     # ── 尝试 C：通过 AssetLibraryService 获取 ──
@@ -159,7 +156,6 @@ def _try_get_builtin_catalog_tree(context):
         except ImportError:
             pass
 
-    print(f"[MMY] 所有内置API均不可用")
     return None
 
 

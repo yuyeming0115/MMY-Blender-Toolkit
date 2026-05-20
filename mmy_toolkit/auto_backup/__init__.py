@@ -25,8 +25,7 @@ def _backup_timer_callback():
         minor_interval = int(prefs.minor_interval_backup)
         major_interval = int(prefs.major_interval_backup)
         daily_max = int(prefs.daily_max_backups)
-    except Exception as e:
-        print(f"[MMY备份] 偏好设置读取失败: {e}")
+    except:
         return 120
 
     # 如果用户禁用了，停止定时器
@@ -67,7 +66,6 @@ def _backup_timer_callback():
                 daily_max,
                 is_major=True
             )
-            print(f"[MMY备份] 大版本备份: {backup_path}")
 
     # 判断是否需要小版本备份
     last_minor = getattr(scene, 'mmy_backup_last_minor', 0.0)
@@ -83,7 +81,6 @@ def _backup_timer_callback():
                 daily_max,
                 is_major=False
             )
-            print(f"[MMY备份] 小版本备份: {backup_path}")
 
     # 清理旧日期文件夹（偶尔执行）
     if need_minor:
@@ -125,8 +122,6 @@ def start_backup_timer():
 
     # 初始化下次保存时间
     backup_manager.update_next_save_time(minor_interval)
-
-    print(f"[MMY备份] 定时器已启动")
 
 
 def _stop_timer():

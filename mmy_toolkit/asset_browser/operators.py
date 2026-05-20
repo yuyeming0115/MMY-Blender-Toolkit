@@ -132,7 +132,6 @@ class MMY_OT_CreateAsset(bpy.types.Operator):
             asset_collection.asset_mark()
             if catalog_id:
                 asset_collection.asset_data.catalog_id = catalog_id
-                print(f"[MMY] Catalog ID 设置为: {catalog_id}")
 
             # 10. 查找并设置预览图
             if auto_preview:
