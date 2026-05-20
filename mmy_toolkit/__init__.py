@@ -359,6 +359,32 @@ class MMY_Preferences(bpy.types.AddonPreferences):
         max=5000
     )
 
+    # === 语言切换按钮位置 ===
+    translation_topbar: bpy.props.BoolProperty(
+        name="顶栏菜单",
+        description="在顶部菜单栏显示语言切换按钮",
+        default=True,
+        update=lambda self, ctx: _update_translation_buttons()
+    )
+    translation_node_header: bpy.props.BoolProperty(
+        name="Shader Editor",
+        description="在 Shader Editor Header 显示语言切换按钮",
+        default=True,
+        update=lambda self, ctx: _update_translation_buttons()
+    )
+    translation_properties_header: bpy.props.BoolProperty(
+        name="属性面板",
+        description="在属性面板 Header 显示语言切换按钮",
+        default=True,
+        update=lambda self, ctx: _update_translation_buttons()
+    )
+    translation_view3d_header: bpy.props.BoolProperty(
+        name="3D视图",
+        description="在 3D视图 Header 显示语言切换按钮",
+        default=False,
+        update=lambda self, ctx: _update_translation_buttons()
+    )
+
     def draw(self, context):
         layout = self.layout
 
@@ -497,6 +523,25 @@ class MMY_Preferences(bpy.types.AddonPreferences):
             if status['warning']:
                 stat_box.label(text="⚠️ 容量超过阈值，请清理备份目录", icon='ERROR')
 
+        layout.separator()
+
+        # === 语言切换按钮位置 ===
+        layout.label(text="语言切换按钮位置:", icon='FILE_FONT')
+        box = layout.box()
+        row = box.row()
+        row.prop(self, "translation_topbar")
+        row.prop(self, "translation_node_header")
+        row = box.row()
+        row.prop(self, "translation_properties_header")
+        row.prop(self, "translation_view3d_header")
+        box.label(text="点击按钮切换中/英文，Ctrl+点击打开偏好设置")
+
+
+def _update_translation_buttons():
+    """更新语言切换按钮显示"""
+    from .translation_toggle.ui import update_translation_buttons
+    update_translation_buttons(None, None)
+
 
 # ============ 绘制函数 ============
 def _draw_header_buttons(self, context):
@@ -600,6 +645,7 @@ from . import render_preview
 from . import shapekey_tools
 from . import cleaning
 from . import poly_edit
+from . import translation_toggle
 
 
 # ============ 快捷键注册 ============
@@ -651,6 +697,7 @@ def register():
     shapekey_tools.register()
     cleaning.register()
     poly_edit.register()
+    translation_toggle.register()
 
     # 注册所有类
     for cls in _classes:
@@ -729,6 +776,7 @@ def unregister():
     asset_browser.unregister()
     ui.unregister()
     mesh_tools.unregister()
+    translation_toggle.unregister()
 
     # 移除绘制函数
     try:
