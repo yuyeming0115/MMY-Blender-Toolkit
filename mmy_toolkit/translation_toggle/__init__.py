@@ -20,14 +20,31 @@ def register():
     # 注册操作符
     bpy.utils.register_class(MMY_OT_ToggleTranslation)
 
-    # 挂载 Header 按钮
+    # 挂载 Header 按钮（先无条件挂载）
+    if HEADER_LOCATIONS:
+        for loc in HEADER_LOCATIONS:
+            try:
+                loc['menu'].prepend(loc['drawing_func'])
+            except:
+                pass
+
+    # 根据偏好设置同步显示状态
     addon = bpy.context.preferences.addons.get("mmy_toolkit")
     if addon and addon.preferences and HEADER_LOCATIONS:
         prefs = addon.preferences
         for loc in HEADER_LOCATIONS:
-            if getattr(prefs, loc['attr'], False):
+            # 默认值定义：顶栏、节点、属性为 True，3D视图为 False
+            default_show = loc['attr'] != 'translation_view3d_header'
+            try:
+                show = getattr(prefs, loc['attr'])
+                if show is None:
+                    show = default_show
+            except AttributeError:
+                show = default_show
+
+            if not show:
                 try:
-                    loc['menu'].prepend(loc['drawing_func'])
+                    loc['menu'].remove(loc['drawing_func'])
                 except:
                     pass
 
