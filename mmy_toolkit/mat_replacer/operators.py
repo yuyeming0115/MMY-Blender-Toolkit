@@ -337,19 +337,34 @@ class MMY_OT_LinkAnimation(bpy.types.Operator):
             return {'CANCELLED'}
 
         try:
+            # Link Ani 集合
             with bpy.data.libraries.load(filepath, link=True) as (data_from, data_to):
                 data_to.collections = ["Ani"]
 
-            ani_collection = bpy.data.collections.get("Ani")
+            # 查找 Ani 集合（可能带文件路径前缀）
+            ani_collection = None
+            for coll in bpy.data.collections:
+                if coll.library is not None:
+                    # Link 的集合名称可能是 "Ani" 或包含 "Ani"
+                    if coll.name == "Ani" or "Ani" in coll.name.split('@')[0]:
+                        ani_collection = coll
+                        print(f"[MMY] 找到Link集合: {coll.name}, library={coll.library}")
+                        break
+
             if not ani_collection:
                 self.report({'ERROR'}, "Link 失败：未找到 Ani 集合")
                 return {'CANCELLED'}
 
-            existing_instance = bpy.data.objects.get("Ani")
-            if existing_instance and existing_instance.instance_collection == ani_collection:
-                self.report({'WARNING'}, "Ani 集合已存在，跳过创建")
-                return {'FINISHED'}
+            # 检查集合是否为空
+            print(f"[MMY] 集合内容: objects={len(ani_collection.objects)}, children={len(ani_collection.children)}")
 
+            # 检查是否已有实例
+            for obj in context.scene.objects:
+                if obj.instance_collection == ani_collection:
+                    self.report({'WARNING'}, "Ani 集合已存在实例")
+                    return {'FINISHED'}
+
+            # 创建集合实例
             instance = bpy.data.objects.new("Ani", None)
             instance.empty_display_type = 'PLAIN_AXES'
             instance.instance_type = 'COLLECTION'
@@ -358,9 +373,12 @@ class MMY_OT_LinkAnimation(bpy.types.Operator):
 
             context.scene.collection.objects.link(instance)
 
-            self.report({'INFO'}, f"已关联 Ani 集合到世界中心")
+            self.report({'INFO'}, f"已关联 {ani_collection.name} 到世界中心")
 
         except Exception as e:
+            print(f"[MMY] 关联动画失败: {e}")
+            import traceback
+            traceback.print_exc()
             self.report({'ERROR'}, f"关联失败: {str(e)}")
             return {'CANCELLED'}
 
