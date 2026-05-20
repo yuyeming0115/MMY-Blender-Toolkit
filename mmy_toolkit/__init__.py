@@ -685,7 +685,18 @@ def _unregister_keymaps():
 
 # ============ 注册/注销 ============
 def register():
-    # 注册子模块
+    # 先注册所有类（包括偏好设置），确保 addon.preferences 可用
+    for cls in _classes:
+        try:
+            bpy.utils.register_class(cls)
+        except ValueError:
+            try:
+                bpy.utils.unregister_class(cls)
+                bpy.utils.register_class(cls)
+            except:
+                pass
+
+    # 再注册子模块（此时偏好设置已可用）
     mesh_tools.register()
     ui.register()
     asset_browser.register()
@@ -698,17 +709,6 @@ def register():
     cleaning.register()
     poly_edit.register()
     translation_toggle.register()
-
-    # 注册所有类
-    for cls in _classes:
-        try:
-            bpy.utils.register_class(cls)
-        except ValueError:
-            try:
-                bpy.utils.unregister_class(cls)
-                bpy.utils.register_class(cls)
-            except:
-                pass
 
     # 注册快捷键
     _register_keymaps()

@@ -19,7 +19,7 @@ def draw_translation_button_header(self, context):
 # Header 挂载位置配置
 HEADER_LOCATIONS = [
     {
-        'menu': bpy.types.TOPBAR_MT_editor_menus,
+        'menu': bpy.types.TOPBAR_HT_header,
         'attr': 'translation_topbar',
         'drawing_func': draw_translation_button_topbar
     },
