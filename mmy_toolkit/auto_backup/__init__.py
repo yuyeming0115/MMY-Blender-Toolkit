@@ -62,7 +62,7 @@ def _backup_timer_callback():
         if backup_path:
             scene.mmy_backup_last_major = current_time
             backup_manager.cleanup_old_backups(
-                backup_manager.get_today_dir(),
+                backup_manager.get_project_backup_dir(),
                 daily_max,
                 is_major=True
             )
@@ -77,7 +77,7 @@ def _backup_timer_callback():
         if backup_path:
             scene.mmy_backup_last_minor = current_time
             backup_manager.cleanup_old_backups(
-                backup_manager.get_today_dir(),
+                backup_manager.get_project_backup_dir(),
                 daily_max,
                 is_major=False
             )

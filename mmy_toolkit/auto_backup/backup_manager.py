@@ -49,6 +49,25 @@ def get_today_dir():
     return today_dir
 
 
+def get_project_backup_dir():
+    """获取当前工程文件的备份目录（在日期目录下的工程名子目录）"""
+    today_dir = get_today_dir()
+    filepath = bpy.data.filepath
+
+    if not filepath:
+        # 未命名文件使用日期目录
+        return today_dir
+
+    # 提取工程文件名
+    filename = os.path.splitext(os.path.basename(filepath))[0]
+    project_dir = os.path.join(today_dir, filename)
+
+    if not os.path.exists(project_dir):
+        os.makedirs(project_dir)
+
+    return project_dir
+
+
 def get_backup_filename(is_major=False):
     """生成备份文件名
 
@@ -90,14 +109,14 @@ def create_backup(is_major=False):
         # 未命名文件，不备份
         return None
 
-    # 获取今日目录和文件名
-    today_dir = get_today_dir()
+    # 获取工程文件目录和文件名
+    project_dir = get_project_backup_dir()
     backup_name = get_backup_filename(is_major)
 
     if not backup_name:
         return None
 
-    backup_path = os.path.join(today_dir, backup_name)
+    backup_path = os.path.join(project_dir, backup_name)
 
     # 执行保存（copy=True 不影响当前文件）
     try:
@@ -144,7 +163,7 @@ def cleanup_old_backups(today_dir, max_count, is_major=False):
 
 
 def cleanup_old_date_folders():
-    """清理超出保留天数的日期文件夹"""
+    """清理超出保留天数的日期文件夹，以及空的工程目录"""
     base_dir = get_backup_base_dir()
 
     # 获取偏好设置中的保留天数
@@ -155,6 +174,20 @@ def cleanup_old_date_folders():
             keep_days = int(prefs.keep_days_backup)
         except:
             keep_days = 7
+
+    # 首先清理各日期目录下的空工程目录
+    for item in os.listdir(base_dir):
+        date_path = os.path.join(base_dir, item)
+        if os.path.isdir(date_path) and item.count('-') == 2:
+            for project_item in os.listdir(date_path):
+                project_path = os.path.join(date_path, project_item)
+                if os.path.isdir(project_path):
+                    # 检查是否为空目录
+                    if not os.listdir(project_path):
+                        try:
+                            shutil.rmtree(project_path)
+                        except:
+                            pass
 
     # 获取所有日期文件夹
     date_folders = []

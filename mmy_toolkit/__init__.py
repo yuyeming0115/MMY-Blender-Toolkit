@@ -338,8 +338,8 @@ class MMY_Preferences(bpy.types.AddonPreferences):
         max=120
     )
     daily_max_backups: bpy.props.IntProperty(
-        name="每日最大备份数",
-        description="每个日期文件夹内每种类型的最大备份数量",
+        name="每工程每日最大备份数",
+        description="每个工程文件每天保留的最大备份数量",
         default=20,
         min=5,
         max=100
