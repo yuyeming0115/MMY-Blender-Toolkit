@@ -1,8 +1,30 @@
 {
   "current_preset": "完整流程",
   "presets": {
-    "完整流程": ["_Mesh", "_Mat", "_Rig", "_Ani", "_Render"],
-    "动画流程": ["_Mesh", "_Rig", "_Ani"],
-    "渲染流程": ["_Mat", "_Light", "_Render"]
+    "完整流程": [
+      "_Mesh",
+      "_Mat",
+      "_Rig",
+      "_Ani",
+      "_Render"
+    ],
+    "动画流程": [
+      "_Mesh",
+      "_Rig",
+      "_Ani"
+    ],
+    "渲染流程": [
+      "_Mat",
+      "_Light",
+      "_Render"
+    ],
+    "工程文件+后缀名": [
+      "_Mesh",
+      "_Mat",
+      "_Rig",
+      "_Ani",
+      "_Render",
+      "_Bake"
+    ]
   }
 }

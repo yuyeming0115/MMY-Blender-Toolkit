@@ -1,0 +1,19 @@
+{
+  "separator": "_",
+  "digits": 2,
+  "prefix_presets": [
+    "Model",
+    "Char",
+    "Prop",
+    "Set",
+    "Asset"
+  ],
+  "suffix_presets": [
+    "_01",
+    "_LOD",
+    "_A",
+    "_B",
+    "_High",
+    "_Low"
+  ]
+}
