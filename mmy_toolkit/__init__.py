@@ -550,6 +550,7 @@ from . import camera_tools
 from . import auto_backup
 from . import mat_replacer
 from . import render_preview
+from . import shapekey_tools
 
 
 # ============ 快捷键注册 ============
@@ -598,6 +599,7 @@ def register():
     auto_backup.register()
     mat_replacer.register()
     render_preview.register()
+    shapekey_tools.register()
 
     # 注册所有类
     for cls in _classes:
@@ -658,6 +660,7 @@ def unregister():
     _unregister_keymaps()
 
     # 注销子模块
+    shapekey_tools.unregister()
     render_preview.unregister()
     mat_replacer.unregister()
     auto_backup.unregister()
