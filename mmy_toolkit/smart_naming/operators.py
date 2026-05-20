@@ -109,12 +109,12 @@ class MMY_OT_SmartDuplicateObject(bpy.types.Operator):
 
             # 链接到同一集合
             for coll in bpy.data.collections:
-                if obj in coll.objects:
+                if coll.objects.get(obj.name):
                     coll.objects.link(new_obj)
                     break
 
             # 如果原对象在场景根集合
-            if obj in context.scene.collection.objects:
+            if context.scene.collection.objects.get(obj.name):
                 context.scene.collection.objects.link(new_obj)
 
             # 选中新对象

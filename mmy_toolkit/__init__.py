@@ -536,6 +536,40 @@ class MMY_Preferences(bpy.types.AddonPreferences):
         row.prop(self, "translation_view3d_header")
         box.label(text="点击按钮切换中/英文，Ctrl+点击打开偏好设置")
 
+        layout.separator()
+
+        # === 智能命名预设 ===
+        layout.label(text="智能命名预设:", icon='SORTBYEXT')
+        box = layout.box()
+
+        # 前缀预设
+        row = box.row()
+        row.label(text="前缀预设:")
+        from .smart_naming.presets import get_prefix_presets
+        prefix_presets = get_prefix_presets()
+        for i, prefix in enumerate(prefix_presets):
+            if i > 0 and i % 5 == 0:
+                row = box.row()
+            op = row.operator("mmy.remove_prefix_preset", text="", icon="X")
+            op.prefix = prefix
+            row.label(text=prefix)
+        row = box.row()
+        row.operator("mmy.add_prefix_preset", text="添加前缀", icon="ADD")
+
+        # 后缀预设
+        row = box.row()
+        row.label(text="后缀预设:")
+        from .smart_naming.presets import get_suffix_presets
+        suffix_presets = get_suffix_presets()
+        for i, suffix in enumerate(suffix_presets):
+            if i > 0 and i % 5 == 0:
+                row = box.row()
+            op = row.operator("mmy.remove_suffix_preset", text="", icon="X")
+            op.suffix = suffix
+            row.label(text=suffix)
+        row = box.row()
+        row.operator("mmy.add_suffix_preset", text="添加后缀", icon="ADD")
+
 
 def _update_translation_buttons():
     """更新语言切换按钮显示"""

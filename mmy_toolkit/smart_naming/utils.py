@@ -224,12 +224,19 @@ def duplicate_collection_contents(source_coll, new_name: str, context) -> object
         new_coll.children.link(child_new_coll)
 
     # 链接到父级（如果源集合有父级）
-    parent_colls = [p for p in bpy.data.collections if source_coll in p.children]
+    parent_colls = []
+    for p in bpy.data.collections:
+        for child in p.children:
+            if child.name == source_coll.name:
+                parent_colls.append(p)
+                break
     for parent in parent_colls:
         parent.children.link(new_coll)
 
     # 如果源集合在场景根集合中，也链接新集合
-    if source_coll in context.scene.collection.children:
-        context.scene.collection.children.link(new_coll)
+    for child in context.scene.collection.children:
+        if child.name == source_coll.name:
+            context.scene.collection.children.link(new_coll)
+            break
 
     return new_coll
