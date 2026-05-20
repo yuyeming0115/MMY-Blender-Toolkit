@@ -16,14 +16,35 @@ from .ui import (
 def _sync_buttons_delayed():
     """延迟同步按钮状态（在 Blender 完全启动后）"""
     if HEADER_LOCATIONS is None:
+        print("[MMY] HEADER_LOCATIONS is None")
         return None
 
+    addon = bpy.context.preferences.addons.get("mmy_toolkit")
+    print(f"[MMY] addon: {addon}")
+    if addon:
+        print(f"[MMY] addon.preferences: {addon.preferences}")
+
     for loc in HEADER_LOCATIONS:
+        attr = loc['attr']
         default_show = loc.get('default_show', True)
-        update_visual_settings(
-            loc['menu'], loc['attr'], loc['drawing_func'],
-            default_show=default_show
-        )
+
+        if addon and addon.preferences:
+            try:
+                show = getattr(addon.preferences, attr)
+                print(f"[MMY] {attr} = {show} (type: {type(show)})")
+            except AttributeError:
+                show = None
+                print(f"[MMY] {attr} AttributeError")
+        else:
+            show = None
+            print(f"[MMY] no addon.preferences for {attr}")
+
+        if show is None:
+            show = default_show
+            print(f"[MMY] {attr} using default: {show}")
+
+        print(f"[MMY] {attr} final show: {show}")
+
     return None  # 定时器只执行一次
 
 
