@@ -14,7 +14,7 @@ class MMY_PT_SmartNamingPanel(bpy.types.Panel):
     bl_idname = "MMY_PT_smart_naming"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
-    bl_category = "MMY-Tools"
+    bl_category = "MMY工具"
 
     def draw(self, context):
         layout = self.layout
