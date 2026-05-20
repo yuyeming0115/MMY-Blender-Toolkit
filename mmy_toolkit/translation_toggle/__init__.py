@@ -49,22 +49,30 @@ def _sync_buttons_delayed():
 
 
 def register():
+    print("[MMY] translation_toggle.register() 开始")
     # 初始化 Header 位置配置（延迟加载 bpy.types）
-    _init_header_locations()
+    try:
+        _init_header_locations()
+        print(f"[MMY] _init_header_locations 成功, HEADER_LOCATIONS: {HEADER_LOCATIONS}")
+    except Exception as e:
+        print(f"[MMY] _init_header_locations 失败: {e}")
 
     # 注册操作符
     bpy.utils.register_class(MMY_OT_ToggleTranslation)
+    print("[MMY] MMY_OT_ToggleTranslation 已注册")
 
     # 挂载 Header 按钮（先无条件挂载）
     if HEADER_LOCATIONS:
         for loc in HEADER_LOCATIONS:
             try:
                 loc['menu'].prepend(loc['drawing_func'])
-            except:
-                pass
+                print(f"[MMY] {loc['attr']} 按钮已挂载")
+            except Exception as e:
+                print(f"[MMY] {loc['attr']} 挂载失败: {e}")
 
     # 延迟同步按钮状态（0.1秒后执行）
     bpy.app.timers.register(_sync_buttons_delayed, first_interval=0.1)
+    print("[MMY] 定时器已注册")
 
 
 def unregister():
