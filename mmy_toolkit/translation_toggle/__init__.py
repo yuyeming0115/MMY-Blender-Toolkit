@@ -13,22 +13,8 @@ from .ui import (
 )
 
 
-def register():
-    # 初始化 Header 位置配置（延迟加载 bpy.types）
-    _init_header_locations()
-
-    # 注册操作符
-    bpy.utils.register_class(MMY_OT_ToggleTranslation)
-
-    # 挂载 Header 按钮（先无条件挂载）
-    if HEADER_LOCATIONS:
-        for loc in HEADER_LOCATIONS:
-            try:
-                loc['menu'].prepend(loc['drawing_func'])
-            except:
-                pass
-
-    # 根据偏好设置同步显示状态
+def _sync_buttons_delayed():
+    """延迟同步按钮状态（在 Blender 完全启动后）"""
     addon = bpy.context.preferences.addons.get("mmy_toolkit")
     if addon and addon.preferences and HEADER_LOCATIONS:
         prefs = addon.preferences
@@ -47,6 +33,26 @@ def register():
                     loc['menu'].remove(loc['drawing_func'])
                 except:
                     pass
+    return None  # 定时器只执行一次
+
+
+def register():
+    # 初始化 Header 位置配置（延迟加载 bpy.types）
+    _init_header_locations()
+
+    # 注册操作符
+    bpy.utils.register_class(MMY_OT_ToggleTranslation)
+
+    # 挂载 Header 按钮（先无条件挂载）
+    if HEADER_LOCATIONS:
+        for loc in HEADER_LOCATIONS:
+            try:
+                loc['menu'].prepend(loc['drawing_func'])
+            except:
+                pass
+
+    # 延迟同步按钮状态（0.1秒后执行）
+    bpy.app.timers.register(_sync_buttons_delayed, first_interval=0.1)
 
 
 def unregister():
@@ -57,6 +63,12 @@ def unregister():
                 loc['menu'].remove(loc['drawing_func'])
             except:
                 pass
+
+    # 取消定时器
+    try:
+        bpy.app.timers.unregister(_sync_buttons_delayed)
+    except:
+        pass
 
     # 注销操作符
     try:
