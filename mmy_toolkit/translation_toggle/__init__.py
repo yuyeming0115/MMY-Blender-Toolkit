@@ -15,24 +15,15 @@ from .ui import (
 
 def _sync_buttons_delayed():
     """延迟同步按钮状态（在 Blender 完全启动后）"""
-    addon = bpy.context.preferences.addons.get("mmy_toolkit")
-    if addon and addon.preferences and HEADER_LOCATIONS:
-        prefs = addon.preferences
-        for loc in HEADER_LOCATIONS:
-            # 默认值定义：顶栏、节点、属性为 True，3D视图为 False
-            default_show = loc['attr'] != 'translation_view3d_header'
-            try:
-                show = getattr(prefs, loc['attr'])
-                if show is None:
-                    show = default_show
-            except AttributeError:
-                show = default_show
+    if HEADER_LOCATIONS is None:
+        return None
 
-            if not show:
-                try:
-                    loc['menu'].remove(loc['drawing_func'])
-                except:
-                    pass
+    for loc in HEADER_LOCATIONS:
+        default_show = loc.get('default_show', True)
+        update_visual_settings(
+            loc['menu'], loc['attr'], loc['drawing_func'],
+            default_show=default_show
+        )
     return None  # 定时器只执行一次
 
 
