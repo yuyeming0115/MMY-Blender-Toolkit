@@ -62,6 +62,7 @@ def _init_header_locations():
         },
     ]
     print(f"[MMY] HEADER_LOCATIONS 已初始化: {len(HEADER_LOCATIONS)} 项")
+    return HEADER_LOCATIONS
 
 
 def update_visual_settings(menu, attr, drawing_func, default_show=True, unregister=False):
