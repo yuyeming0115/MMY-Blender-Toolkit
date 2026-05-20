@@ -93,12 +93,24 @@ class VIEW3D_PT_MMYMeshTools(bpy.types.Panel):
                 box2.label(text="资产创建", icon='ASSET_MANAGER')
                 box2.label(text=f"加载错误: {str(e)}", icon='ERROR')
 
-        # 编辑模式：缝合边工具
+        # 编辑模式：缝合边工具 + 拆出工具
         if mode == 'EDIT' and obj and obj.type == 'MESH':
             box = layout.box()
             box.label(text="缝合边工具", icon='SNAP_EDGE')
             row = box.row()
             row.operator("mmy.mark_uv_island_seams")
+            row.scale_y = 1.5
+
+            # 拆出工具
+            box = layout.box()
+            box.label(text="拆出工具", icon='MESH_DATA')
+            row = box.row(align=True)
+            row.operator("mmy.detach_selection", text="拆出")
+            row.operator("mmy.duplicate_detach", text="复制拆出")
+            row.scale_y = 1.5
+            row = box.row(align=True)
+            row.operator("mmy.separate_by_material", text="按材质拆")
+            row.operator("mmy.separate_by_loose", text="按松散块拆")
             row.scale_y = 1.5
 
     def _draw_asset_creator(self, layout, context):

@@ -5,6 +5,10 @@ _classes = (
     operators.MMY_OT_MarkUVIslandSeams,
     operators.MMY_OT_ImportFBX,
     operators.MMY_OT_BetterImportFBX,
+    operators.MMY_OT_DetachSelection,
+    operators.MMY_OT_DuplicateDetach,
+    operators.MMY_OT_SeparateByMaterial,
+    operators.MMY_OT_SeparateByLoose,
 )
 
 

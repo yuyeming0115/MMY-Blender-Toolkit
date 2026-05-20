@@ -205,3 +205,168 @@ class MMY_OT_BetterImportFBX(bpy.types.Operator):
         # 这样可以使用 Better FBX 的所有设置
         bpy.ops.better_import.fbx('INVOKE_DEFAULT')
         return {'FINISHED'}
+
+
+class MMY_OT_DetachSelection(bpy.types.Operator):
+    """拆出选中部分为新物体，退出编辑模式并选中新物体"""
+    bl_idname = "mmy.detach_selection"
+    bl_label = "拆出"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        obj = context.active_object
+        return obj and obj.type == 'MESH' and obj.mode == 'EDIT'
+
+    def execute(self, context):
+        obj = context.active_object
+        obj_name = obj.name
+
+        # 分离选中部分
+        bpy.ops.mesh.separate(type='SELECTED')
+
+        # 退出编辑模式
+        bpy.ops.object.mode_set(mode='OBJECT')
+
+        # 取消选择原物体
+        obj.select_set(False)
+
+        # 找到新分离出的物体并选中
+        new_obj = None
+        for o in context.scene.objects:
+            if o.type == 'MESH' and o.name.startswith(obj_name) and o != obj:
+                if new_obj is None or o.name > new_obj.name:
+                    new_obj = o
+
+        if new_obj:
+            new_obj.select_set(True)
+            context.view_layer.objects.active = new_obj
+            self.report({'INFO'}, f"已拆出: {new_obj.name}")
+        else:
+            self.report({'WARNING'}, "未找到分离的物体")
+
+        return {'FINISHED'}
+
+
+class MMY_OT_DuplicateDetach(bpy.types.Operator):
+    """复制选中部分并拆出新物体，退出编辑模式并选中新物体"""
+    bl_idname = "mmy.duplicate_detach"
+    bl_label = "复制拆出"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        obj = context.active_object
+        return obj and obj.type == 'MESH' and obj.mode == 'EDIT'
+
+    def execute(self, context):
+        obj = context.active_object
+        obj_name = obj.name
+
+        # 复制选中部分
+        bpy.ops.mesh.duplicate_move(MESH_OT_duplicate={"mode": 1})
+
+        # 分离复制部分
+        bpy.ops.mesh.separate(type='SELECTED')
+
+        # 退出编辑模式
+        bpy.ops.object.mode_set(mode='OBJECT')
+
+        # 取消选择原物体
+        obj.select_set(False)
+
+        # 找到新分离出的物体并选中
+        new_obj = None
+        for o in context.scene.objects:
+            if o.type == 'MESH' and o.name.startswith(obj_name) and o != obj:
+                if new_obj is None or o.name > new_obj.name:
+                    new_obj = o
+
+        if new_obj:
+            new_obj.select_set(True)
+            context.view_layer.objects.active = new_obj
+            self.report({'INFO'}, f"已复制拆出: {new_obj.name}")
+        else:
+            self.report({'WARNING'}, "未找到分离的物体")
+
+        return {'FINISHED'}
+
+
+class MMY_OT_SeparateByMaterial(bpy.types.Operator):
+    """按材质分离网格，退出编辑模式并选中所有新物体"""
+    bl_idname = "mmy.separate_by_material"
+    bl_label = "按材质拆"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        obj = context.active_object
+        return obj and obj.type == 'MESH' and obj.mode == 'EDIT'
+
+    def execute(self, context):
+        obj = context.active_object
+        obj_name = obj.name
+
+        # 按材质分离
+        bpy.ops.mesh.separate(type='MATERIAL')
+
+        # 退出编辑模式
+        bpy.ops.object.mode_set(mode='OBJECT')
+
+        # 取消选择原物体
+        obj.select_set(False)
+
+        # 选中新分离出的所有物体
+        new_objs = []
+        for o in context.scene.objects:
+            if o.type == 'MESH' and o.name.startswith(obj_name) and o != obj:
+                new_objs.append(o)
+                o.select_set(True)
+
+        if new_objs:
+            context.view_layer.objects.active = new_objs[0]
+            self.report({'INFO'}, f"已按材质拆出 {len(new_objs)} 个物体")
+        else:
+            self.report({'WARNING'}, "未分离出新物体（可能只有一个材质）")
+
+        return {'FINISHED'}
+
+
+class MMY_OT_SeparateByLoose(bpy.types.Operator):
+    """按松散块分离网格，退出编辑模式并选中所有新物体"""
+    bl_idname = "mmy.separate_by_loose"
+    bl_label = "按松散块拆"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        obj = context.active_object
+        return obj and obj.type == 'MESH' and obj.mode == 'EDIT'
+
+    def execute(self, context):
+        obj = context.active_object
+        obj_name = obj.name
+
+        # 按松散块分离
+        bpy.ops.mesh.separate(type='LOOSE')
+
+        # 退出编辑模式
+        bpy.ops.object.mode_set(mode='OBJECT')
+
+        # 取消选择原物体
+        obj.select_set(False)
+
+        # 选中新分离出的所有物体
+        new_objs = []
+        for o in context.scene.objects:
+            if o.type == 'MESH' and o.name.startswith(obj_name) and o != obj:
+                new_objs.append(o)
+                o.select_set(True)
+
+        if new_objs:
+            context.view_layer.objects.active = new_objs[0]
+            self.report({'INFO'}, f"已按松散块拆出 {len(new_objs)} 个物体")
+        else:
+            self.report({'WARNING'}, "未分离出新物体（可能已是整体）")
+
+        return {'FINISHED'}
