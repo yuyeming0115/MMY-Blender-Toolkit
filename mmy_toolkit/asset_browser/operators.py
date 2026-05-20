@@ -221,20 +221,17 @@ class MMY_OT_AddFavoritePath(bpy.types.Operator):
 
     alias: bpy.props.StringProperty(name="别名", default="")
 
-    def invoke(self, context, event):
+    def execute(self, context):
         props = context.scene.mmy_asset_creator
+
         if not props.asset_path:
             self.report({'WARNING'}, "请先选择路径")
             return {'CANCELLED'}
 
-        # 使用路径名作为默认别名
-        self.alias = os.path.basename(props.asset_path) or props.asset_path
-        return context.window_manager.invoke_props_dialog(self)
+        # 自动使用路径名作为别名
+        alias = self.alias or os.path.basename(props.asset_path) or props.asset_path
 
-    def execute(self, context):
-        props = context.scene.mmy_asset_creator
-
-        if add_favorite_path(props.asset_path, self.alias):
+        if add_favorite_path(props.asset_path, alias):
             # 同步到场景属性
             props.favorite_paths.clear()
             favorites = get_favorite_paths()
@@ -243,7 +240,7 @@ class MMY_OT_AddFavoritePath(bpy.types.Operator):
                 item.path = fav.get("path", "")
                 item.alias = fav.get("alias", "")
 
-            self.report({'INFO'}, f"已收藏: {self.alias}")
+            self.report({'INFO'}, f"已收藏: {alias}")
         else:
             self.report({'WARNING'}, "该路径已在收藏夹中")
 

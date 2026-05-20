@@ -328,19 +328,12 @@ def register():
     for cls in _classes:
         bpy.utils.register_class(cls)
 
-    # 添加 Header 按钮
-    try:
-        bpy.types.VIEW3D_HT_header.append(_append_render_button)
-    except Exception as e:
-        print(f"[MMY] 添加 Header 按钮失败: {e}")
+    # Header 挂载由主模块统一管理
+    # 不在此处单独 append
 
 
 def unregister():
-    # 移除 Header 按钮
-    try:
-        bpy.types.VIEW3D_HT_header.remove(_append_render_button)
-    except:
-        pass
+    # Header 挂载由主模块统一管理
 
     for cls in reversed(_classes):
         bpy.utils.unregister_class(cls)

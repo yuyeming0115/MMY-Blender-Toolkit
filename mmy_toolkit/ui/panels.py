@@ -1,6 +1,31 @@
 import bpy
 
 
+class MMY_UL_PreviewFileList(bpy.types.UIList):
+    """刷新预览图文件列表（带勾选框）"""
+    bl_idname = "MMY_UL_preview_file_list"
+
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
+        props = context.scene.mmy_asset_creator
+
+        # 检查是否被排除
+        is_excluded = item.filename in props.excluded_files
+
+        row = layout.row(align=True)
+        row.prop(item, "is_selected", text="")
+
+        if is_excluded:
+            row.label(text=item.filename, icon='CANCEL')
+            row.label(text="已排除")
+        elif item.has_preview:
+            row.label(text=item.filename, icon='FILE_BLEND')
+            row.label(text="✓")
+        else:
+            row.alert = True
+            row.label(text=item.filename, icon='FILE_BLEND')
+            row.alert = False
+
+
 class MMY_MT_FavoritePathMenu(bpy.types.Menu):
     """收藏路径下拉菜单"""
     bl_idname = "MMY_MT_favorite_path_menu"
@@ -14,6 +39,7 @@ class MMY_MT_FavoritePathMenu(bpy.types.Menu):
         try:
             if len(props.favorite_paths) == 0:
                 layout.label(text="暂无收藏路径")
+                layout.label(text="点击 + 添加")
                 return
             for item in props.favorite_paths:
                 display_text = item.alias if item.alias else item.path
@@ -90,28 +116,23 @@ class VIEW3D_PT_MMYMeshTools(bpy.types.Panel):
         box.label(text="资产创建", icon='ASSET_MANAGER')
 
         # === 路径设置 ===
+        # asset_path 的 subtype="DIR_PATH" 会自动显示文件夹按钮
         row = box.row(align=True)
         row.prop(props, "asset_path", text="")
-
-        # 最近使用路径下拉菜单
+        # ➕ 快速收藏按钮（在文件夹按钮后、书签按钮前）
+        row.operator("mmy.add_favorite_path", text="", icon='ADD')
+        # 🔖 收藏路径菜单
         row.menu("MMY_MT_favorite_path_menu", text="", icon='BOOKMARKS')
 
-        # 添加收藏按钮
-        if props.asset_path:
-            box.operator("mmy.add_favorite_path", text="收藏当前路径", icon='ADD')
-
-        # === 资产信息 ===
-        box.prop(props, "asset_name", text="名称")
-
-        # === Catalog选择 ===
-        row = box.row()
+        # === 资产信息：名称 + 分类（一行）===
+        row = box.row(align=True)
+        row.prop(props, "asset_name", text="名称")
         row.prop(props, "catalog_enum", text="分类")
 
-        # === 预览图选项 ===
-        box.prop(props, "auto_preview", text="自动预览图")
-
-        # === 保存选项 ===
-        box.prop(props, "compress", text="压缩")
+        # === 预览图 + 压缩选项（一行）===
+        row = box.row(align=True)
+        row.prop(props, "auto_preview", text="自动缩略图")
+        row.prop(props, "compress", text="压缩")
 
         # === 创建按钮 ===
         layout.separator()
@@ -131,7 +152,7 @@ class VIEW3D_PT_MMYMeshTools(bpy.types.Panel):
             if len(props.refresh_preview_files) > 0:
                 row.operator("mmy.clear_preview_list", text="清空", icon='X')
 
-            # 文件列表
+            # 文件列表（可滚动，默认显示10行）
             if len(props.refresh_preview_files) > 0:
                 # 快捷选择按钮
                 row = box.row(align=True)
@@ -140,24 +161,13 @@ class VIEW3D_PT_MMYMeshTools(bpy.types.Panel):
                 row.operator("mmy.select_none_preview", text="无预览", icon='ERROR')
                 row.operator("mmy.manage_excluded_files", text="排除", icon='CANCEL')
 
-                # 显示文件列表（带勾选）
-                for item in props.refresh_preview_files:
-                    row = box.row(align=True)
-                    row.prop(item, "is_selected", text="")
-                    # 检查是否被排除
-                    is_excluded = item.filename in props.excluded_files
-                    if is_excluded:
-                        row.label(text=item.filename, icon='CANCEL')
-                        row.label(text="已排除", icon='X')
-                    elif item.has_preview:
-                        row.label(text=item.filename, icon='FILE_BLEND')
-                        row.label(text="有预览", icon='CHECKMARK')
-                    else:
-                        # 无预览用红色标注
-                        row.alert = True
-                        row.label(text=item.filename, icon='FILE_BLEND')
-                        row.label(text="无预览", icon='X')
-                        row.alert = False
+                # 使用 template_list 显示可滚动列表
+                box.template_list(
+                    "MMY_UL_preview_file_list", "",
+                    props, "refresh_preview_files",
+                    props, "refresh_preview_index",
+                    rows=10
+                )
 
                 # 统计选中数量（排除已排除的文件）
                 selected_with_preview = sum(
@@ -331,6 +341,7 @@ class VIEW3D_PT_MMYMeshTools(bpy.types.Panel):
 
 
 _classes = (
+    MMY_UL_PreviewFileList,
     MMY_MT_FavoritePathMenu,
     VIEW3D_PT_MMYMeshTools,
 )

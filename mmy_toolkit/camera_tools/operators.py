@@ -131,19 +131,12 @@ def register():
             except:
                 pass
 
-    # 挂载到3D视图Header开头（左侧）
-    try:
-        bpy.types.VIEW3D_HT_header.prepend(_draw_lens_header)
-    except:
-        pass
+    # Header 挂载由主模块统一管理
+    # 不在此处单独 prepend
 
 
 def unregister():
-    # 移除Header挂载
-    try:
-        bpy.types.VIEW3D_HT_header.remove(_draw_lens_header)
-    except:
-        pass
+    # Header 挂载由主模块统一管理
 
     for cls in reversed(_classes):
         try:

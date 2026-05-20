@@ -454,6 +454,16 @@ class MMY_Preferences(bpy.types.AddonPreferences):
 
 
 # ============ 绘制函数 ============
+def _draw_header_buttons(self, context):
+    """统一的 Header 按钮绘制函数（焦距预设 + 渲染预览图）"""
+    # 焦距在前，渲染在后
+    from .camera_tools.operators import _draw_lens_header
+    from .render_preview import _append_render_button
+
+    _draw_lens_header(self, context)
+    _append_render_button(self, context)
+
+
 def draw_suffix_menu(self, context):
     space = context.space_data
     if not space or space.type != "FILE_BROWSER":
@@ -612,6 +622,12 @@ def register():
         except:
             pass
 
+    # 挂载统一的 Header 按钮（左边位置）
+    try:
+        bpy.types.VIEW3D_HT_header.prepend(_draw_header_buttons)
+    except:
+        pass
+
     # 挂载状态栏备份状态显示
     try:
         bpy.types.STATUSBAR_HT_header.append(draw_statusbar_backup)
@@ -658,6 +674,11 @@ def unregister():
         pass
     try:
         bpy.types.FILEBROWSER_HT_header.remove(draw_suffix_menu)
+    except:
+        pass
+    # 移除统一的 Header 按钮
+    try:
+        bpy.types.VIEW3D_HT_header.remove(_draw_header_buttons)
     except:
         pass
     try:
