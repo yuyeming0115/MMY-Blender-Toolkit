@@ -1,0 +1,181 @@
+"""智能命名 UI - N面板 + 大纲右键菜单"""
+
+import bpy
+from .presets import get_prefix_presets, get_suffix_presets, get_separator, get_digits
+
+
+# ===================================================================
+# N面板
+# ===================================================================
+
+class MMY_PT_SmartNamingPanel(bpy.types.Panel):
+    """智能命名 N面板"""
+    bl_label = "智能命名"
+    bl_idname = "MMY_PT_smart_naming"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = "MMY-Tools"
+
+    def draw(self, context):
+        layout = self.layout
+
+        # === 快捷复制 ===
+        box = layout.box()
+        box.label(text="快捷复制", icon='DUPLICATE')
+
+        row = box.row(align=True)
+        row.operator("mmy.smart_duplicate_collection", text="复制集合", icon='OUTLINER_COLLECTION')
+        row.operator("mmy.smart_duplicate_object", text="复制对象", icon='OBJECT_DATAMODE')
+
+        # === 批量重命名 ===
+        layout.separator()
+        box = layout.box()
+        box.label(text="批量重命名", icon='TEXT')
+
+        row = box.row(align=True)
+        row.operator("mmy.batch_rename", text="批量重命名", icon='SORTBYEXT')
+
+        # === 单个重命名 ===
+        layout.separator()
+        box = layout.box()
+        box.label(text="单个重命名", icon='FONT_DATA')
+
+        if context.active_object:
+            row = box.row(align=True)
+            row.prop(context.active_object, "name", text="")
+            row.operator("mmy.rename_single", text="", icon='CHECKMARK')
+
+        # === 预设快捷按钮 ===
+        layout.separator()
+        box = layout.box()
+        box.label(text="常用预设", icon='PRESET')
+
+        # 前缀预设
+        prefix_presets = get_prefix_presets()
+        if prefix_presets:
+            row = box.row(align=True)
+            row.label(text="前缀:")
+            for prefix in prefix_presets[:5]:  # 只显示前5个
+                op = row.operator("mmy.apply_prefix", text=prefix)
+                op.prefix = prefix
+
+        # 后缀预设
+        suffix_presets = get_suffix_presets()
+        if suffix_presets:
+            row = box.row(align=True)
+            row.label(text="后缀:")
+            for suffix in suffix_presets[:5]:  # 只显示前5个
+                op = row.operator("mmy.apply_suffix", text=suffix)
+                op.suffix = suffix
+
+        # === 配置入口 ===
+        layout.separator()
+        row = layout.row()
+        row.operator("mmy.open_prefs", text="配置预设", icon='SETTINGS')
+
+
+# ===================================================================
+# 大纲右键菜单
+# ===================================================================
+
+def _append_to_outliner_menu(self, context):
+    """在大纲右键菜单添加智能复制选项"""
+    layout = self.layout
+
+    # 检查是否在集合上右键
+    if context.collection:
+        layout.separator()
+        layout.operator("mmy.smart_duplicate_collection", text="智能复制集合", icon='OUTLINER_COLLECTION')
+
+
+def _append_to_outliner_context_menu(self, context):
+    """在大纲上下文菜单添加选项"""
+    layout = self.layout
+
+    # 添加分隔线和智能复制选项
+    layout.separator()
+    layout.operator("mmy.smart_duplicate_collection", text="智能复制集合")
+
+
+# ===================================================================
+# 辅助操作符（应用预设）
+# ===================================================================
+
+class MMY_OT_ApplyPrefix(bpy.types.Operator):
+    """应用前缀预设到选中对象"""
+    bl_idname = "mmy.apply_prefix"
+    bl_label = "应用前缀"
+
+    prefix: bpy.props.StringProperty()
+
+    def execute(self, context):
+        for obj in context.selected_objects:
+            obj.name = f"{self.prefix}{obj.name}"
+        self.report({'INFO'}, f"已应用前缀: {self.prefix}")
+        return {'FINISHED'}
+
+    @classmethod
+    def poll(cls, context):
+        return context.selected_objects
+
+
+class MMY_OT_ApplySuffix(bpy.types.Operator):
+    """应用后缀预设到选中对象"""
+    bl_idname = "mmy.apply_suffix"
+    bl_label = "应用后缀"
+
+    suffix: bpy.props.StringProperty()
+
+    def execute(self, context):
+        for obj in context.selected_objects:
+            obj.name = f"{obj.name}{self.suffix}"
+        self.report({'INFO'}, f"已应用后缀: {self.suffix}")
+        return {'FINISHED'}
+
+    @classmethod
+    def poll(cls, context):
+        return context.selected_objects
+
+
+_classes = (
+    MMY_PT_SmartNamingPanel,
+    MMY_OT_ApplyPrefix,
+    MMY_OT_ApplySuffix,
+)
+
+
+def register():
+    # 注册面板和操作符
+    for cls in _classes:
+        bpy.utils.register_class(cls)
+
+    # 挂载大纲右键菜单
+    try:
+        bpy.types.OUTLINER_MT_collection.append(_append_to_outliner_menu)
+    except:
+        pass
+
+    try:
+        bpy.types.OUTLINER_MT_collection_context_menu.append(_append_to_outliner_context_menu)
+    except:
+        pass
+
+
+def unregister():
+    # 移除大纲右键菜单
+    try:
+        bpy.types.OUTLINER_MT_collection.remove(_append_to_outliner_menu)
+    except:
+        pass
+
+    try:
+        bpy.types.OUTLINER_MT_collection_context_menu.remove(_append_to_outliner_context_menu)
+    except:
+        pass
+
+    # 注销面板和操作符
+    for cls in reversed(_classes):
+        try:
+            bpy.utils.unregister_class(cls)
+        except:
+            pass

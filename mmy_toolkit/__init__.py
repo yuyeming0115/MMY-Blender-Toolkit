@@ -646,6 +646,7 @@ from . import shapekey_tools
 from . import cleaning
 from . import poly_edit
 from . import translation_toggle
+from . import smart_naming
 
 
 # ============ 快捷键注册 ============
@@ -709,6 +710,7 @@ def register():
     cleaning.register()
     poly_edit.register()
     translation_toggle.register()
+    smart_naming.register()
 
     # 注册快捷键
     _register_keymaps()
@@ -777,6 +779,7 @@ def unregister():
     ui.unregister()
     mesh_tools.unregister()
     translation_toggle.unregister()
+    smart_naming.unregister()
 
     # 移除绘制函数
     try:
