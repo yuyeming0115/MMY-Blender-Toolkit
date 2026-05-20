@@ -193,6 +193,31 @@ class MMY_OT_RemoveRenderSuffix(bpy.types.Operator):
         return {"FINISHED"}
 
 
+class MMY_OT_AddAniCollectionName(bpy.types.Operator):
+    """添加动画集合名称预设"""
+    bl_idname = "mmy.add_ani_collection_name"
+    bl_label = "添加集合名"
+
+    def execute(self, context):
+        prefs = context.preferences.addons["mmy_toolkit"].preferences
+        item = prefs.ani_collection_names.add()
+        item.name = "Ani"
+        return {"FINISHED"}
+
+
+class MMY_OT_RemoveAniCollectionName(bpy.types.Operator):
+    """删除动画集合名称预设"""
+    bl_idname = "mmy.remove_ani_collection_name"
+    bl_label = "删除集合名"
+
+    index: bpy.props.IntProperty()
+
+    def execute(self, context):
+        prefs = context.preferences.addons["mmy_toolkit"].preferences
+        prefs.ani_collection_names.remove(self.index)
+        return {"FINISHED"}
+
+
 class MMY_OT_SavePreset(bpy.types.Operator):
     bl_idname = "mmy.save_preset"
     bl_label = "保存为预设"
@@ -287,6 +312,9 @@ class MMY_Preferences(bpy.types.AddonPreferences):
 
     # === 渲染预览图后缀去除列表 ===
     render_remove_suffixes: bpy.props.CollectionProperty(type=MMY_SuffixItem)
+
+    # === 动画集合名称预设列表 ===
+    ani_collection_names: bpy.props.CollectionProperty(type=MMY_SuffixItem)
 
     # 自动备份属性
     enabled_backup: bpy.props.BoolProperty(
@@ -399,6 +427,22 @@ class MMY_Preferences(bpy.types.AddonPreferences):
         r = box.row(align=True)
         r.operator("mmy.add_render_suffix", text="添加后缀", icon="ADD")
         r.label(text="示例: Model_Render.blend → Model.png")
+
+        layout.separator()
+
+        # === 动画集合名称预设 ===
+        layout.label(text="动画集合名称预设:", icon='OUTLINER_COLLECTION')
+        box = layout.box()
+        row = box.row()
+        row.label(text="关联动画时查找的集合名称:")
+        for i, item in enumerate(self.ani_collection_names):
+            r = box.row(align=True)
+            r.prop(item, "name", text="")
+            op = r.operator("mmy.remove_ani_collection_name", text="", icon="X")
+            op.index = i
+        r = box.row(align=True)
+        r.operator("mmy.add_ani_collection_name", text="添加名称", icon="ADD")
+        r.label(text="示例: Ani, Animation, 动画")
 
         layout.separator()
 
@@ -532,6 +576,8 @@ _classes = (
     MMY_OT_RemoveSuffix,
     MMY_OT_AddRenderSuffix,
     MMY_OT_RemoveRenderSuffix,
+    MMY_OT_AddAniCollectionName,
+    MMY_OT_RemoveAniCollectionName,
     MMY_OT_SavePreset,
     MMY_OT_DeletePreset,
     MMY_OT_OpenPrefs,
@@ -650,6 +696,13 @@ def register():
             for suffix in default_render_suffixes:
                 item = addon.preferences.render_remove_suffixes.add()
                 item.name = suffix
+
+        # 初始化默认动画集合名称预设
+        if len(addon.preferences.ani_collection_names) == 0:
+            default_ani_names = ["Ani", "Animation", "动画"]
+            for name in default_ani_names:
+                item = addon.preferences.ani_collection_names.add()
+                item.name = name
 
     # 启动自动备份定时器（类注册后）
     auto_backup.start_backup_if_enabled()

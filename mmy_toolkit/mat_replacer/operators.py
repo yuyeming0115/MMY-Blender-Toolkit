@@ -297,15 +297,31 @@ class MMY_OT_SelectAnimFile(bpy.types.Operator, ImportHelper):
         try:
             with bpy.data.libraries.load(filepath) as (data_from, data_to):
                 collections = list(data_from.collections)
-                has_ani = "Ani" in collections
 
-                props.has_ani_collection = has_ani
-                props.ani_collection_name = "Ani" if has_ani else ""
+                # 从偏好设置获取预设集合名称
+                addon = context.preferences.addons.get("mmy_toolkit")
+                preset_names = []
+                if addon and addon.preferences:
+                    preset_names = [item.name for item in addon.preferences.ani_collection_names]
 
-                if has_ani:
-                    self.report({'INFO'}, f"找到 Ani 集合")
+                # 如果没有预设，使用默认值
+                if not preset_names:
+                    preset_names = ["Ani"]
+
+                # 查找匹配的集合
+                found_name = None
+                for preset in preset_names:
+                    if preset in collections:
+                        found_name = preset
+                        break
+
+                props.has_ani_collection = found_name is not None
+                props.ani_collection_name = found_name if found_name else ""
+
+                if found_name:
+                    self.report({'INFO'}, f"找到集合: {found_name}")
                 else:
-                    self.report({'WARNING'}, f"文件中未找到 Ani 集合")
+                    self.report({'WARNING'}, f"未找到预设集合")
                     if collections:
                         self.report({'INFO'}, f"可用集合: {', '.join(collections[:5])}")
 
@@ -318,7 +334,7 @@ class MMY_OT_SelectAnimFile(bpy.types.Operator, ImportHelper):
 
 
 class MMY_OT_LinkAnimation(bpy.types.Operator):
-    """关联 Ani 集合到世界中心"""
+    """关联动画集合到世界中心"""
     bl_idname = "mmy.link_animation"
     bl_label = "关联动画"
     bl_options = {'REGISTER', 'UNDO'}
@@ -326,33 +342,33 @@ class MMY_OT_LinkAnimation(bpy.types.Operator):
     @classmethod
     def poll(cls, context):
         props = context.scene.mmy_mat_replacer
-        return props.anim_file and props.has_ani_collection
+        return props.anim_file and props.has_ani_collection and props.ani_collection_name
 
     def execute(self, context):
         props = context.scene.mmy_mat_replacer
         filepath = props.anim_file
+        collection_name = props.ani_collection_name
 
         if not os.path.exists(filepath):
             self.report({'ERROR'}, f"文件不存在")
             return {'CANCELLED'}
 
         try:
-            # Link Ani 集合
+            # Link 集合（使用预设中的名称）
             with bpy.data.libraries.load(filepath, link=True) as (data_from, data_to):
-                data_to.collections = ["Ani"]
+                data_to.collections = [collection_name]
 
-            # 查找 Ani 集合（可能带文件路径前缀）
+            # 查找 Link 集合（可能带文件路径前缀）
             ani_collection = None
             for coll in bpy.data.collections:
                 if coll.library is not None:
-                    # Link 的集合名称可能是 "Ani" 或包含 "Ani"
-                    if coll.name == "Ani" or "Ani" in coll.name.split('@')[0]:
+                    if coll.name == collection_name or collection_name in coll.name.split('@')[0]:
                         ani_collection = coll
                         print(f"[MMY] 找到Link集合: {coll.name}, library={coll.library}")
                         break
 
             if not ani_collection:
-                self.report({'ERROR'}, "Link 失败：未找到 Ani 集合")
+                self.report({'ERROR'}, f"Link 失败：未找到 {collection_name} 集合")
                 return {'CANCELLED'}
 
             # 检查集合是否为空
@@ -361,11 +377,11 @@ class MMY_OT_LinkAnimation(bpy.types.Operator):
             # 检查是否已有实例
             for obj in context.scene.objects:
                 if obj.instance_collection == ani_collection:
-                    self.report({'WARNING'}, "Ani 集合已存在实例")
+                    self.report({'WARNING'}, f"{collection_name} 集合已存在实例")
                     return {'FINISHED'}
 
             # 创建集合实例
-            instance = bpy.data.objects.new("Ani", None)
+            instance = bpy.data.objects.new(collection_name, None)
             instance.empty_display_type = 'PLAIN_AXES'
             instance.instance_type = 'COLLECTION'
             instance.instance_collection = ani_collection
