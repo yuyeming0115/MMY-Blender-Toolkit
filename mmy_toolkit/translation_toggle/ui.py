@@ -25,7 +25,7 @@ def _init_header_locations():
     global HEADER_LOCATIONS
     HEADER_LOCATIONS = [
         {
-            'menu': bpy.types.TOPBAR_HT_header,
+            'menu': bpy.types.TOPBAR_MT_editor_menus,
             'attr': 'translation_topbar',
             'drawing_func': draw_translation_button_topbar
         },
