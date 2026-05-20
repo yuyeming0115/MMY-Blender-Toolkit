@@ -9,7 +9,7 @@ class VIEW3D_PT_mmy_poly_edit(bpy.types.Panel):
     """Poly @ Edit 主面板"""
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
-    bl_category = 'MMY-Tools'
+    bl_category = 'MMY工具'
     bl_label = "Poly @ Edit"
 
     def draw(self, context):
@@ -20,7 +20,7 @@ class VIEW3D_PT_mmy_poly_edit_smooth_groups(bpy.types.Panel):
     """平滑组面板"""
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
-    bl_category = 'MMY-Tools'
+    bl_category = 'MMY工具'
     bl_label = "平滑组"
     bl_parent_id = "VIEW3D_PT_mmy_poly_edit"
 
@@ -109,7 +109,7 @@ class VIEW3D_PT_mmy_poly_edit_selection_sets(bpy.types.Panel):
     """选择集面板"""
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
-    bl_category = 'MMY-Tools'
+    bl_category = 'MMY工具'
     bl_label = "选择集"
     bl_parent_id = "VIEW3D_PT_mmy_poly_edit"
 

@@ -6,6 +6,7 @@ import re
 # ============ bl_info ============
 bl_info = {
     "name": "MMY Blender Toolkit",
+    "author": "会叫喵的鱼",
     "blender": (4, 5, 0),
     "version": (0, 5, 0),
     "category": "Pipeline",
