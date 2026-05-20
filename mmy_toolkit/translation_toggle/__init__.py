@@ -8,17 +8,21 @@ from .ui import (
     draw_translation_button_topbar,
     draw_translation_button_header,
     update_visual_settings,
+    _init_header_locations,
     HEADER_LOCATIONS,
 )
 
 
 def register():
+    # 初始化 Header 位置配置（延迟加载 bpy.types）
+    _init_header_locations()
+
     # 注册操作符
     bpy.utils.register_class(MMY_OT_ToggleTranslation)
 
     # 挂载 Header 按钮
     addon = bpy.context.preferences.addons.get("mmy_toolkit")
-    if addon and addon.preferences:
+    if addon and addon.preferences and HEADER_LOCATIONS:
         prefs = addon.preferences
         for loc in HEADER_LOCATIONS:
             if getattr(prefs, loc['attr'], False):
@@ -30,9 +34,7 @@ def register():
 
 def unregister():
     # 移除 Header 按钮
-    addon = bpy.context.preferences.addons.get("mmy_toolkit")
-    if addon and addon.preferences:
-        prefs = addon.preferences
+    if HEADER_LOCATIONS:
         for loc in HEADER_LOCATIONS:
             try:
                 loc['menu'].remove(loc['drawing_func'])

@@ -16,29 +16,35 @@ def draw_translation_button_header(self, context):
     layout.operator('mmy.toggle_translation', text='', icon='FILE_FONT')
 
 
-# Header 挂载位置配置
-HEADER_LOCATIONS = [
-    {
-        'menu': bpy.types.TOPBAR_HT_header,
-        'attr': 'translation_topbar',
-        'drawing_func': draw_translation_button_topbar
-    },
-    {
-        'menu': bpy.types.NODE_HT_header,
-        'attr': 'translation_node_header',
-        'drawing_func': draw_translation_button_header
-    },
-    {
-        'menu': bpy.types.PROPERTIES_HT_header,
-        'attr': 'translation_properties_header',
-        'drawing_func': draw_translation_button_header
-    },
-    {
-        'menu': bpy.types.VIEW3D_HT_header,
-        'attr': 'translation_view3d_header',
-        'drawing_func': draw_translation_button_header
-    },
-]
+# Header 挂载位置配置（延迟初始化）
+HEADER_LOCATIONS = None
+
+
+def _init_header_locations():
+    """初始化 Header 位置配置（在 register 时调用）"""
+    global HEADER_LOCATIONS
+    HEADER_LOCATIONS = [
+        {
+            'menu': bpy.types.TOPBAR_HT_header,
+            'attr': 'translation_topbar',
+            'drawing_func': draw_translation_button_topbar
+        },
+        {
+            'menu': bpy.types.NODE_HT_header,
+            'attr': 'translation_node_header',
+            'drawing_func': draw_translation_button_header
+        },
+        {
+            'menu': bpy.types.PROPERTIES_HT_header,
+            'attr': 'translation_properties_header',
+            'drawing_func': draw_translation_button_header
+        },
+        {
+            'menu': bpy.types.VIEW3D_HT_header,
+            'attr': 'translation_view3d_header',
+            'drawing_func': draw_translation_button_header
+        },
+    ]
 
 
 def update_visual_settings(menu, attr, drawing_func, unregister=False):
@@ -70,5 +76,7 @@ def update_visual_settings(menu, attr, drawing_func, unregister=False):
 
 def update_translation_buttons(self, context):
     """偏好设置变化时更新所有 Header 按钮"""
+    if HEADER_LOCATIONS is None:
+        return
     for loc in HEADER_LOCATIONS:
         update_visual_settings(loc['menu'], loc['attr'], loc['drawing_func'])
