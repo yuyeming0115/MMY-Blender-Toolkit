@@ -385,6 +385,20 @@ class MMY_Preferences(bpy.types.AddonPreferences):
         update=lambda self, ctx: _update_translation_buttons()
     )
 
+    # === 修改器显示切换按钮位置 ===
+    modifier_panel: bpy.props.BoolProperty(
+        name="修改器面板",
+        description="在修改器面板顶部显示切换按钮（推荐，稳定显示）",
+        default=True,
+        update=lambda self, ctx: _update_modifier_toggle_buttons()
+    )
+    modifier_properties_header: bpy.props.BoolProperty(
+        name="属性面板 Header",
+        description="在属性面板 Header 显示切换按钮（备用位置）",
+        default=False,
+        update=lambda self, ctx: _update_modifier_toggle_buttons()
+    )
+
     def draw(self, context):
         layout = self.layout
 
@@ -538,6 +552,16 @@ class MMY_Preferences(bpy.types.AddonPreferences):
 
         layout.separator()
 
+        # === 修改器显示切换按钮位置 ===
+        layout.label(text="修改器切换按钮位置:", icon='MODIFIER')
+        box = layout.box()
+        row = box.row()
+        row.prop(self, "modifier_panel")
+        row.prop(self, "modifier_properties_header")
+        box.label(text="一键切换所有修改器的视口显示状态")
+
+        layout.separator()
+
         # === 智能命名预设 ===
         layout.label(text="智能命名预设:", icon='SORTBYEXT')
         box = layout.box()
@@ -575,6 +599,12 @@ def _update_translation_buttons():
     """更新语言切换按钮显示"""
     from .translation_toggle.ui import update_translation_buttons
     update_translation_buttons(None, None)
+
+
+def _update_modifier_toggle_buttons():
+    """更新修改器切换按钮显示"""
+    from .modifier_tools.ui import update_modifier_buttons
+    update_modifier_buttons(None, None)
 
 
 # ============ 绘制函数 ============
@@ -710,6 +740,7 @@ from . import smart_naming
 from . import project_switcher
 from . import transform_check
 from . import sculpt_tools
+from . import modifier_tools
 
 
 # ============ 快捷键注册 ============
@@ -777,6 +808,7 @@ def register():
     project_switcher.register()
     transform_check.register()
     sculpt_tools.register()
+    modifier_tools.register()
 
     # 注册快捷键
     _register_keymaps()
@@ -855,6 +887,7 @@ def unregister():
     project_switcher.unregister()
     transform_check.unregister()
     sculpt_tools.unregister()
+    modifier_tools.unregister()
 
     # 移除绘制函数
     try:
