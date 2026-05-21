@@ -40,7 +40,7 @@ def register():
     if _HEADER_LOCATIONS:
         for loc in _HEADER_LOCATIONS:
             try:
-                loc['menu'].prepend(loc['drawing_func'])
+                loc['menu'].append(loc['drawing_func'])  # 使用 append 挂载到右边
             except:
                 pass
 

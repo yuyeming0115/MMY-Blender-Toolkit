@@ -69,7 +69,7 @@ def update_visual_settings(menu, attr, drawing_func, default_show=True, unregist
         # preferences 未初始化时使用默认值
         if default_show:
             try:
-                menu.prepend(drawing_func)
+                menu.append(drawing_func)  # 使用 append 挂载到右边
             except:
                 pass
         return
@@ -89,7 +89,7 @@ def update_visual_settings(menu, attr, drawing_func, default_show=True, unregist
             menu.remove(drawing_func)
         except:
             pass
-        menu.prepend(drawing_func)
+        menu.append(drawing_func)  # 使用 append 挂载到右边
 
 
 def update_modifier_buttons(self, context):
