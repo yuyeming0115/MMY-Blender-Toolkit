@@ -4,8 +4,129 @@ import bpy
 import os
 import subprocess
 import platform
+import tempfile
+import struct
 
 
+# ============ 缩略图缓存 ============
+_thumbnail_cache = {}  # filepath -> {'icon_id': int, 'image_name': str}
+_temp_images = []  # 临时加载的图像列表，用于清理
+
+
+def extract_blend_thumbnail(filepath):
+    """从.blend文件中提取嵌入的缩略图PNG数据
+
+    .blend文件结构：文件头部包含一个嵌入的预览图（如果启用了"Save Preview"选项）
+    预览图是PNG格式，嵌入在文件开头约200字节后的位置
+    """
+    try:
+        with open(filepath, 'rb') as f:
+            # 读取前64KB足够找到缩略图
+            data = f.read(65536)
+
+            # PNG文件头标识
+            png_header = b'\x89PNG\r\n\x1a\n'
+            png_start = data.find(png_header)
+
+            if png_start == -1:
+                # 没有找到PNG，文件可能没有保存预览图
+                return None
+
+            # 找到PNG的结尾 (IEND chunk)
+            iend_marker = b'IEND'
+            iend_pos = data.find(iend_marker, png_start)
+            if iend_pos == -1:
+                return None
+
+            # IEND chunk完整结束位置（包含CRC）
+            png_end = iend_pos + 8  # IEND(4) + CRC(4)
+
+            # 提取完整的PNG数据
+            png_data = data[png_start:png_end]
+
+            return png_data
+    except Exception:
+        return None
+
+
+def get_thumbnail_icon_id(filepath):
+    """获取文件缩略图的icon_id（带缓存）"""
+
+    # 检查缓存
+    if filepath in _thumbnail_cache:
+        cache_entry = _thumbnail_cache[filepath]
+        # 验证图像仍然存在
+        if cache_entry['image_name'] in bpy.data.images:
+            return cache_entry['icon_id']
+        else:
+            # 缓存失效，清理
+            _thumbnail_cache.pop(filepath, None)
+
+    # 提取缩略图
+    png_data = extract_blend_thumbnail(filepath)
+
+    if png_data is None:
+        # 没有缩略图，返回默认图标
+        return None
+
+    # 创建临时文件
+    temp_dir = tempfile.gettempdir()
+    thumb_filename = f"mmy_thumb_{os.path.basename(filepath)}.png"
+    temp_path = os.path.join(temp_dir, thumb_filename)
+
+    try:
+        # 写入临时PNG文件
+        with open(temp_path, 'wb') as f:
+            f.write(png_data)
+
+        # 加载为Blender图像
+        try:
+            image = bpy.data.images.load(temp_path)
+        except RuntimeError:
+            # 图像可能已存在
+            image = bpy.data.images.get(thumb_filename)
+            if image is None:
+                return None
+
+        # 确保图像有预览
+        if image.preview is None:
+            # 强制生成预览
+            image.reload()
+
+        # 获取icon_id
+        icon_id = image.preview.icon_id
+
+        # 缓存
+        _thumbnail_cache[filepath] = {
+            'icon_id': icon_id,
+            'image_name': image.name
+        }
+        _temp_images.append(image.name)
+
+        return icon_id
+
+    except Exception:
+        return None
+
+
+def cleanup_thumbnail_cache():
+    """清理缩略图缓存和临时图像"""
+    global _thumbnail_cache, _temp_images
+
+    # 删除临时图像
+    for img_name in _temp_images:
+        try:
+            img = bpy.data.images.get(img_name)
+            if img:
+                bpy.data.images.remove(img)
+        except:
+            pass
+
+    _thumbnail_cache.clear()
+    _temp_images.clear()
+
+
+# ============ 操作符 ============
 class MMY_OT_OpenProjectFile(bpy.types.Operator):
     """打开项目文件"""
     bl_idname = "mmy.open_project_file"
@@ -49,6 +170,18 @@ class MMY_OT_OpenProjectDirectory(bpy.types.Operator):
         return {'FINISHED'}
 
 
+class MMY_OT_ClearThumbnailCache(bpy.types.Operator):
+    """清理缩略图缓存"""
+    bl_idname = "mmy.clear_thumbnail_cache"
+    bl_label = "清理缩略图缓存"
+    bl_options = {'REGISTER'}
+
+    def execute(self, context):
+        cleanup_thumbnail_cache()
+        self.report({'INFO'}, "缩略图缓存已清理")
+        return {'FINISHED'}
+
+
 class MMY_MT_ProjectFiles(bpy.types.Menu):
     """项目文件下拉菜单"""
     bl_idname = "MMY_MT_project_files"
@@ -86,12 +219,25 @@ class MMY_MT_ProjectFiles(bpy.types.Menu):
         for i, (f, mtime, full_path) in enumerate(blend_files[:max_files]):
             if i >= max_files:
                 break
+
+            # 尝试获取缩略图
+            icon_id = get_thumbnail_icon_id(full_path)
+
             # 当前文件标记 ✓
             if f == current_name:
                 text = f"✓ {f}"
             else:
                 text = f
-            op = layout.operator("mmy.open_project_file", text=text, icon='FILE_BLEND')
+
+            # 使用缩略图或默认图标
+            row = layout.row(align=True)
+            if icon_id is not None:
+                # 显示缩略图
+                row.template_icon(icon_value=icon_id, scale=1.0)
+                op = row.operator("mmy.open_project_file", text=text)
+            else:
+                # 使用默认图标
+                op = row.operator("mmy.open_project_file", text=text, icon='FILE_BLEND')
             op.filepath = full_path
 
         # 如果有更多文件，显示提示
@@ -104,10 +250,15 @@ class MMY_MT_ProjectFiles(bpy.types.Menu):
         # 打开目录
         layout.operator("mmy.open_project_directory", text="打开目录", icon='FILE_FOLDER')
 
+        # 清理缓存（可选）
+        layout.separator()
+        layout.operator("mmy.clear_thumbnail_cache", text="刷新缩略图", icon='FILE_REFRESH')
+
 
 _classes = (
     MMY_OT_OpenProjectFile,
     MMY_OT_OpenProjectDirectory,
+    MMY_OT_ClearThumbnailCache,
     MMY_MT_ProjectFiles,
 )
 
@@ -125,6 +276,9 @@ def register():
 
 
 def unregister():
+    # 清理缩略图缓存
+    cleanup_thumbnail_cache()
+
     for cls in reversed(_classes):
         try:
             bpy.utils.unregister_class(cls)
