@@ -117,7 +117,6 @@ def _draw_project_switcher(self, context):
     row = self.layout.row(align=True)
 
     if filepath:
-        filename = os.path.splitext(os.path.basename(filepath))[0]
-        row.menu("MMY_MT_project_files", text=f"📂 {filename}")
+        row.menu("MMY_MT_project_files", text="", icon='FILE_FOLDER')
     else:
-        row.label(text="📂 未保存", icon='FILE_BLEND')
+        row.label(text="", icon='FILE_BLEND')
