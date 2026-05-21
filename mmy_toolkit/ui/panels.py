@@ -131,10 +131,8 @@ class VIEW3D_PT_MMYMeshTools(bpy.types.Panel):
         # asset_path 的 subtype="DIR_PATH" 会自动显示文件夹按钮
         row = box.row(align=True)
         row.prop(props, "asset_path", text="")
-        # ➕ 快速收藏按钮（在文件夹按钮后、书签按钮前）
+        # ➕ 快速收藏按钮
         row.operator("mmy.add_favorite_path", text="", icon='ADD')
-        # 🔖 收藏路径菜单
-        row.menu("MMY_MT_favorite_path_menu", text="", icon='BOOKMARKS')
 
         # === 资产信息：名称 + 分类（一行）===
         row = box.row(align=True)
