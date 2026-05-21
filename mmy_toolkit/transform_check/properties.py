@@ -58,7 +58,7 @@ class TQA_Properties(PropertyGroup):
     issue_count_parent_dirty: IntProperty(default=0)
     problem_names_preview: StringProperty(default="")
     fix_skip_summary: StringProperty(default="")
-    last_action_report: StringProperty(default="点击"扫描"开始检查。")
+    last_action_report: StringProperty(default="点击'扫描'开始检查。")
 
 
 _classes = (TQA_Properties,)
