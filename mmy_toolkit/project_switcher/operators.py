@@ -54,13 +54,19 @@ class MMY_OT_OpenFileBrowser(bpy.types.Operator):
 
         directory = os.path.dirname(filepath)
 
-        # 打开 Blender 文件浏览器，显示缩略图
-        # 使用 wm.filebrowser_open 打开文件选择对话框
-        bpy.ops.wm.filebrowser_open(
-            directory=directory,
-            filter_blender=True,
-            display_type='THUMBNAIL',  # 缩略图显示模式
-        )
+        # 方法：切换当前区域为文件浏览器
+        # 找到一个合适的区域切换
+        for area in context.screen.areas:
+            if area.type in ('VIEW_3D', 'PROPERTIES', 'OUTLINER'):
+                area.type = 'FILE_BROWSER'
+                # 设置目录和显示模式
+                for space in area.spaces:
+                    if space.type == 'FILE_BROWSER':
+                        space.params.directory = directory
+                        space.params.display_type = 'THUMBNAIL'
+                        space.params.filter_blender = True
+                        break
+                break
 
         return {'FINISHED'}
 
