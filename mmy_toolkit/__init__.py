@@ -621,7 +621,7 @@ def draw_suffix_menu(self, context):
 
 
 def draw_statusbar_backup(self, context):
-    """状态栏显示自动备份状态"""
+    """状态栏显示自动备份状态 - 能量条效果"""
     addon = context.preferences.addons.get("mmy_toolkit")
     if not addon or not addon.preferences:
         return
@@ -630,6 +630,7 @@ def draw_statusbar_backup(self, context):
     try:
         if not bool(prefs.enabled_backup):
             return
+        threshold = int(prefs.capacity_threshold_mb)
     except:
         return
 
@@ -639,12 +640,27 @@ def draw_statusbar_backup(self, context):
     layout = self.layout
     row = layout.row(align=True)
 
-    # 容量警告时显示红色
-    if status['warning']:
-        row.alert = True
-        row.label(text=f"[MMY备份] ⚠️ {status['capacity_mb']:.0f}MB | 请清理")
+    # 计算填充比例
+    capacity = status['capacity_mb']
+    ratio = min(capacity / threshold, 1.0)
+
+    # 生成能量条字符串（10格）
+    filled = int(ratio * 10)
+    bar = "█" * filled + "░" * (10 - filled)
+
+    # 根据比例选择状态图标
+    if ratio < 0.5:
+        icon = 'CHECKMARK'  # 正常
+    elif ratio < 0.75:
+        icon = 'ERROR'      # 注意（黄色）
+    elif ratio < 0.9:
+        icon = 'QUESTION'   # 警告（橙色提示）
     else:
-        row.label(text=f"[MMY备份] {status['capacity_mb']:.0f}MB | 下次: {get_next_save_time()}")
+        icon = 'X'          # 需清理（红色）
+        row.alert = True
+
+    # 显示能量条 + 容量 + 下次时间
+    row.label(text=f"[MMY] {bar} {capacity:.0f}MB | {get_next_save_time()}", icon=icon)
 
 
 # ============ 所有类 ============
