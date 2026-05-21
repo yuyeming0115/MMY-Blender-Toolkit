@@ -579,17 +579,20 @@ def _update_translation_buttons():
 
 # ============ 绘制函数 ============
 def _draw_header_buttons(self, context):
-    """3D视图 Header 按钮绘制函数（项目文件切换 + 焦距预设）"""
-    from .project_switcher.operators import _draw_project_switcher
+    """3D视图 Header 按钮绘制函数（焦距预设）"""
     from .camera_tools.operators import _draw_lens_header
-
-    _draw_project_switcher(self, context)
     _draw_lens_header(self, context)
 
 
 def _draw_topbar_buttons(self, context):
-    """顶栏按钮绘制函数（渲染预览图 - 右侧区域）"""
+    """顶栏按钮绘制函数（右侧区域：项目文件切换 + 渲染预览图）"""
+    if context.region.alignment != 'RIGHT':
+        return
+
+    from .project_switcher.operators import _draw_project_switcher
     from .render_preview import _append_render_button
+
+    _draw_project_switcher(self, context)
     _append_render_button(self, context)
 
 

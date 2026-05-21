@@ -109,8 +109,8 @@ def unregister():
 
 
 def _draw_project_switcher(self, context):
-    space = context.space_data
-    if not space or space.type != 'VIEW_3D':
+    """顶栏项目文件切换按钮（右侧区域）"""
+    if context.region.alignment != 'RIGHT':
         return
 
     filepath = bpy.data.filepath
