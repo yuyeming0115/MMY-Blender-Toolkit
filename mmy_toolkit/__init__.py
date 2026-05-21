@@ -354,9 +354,9 @@ class MMY_Preferences(bpy.types.AddonPreferences):
     capacity_threshold_mb: bpy.props.IntProperty(
         name="容量警告阈值（MB）",
         description="超过此容量时在状态栏显示警告",
-        default=500,
+        default=10000,
         min=100,
-        max=5000
+        max=50000
     )
 
     # === 语言切换按钮位置 ===
