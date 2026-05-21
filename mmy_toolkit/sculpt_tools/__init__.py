@@ -1,48 +1,86 @@
-"""雕刻工具模块 - 面组右键菜单"""
+"""雕刻工具模块 - 面组菜单"""
 
 import bpy
 
 
-def _append_sculpt_context_menu(self, context):
-    """在雕刻模式右键菜单中添加面组功能"""
+class MMY_MT_SculptFaceSets(bpy.types.Menu):
+    """面组菜单"""
+    bl_idname = "MMY_MT_sculpt_face_sets"
+    bl_label = "面组"
+
+    def draw(self, context):
+        layout = self.layout
+
+        # 创建面组
+        layout.label(text="创建")
+        layout.operator("sculpt.face_sets_create", text="从遮罩创建").mode = 'MASK'
+        layout.operator("sculpt.face_sets_create", text="从可见面创建").mode = 'VISIBLE'
+
+        layout.separator()
+
+        # 可见性控制
+        layout.label(text="可见性")
+        layout.operator("sculpt.face_set_change_visibility", text="切换显示")
+        layout.operator("sculpt.face_set_invert_visibility", text="反转可见性")
+
+        layout.separator()
+
+        # 全局控制
+        layout.label(text="全局")
+        layout.operator("sculpt.face_set_hide_all", text="隐藏全部")
+        layout.operator("sculpt.face_set_show_all", text="显示全部")
+
+        layout.separator()
+
+        # 编辑功能
+        layout.label(text="编辑")
+        layout.operator("sculpt.face_set_edit", text="填充面组").mode = 'GROW'
+        layout.operator("sculpt.face_set_edit", text="收缩面组").mode = 'SHRINK'
+
+
+_classes = (MMY_MT_SculptFaceSets,)
+
+
+def _draw_sculpt_header_menu(self, context):
+    """在雕刻模式 Header 添加面组菜单按钮"""
     obj = context.active_object
     if not obj or obj.type != 'MESH' or obj.mode != 'SCULPT':
         return
 
     layout = self.layout
-    layout.separator()
-    layout.label(text="面组")
-
-    # 创建面组（基于选择/遮罩）
-    layout.operator("sculpt.face_sets_create", text="从遮罩创建", icon='GROUP_VERTEX').mode = 'MASK'
-
-    # 可见性控制
     row = layout.row(align=True)
-    row.operator("sculpt.face_set_change_visibility", text="切换显示", icon='HIDE_OFF')
-    row.operator("sculpt.face_set_invert_visibility", text="反转", icon='ARROW_LEFTRIGHT')
-
-    # 全局控制
-    row = layout.row(align=True)
-    row.operator("sculpt.face_set_hide_all", text="隐藏全部", icon='HIDE_ON')
-    row.operator("sculpt.face_set_show_all", text="显示全部", icon='HIDE_OFF')
-
-    # 编辑功能
-    layout.separator()
-    layout.operator("sculpt.face_set_edit", text="填充", icon='FILL').mode = 'GROW'
-    layout.operator("sculpt.face_set_edit", text="收缩", icon='SHRINK').mode = 'SHRINK'
+    row.menu("MMY_MT_sculpt_face_sets", text="", icon='GROUP_VERTEX')
 
 
 def register():
     """注册模块"""
+    # 注册菜单类
+    for cls in _classes:
+        try:
+            bpy.utils.register_class(cls)
+        except ValueError:
+            bpy.utils.unregister_class(cls)
+            bpy.utils.register_class(cls)
+
+    # 挂载到雕刻模式 Header
     try:
-        bpy.types.VIEW3D_MT_sculpt_context_menu.append(_append_sculpt_context_menu)
+        bpy.types.VIEW3D_HT_header.append(_draw_sculpt_header_menu)
+        print("[MMY Sculpt] 面组菜单已添加到雕刻模式 Header")
     except Exception as e:
-        print(f"[MMY Sculpt] 注册右键菜单失败: {e}")
+        print(f"[MMY Sculpt] 挂载 Header 失败: {e}")
 
 
 def unregister():
     """注销模块"""
+    # 移除 Header 挂载
     try:
-        bpy.types.VIEW3D_MT_sculpt_context_menu.remove(_append_sculpt_context_menu)
+        bpy.types.VIEW3D_HT_header.remove(_draw_sculpt_header_menu)
     except:
         pass
+
+    # 注销菜单类
+    for cls in reversed(_classes):
+        try:
+            bpy.utils.unregister_class(cls)
+        except:
+            pass
