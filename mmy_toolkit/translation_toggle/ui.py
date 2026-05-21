@@ -6,14 +6,24 @@ import bpy
 def draw_translation_button_topbar(self, context):
     """顶栏菜单绘制（带分隔符）"""
     layout = self.layout
-    layout.operator('mmy.toggle_translation', text='', icon='FILE_FONT')
+    use_translate = context.preferences.view.use_translate_interface
+    text = "中" if use_translate else "En"
+    # 紧凑方形按钮
+    row = layout.row(align=True)
+    row.ui_units_x = 1.0
+    row.operator('mmy.toggle_translation', text=text, emboss=True)
     layout.separator()
 
 
 def draw_translation_button_header(self, context):
     """普通 Header 绘制（无分隔符）"""
     layout = self.layout
-    layout.operator('mmy.toggle_translation', text='', icon='FILE_FONT')
+    use_translate = context.preferences.view.use_translate_interface
+    text = "中" if use_translate else "En"
+    # 紧凑方形按钮
+    row = layout.row(align=True)
+    row.ui_units_x = 1.0
+    row.operator('mmy.toggle_translation', text=text, emboss=True)
 
 
 # Header 挂载位置配置（延迟初始化）
