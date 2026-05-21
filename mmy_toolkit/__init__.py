@@ -579,11 +579,12 @@ def _update_translation_buttons():
 
 # ============ 绘制函数 ============
 def _draw_header_buttons(self, context):
-    """统一的 Header 按钮绘制函数（焦距预设 + 渲染预览图）"""
-    # 焦距在前，渲染在后
+    """统一的 Header 按钮绘制函数（项目文件切换 + 焦距预设 + 渲染预览图）"""
+    from .project_switcher.operators import _draw_project_switcher
     from .camera_tools.operators import _draw_lens_header
     from .render_preview import _append_render_button
 
+    _draw_project_switcher(self, context)  # 项目文件切换在最前
     _draw_lens_header(self, context)
     _append_render_button(self, context)
 
@@ -697,6 +698,7 @@ from . import cleaning
 from . import poly_edit
 from . import translation_toggle
 from . import smart_naming
+from . import project_switcher
 
 
 # ============ 快捷键注册 ============
@@ -761,6 +763,7 @@ def register():
     poly_edit.register()
     translation_toggle.register()
     smart_naming.register()
+    project_switcher.register()
 
     # 注册快捷键
     _register_keymaps()
@@ -830,6 +833,7 @@ def unregister():
     mesh_tools.unregister()
     translation_toggle.unregister()
     smart_naming.unregister()
+    project_switcher.unregister()
 
     # 移除绘制函数
     try:
