@@ -709,6 +709,7 @@ from . import translation_toggle
 from . import smart_naming
 from . import project_switcher
 from . import transform_check
+from . import sculpt_tools
 
 
 # ============ 快捷键注册 ============
@@ -775,6 +776,7 @@ def register():
     smart_naming.register()
     project_switcher.register()
     transform_check.register()
+    sculpt_tools.register()
 
     # 注册快捷键
     _register_keymaps()
@@ -852,6 +854,7 @@ def unregister():
     smart_naming.unregister()
     project_switcher.unregister()
     transform_check.unregister()
+    sculpt_tools.unregister()
 
     # 移除绘制函数
     try:
