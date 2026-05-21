@@ -21,7 +21,7 @@ class MMY_OT_ToggleTranslation(bpy.types.Operator):
             current = view.use_translate_interface
             view.use_translate_interface = not current
             view.use_translate_tooltips = view.use_translate_interface
-            view.use_translate_new_dataname = view.use_translate_interface
+            # 不切换 use_translate_new_dataname，保持用户原有设置
 
             # 显示切换结果
             status = "中文" if view.use_translate_interface else "英文"
