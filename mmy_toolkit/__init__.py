@@ -386,16 +386,16 @@ class MMY_Preferences(bpy.types.AddonPreferences):
     )
 
     # === 修改器显示切换按钮位置 ===
-    modifier_data_header: bpy.props.BoolProperty(
-        name="数据属性面板",
-        description="在数据属性面板 Header 显示修改器切换按钮（仅 Blender 4.x）",
+    modifier_panel: bpy.props.BoolProperty(
+        name="修改器面板",
+        description="在修改器面板顶部显示切换按钮（推荐，稳定显示）",
         default=True,
         update=lambda self, ctx: _update_modifier_toggle_buttons()
     )
     modifier_properties_header: bpy.props.BoolProperty(
-        name="属性面板",
-        description="在属性面板 Header 显示修改器切换按钮",
-        default=True,
+        name="属性面板 Header",
+        description="在属性面板 Header 显示切换按钮（备用位置）",
+        default=False,
         update=lambda self, ctx: _update_modifier_toggle_buttons()
     )
 
@@ -556,7 +556,7 @@ class MMY_Preferences(bpy.types.AddonPreferences):
         layout.label(text="修改器切换按钮位置:", icon='MODIFIER')
         box = layout.box()
         row = box.row()
-        row.prop(self, "modifier_data_header")
+        row.prop(self, "modifier_panel")
         row.prop(self, "modifier_properties_header")
         box.label(text="一键切换所有修改器的视口显示状态")
 
