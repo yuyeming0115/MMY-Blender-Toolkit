@@ -579,13 +579,17 @@ def _update_translation_buttons():
 
 # ============ 绘制函数 ============
 def _draw_header_buttons(self, context):
-    """统一的 Header 按钮绘制函数（项目文件切换 + 焦距预设 + 渲染预览图）"""
+    """3D视图 Header 按钮绘制函数（项目文件切换 + 焦距预设）"""
     from .project_switcher.operators import _draw_project_switcher
     from .camera_tools.operators import _draw_lens_header
-    from .render_preview import _append_render_button
 
-    _draw_project_switcher(self, context)  # 项目文件切换在最前
+    _draw_project_switcher(self, context)
     _draw_lens_header(self, context)
+
+
+def _draw_topbar_buttons(self, context):
+    """顶栏按钮绘制函数（渲染预览图 - 右侧区域）"""
+    from .render_preview import _append_render_button
     _append_render_button(self, context)
 
 
@@ -783,6 +787,12 @@ def register():
     except:
         pass
 
+    # 挂载顶栏按钮（渲染预览图）
+    try:
+        bpy.types.TOPBAR_HT_upper_bar.prepend(_draw_topbar_buttons)
+    except:
+        pass
+
     # 挂载状态栏备份状态显示
     try:
         bpy.types.STATUSBAR_HT_header.append(draw_statusbar_backup)
@@ -847,6 +857,11 @@ def unregister():
     # 移除统一的 Header 按钮
     try:
         bpy.types.VIEW3D_HT_header.remove(_draw_header_buttons)
+    except:
+        pass
+    # 移除顶栏按钮
+    try:
+        bpy.types.TOPBAR_HT_upper_bar.remove(_draw_topbar_buttons)
     except:
         pass
     try:

@@ -313,12 +313,13 @@ _classes = (
 
 
 def _append_render_button(self, context):
-    """在 3D 视图 Header 添加渲染按钮和下拉菜单"""
-    layout = self.layout
+    """顶栏渲染按钮（右侧区域）"""
+    if context.region.alignment != 'RIGHT':
+        return
+
     # 只在对象模式下显示
     if context.mode == 'OBJECT':
-        layout.separator()
-        # 主按钮 + 下拉菜单
+        layout = self.layout
         row = layout.row(align=True)
         row.operator("mmy.render_preview", text="", icon='RENDER_STILL')
         row.menu("MMY_MT_render_preview_menu", text="", icon='DOWNARROW_HLT')

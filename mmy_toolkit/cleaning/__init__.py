@@ -1,4 +1,4 @@
-"""清理工具模块 - Header 按钮 + 弹出菜单"""
+"""清理工具模块 - 顶栏按钮 + 弹出菜单"""
 
 import bpy
 
@@ -26,7 +26,10 @@ class MMY_MT_CleaningMenu(bpy.types.Menu):
 
 
 def _draw_cleaning_button(self, context):
-    """Header 清理按钮绘制函数"""
+    """顶栏清理按钮绘制函数（右侧区域）"""
+    if context.region.alignment != 'RIGHT':
+        return
+
     layout = self.layout
     layout.menu("MMY_MT_cleaning_menu", text="", icon='BRUSH_DATA')
 
@@ -45,14 +48,14 @@ def register():
     from .operators import register
     register()
 
-    # 挂载 Header 按钮
-    bpy.types.VIEW3D_HT_header.prepend(_draw_cleaning_button)
+    # 挂载到顶栏右侧
+    bpy.types.TOPBAR_HT_upper_bar.prepend(_draw_cleaning_button)
 
 
 def unregister():
-    # 移除 Header 按钮
+    # 移除顶栏按钮
     try:
-        bpy.types.VIEW3D_HT_header.remove(_draw_cleaning_button)
+        bpy.types.TOPBAR_HT_upper_bar.remove(_draw_cleaning_button)
     except:
         pass
 
