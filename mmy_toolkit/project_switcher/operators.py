@@ -115,6 +115,7 @@ def _draw_project_switcher(self, context):
 
     filepath = bpy.data.filepath
     row = self.layout.row(align=True)
+    row.ui_units_x = 2.0  # 固定宽度容纳两个字
 
     if filepath:
         row.menu("MMY_MT_project_files", text="项目", icon='FILE_FOLDER')
