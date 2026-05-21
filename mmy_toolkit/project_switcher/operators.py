@@ -17,20 +17,26 @@ def extract_blend_thumbnail(filepath):
     """从.blend文件中提取嵌入的缩略图PNG数据
 
     .blend文件结构：文件头部包含一个嵌入的预览图（如果启用了"Save Preview"选项）
-    预览图是PNG格式，嵌入在文件开头约200字节后的位置
+    预览图是PNG格式，通常存储在前面的块中
     """
     try:
         with open(filepath, 'rb') as f:
-            # 读取前64KB足够找到缩略图
-            data = f.read(65536)
+            # 读取前256KB，确保覆盖整个预览区域
+            data = f.read(262144)
 
             # PNG文件头标识
             png_header = b'\x89PNG\r\n\x1a\n'
             png_start = data.find(png_header)
 
             if png_start == -1:
-                # 没有找到PNG，文件可能没有保存预览图
-                return None
+                # 尝试读取更多数据
+                f.seek(0)
+                data = f.read(524288)  # 512KB
+                png_start = data.find(png_header)
+
+                if png_start == -1:
+                    # 没有找到PNG，文件可能没有保存预览图
+                    return None
 
             # 找到PNG的结尾 (IEND chunk)
             iend_marker = b'IEND'
@@ -44,8 +50,13 @@ def extract_blend_thumbnail(filepath):
             # 提取完整的PNG数据
             png_data = data[png_start:png_end]
 
+            # 验证PNG完整性
+            if len(png_data) < 100:  # 太小，可能是无效数据
+                return None
+
             return png_data
-    except Exception:
+    except Exception as e:
+        print(f"[MMY] 提取缩略图失败: {filepath}, 错误: {e}")
         return None
 
 
@@ -249,6 +260,9 @@ class MMY_MT_ProjectFiles(bpy.types.Menu):
 
         # 打开目录
         layout.operator("mmy.open_project_directory", text="打开目录", icon='FILE_FOLDER')
+
+        # 缩略图提示
+        layout.label(text="提示: 保存时勾选 'Save Preview Images'", icon='INFO')
 
         # 清理缓存（可选）
         layout.separator()
