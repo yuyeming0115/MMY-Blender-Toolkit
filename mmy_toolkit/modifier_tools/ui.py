@@ -33,20 +33,25 @@ HEADER_LOCATIONS = None
 def _init_header_locations():
     """初始化 Header 位置配置（在 register 时调用）"""
     global HEADER_LOCATIONS
-    HEADER_LOCATIONS = [
-        {
+    HEADER_LOCATIONS = []
+
+    # DATA_HT_header 在 Blender 5.1 中被移除，需检查是否存在
+    if hasattr(bpy.types, 'DATA_HT_header'):
+        HEADER_LOCATIONS.append({
             'menu': bpy.types.DATA_HT_header,
             'attr': 'modifier_data_header',
             'drawing_func': draw_modifier_toggle_button,
             'default_show': True
-        },
-        {
-            'menu': bpy.types.PROPERTIES_HT_header,
-            'attr': 'modifier_properties_header',
-            'drawing_func': draw_modifier_toggle_button_properties,
-            'default_show': False
-        },
-    ]
+        })
+
+    # PROPERTIES_HT_header 在所有版本中都可用
+    HEADER_LOCATIONS.append({
+        'menu': bpy.types.PROPERTIES_HT_header,
+        'attr': 'modifier_properties_header',
+        'drawing_func': draw_modifier_toggle_button_properties,
+        'default_show': False
+    })
+
     return HEADER_LOCATIONS
 
 
