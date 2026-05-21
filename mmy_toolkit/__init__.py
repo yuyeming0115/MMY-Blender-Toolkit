@@ -585,14 +585,16 @@ def _draw_header_buttons(self, context):
 
 
 def _draw_topbar_buttons(self, context):
-    """顶栏按钮绘制函数（右侧区域：项目文件切换 + 渲染预览图）"""
+    """顶栏按钮绘制函数（右侧区域：项目文件切换 + TQA + 渲染预览图）"""
     if context.region.alignment != 'RIGHT':
         return
 
     from .project_switcher.operators import _draw_project_switcher
+    from .transform_check.operators import _draw_tqa_header_button
     from .render_preview import _append_render_button
 
     _draw_project_switcher(self, context)
+    _draw_tqa_header_button(self, context)
     _append_render_button(self, context)
 
 
@@ -706,6 +708,7 @@ from . import poly_edit
 from . import translation_toggle
 from . import smart_naming
 from . import project_switcher
+from . import transform_check
 
 
 # ============ 快捷键注册 ============
@@ -771,6 +774,7 @@ def register():
     translation_toggle.register()
     smart_naming.register()
     project_switcher.register()
+    transform_check.register()
 
     # 注册快捷键
     _register_keymaps()
@@ -847,6 +851,7 @@ def unregister():
     translation_toggle.unregister()
     smart_naming.unregister()
     project_switcher.unregister()
+    transform_check.unregister()
 
     # 移除绘制函数
     try:
