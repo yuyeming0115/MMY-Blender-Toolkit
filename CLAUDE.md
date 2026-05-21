@@ -82,6 +82,25 @@ def get_items(self, context):
 - 用户确认后才执行合并操作
 - 合并后及时更新相关开发文档
 
+### 自动打包机制
+
+**触发时机**：每次功能完成或 Bug 修复合并到 main 后，自动打包分发版本。
+
+**打包命令**：
+```bash
+python pack.py
+```
+
+**输出位置**：`releases/MMY_Blender_Toolkit_v0.5.0_20260521_1430.zip`
+
+**命名格式**：`MMY_Blender_Toolkit_{版本号}_{日期时间}.zip`
+
+**打包内容**：
+- `mmy_toolkit/` 整个目录
+- 排除：`__pycache__`、`.pyc`、用户自定义预设
+
+**版本号来源**：自动读取 `mmy_toolkit/__init__.py` 的 `bl_info["version"]`
+
 ---
 
 ## 模块化开发文档管理
