@@ -5,6 +5,7 @@ import bpy
 
 from .operators import _classes as _op_classes
 from .ui import (
+    _classes_ui,
     draw_modifier_buttons_panel,
     draw_modifier_buttons_header,
     update_visual_settings,
@@ -36,7 +37,12 @@ def register():
     global _HEADER_LOCATIONS
     _HEADER_LOCATIONS = _init_header_locations()
 
+    # 注册操作符
     for cls in _op_classes:
+        bpy.utils.register_class(cls)
+
+    # 注册菜单类
+    for cls in _classes_ui:
         bpy.utils.register_class(cls)
 
     if _HEADER_LOCATIONS:
@@ -66,6 +72,12 @@ def unregister():
         bpy.app.timers.unregister(_sync_buttons_delayed)
     except:
         pass
+
+    for cls in reversed(_classes_ui):
+        try:
+            bpy.utils.unregister_class(cls)
+        except:
+            pass
 
     for cls in reversed(_op_classes):
         try:

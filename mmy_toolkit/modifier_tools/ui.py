@@ -3,18 +3,75 @@
 import bpy
 
 
+# ============ 修改器分类定义 ============
+# 按类别分组，便于快速查找
+
+MODIFIER_CATEGORIES = {
+    "生成": [
+        ('ARRAY', "阵列", 'MOD_ARRAY'),
+        ('BOOLEAN', "布尔", 'MOD_BOOLEAN'),
+        ('BUILD', "构建", 'MOD_BUILD'),
+        ('DECIMATE', "精简", 'MOD_DECIM'),
+        ('EDGE_SPLIT', "拆边", 'MOD_EDGESPLIT'),
+        ('MASK', "遮罩", 'MOD_MASK'),
+        ('MIRROR', "镜像", 'MOD_MIRROR'),
+        ('MULTIRES', "多级精度", 'MOD_MULTIRES'),
+        ('REMESH', "重构网格", 'MOD_REMESH'),
+        ('SCREW', "螺旋", 'MOD_SCREW'),
+        ('SKIN', "蒙皮", 'MOD_SKIN'),
+        ('SOLIDIFY', "实体化", 'MOD_SOLIDIFY'),
+        ('SUBSURF', "细分", 'MOD_SUBSURF'),
+        ('TRIANGULATE', "三角化", 'MOD_TRIANGULATE'),
+        ('WIREFRAME', "线框", 'MOD_WIREFRAME'),
+        ('WELD', "焊接", 'AUTOMERGE_OFF'),
+        ('GEOMETRY_NODES', "几何节点", 'NODETREE'),
+    ],
+    "变形": [
+        ('ARMATURE', "骨架", 'MOD_ARMATURE'),
+        ('CAST', "投射", 'MOD_CAST'),
+        ('CURVE', "曲线", 'MOD_CURVE'),
+        ('DISPLACE', "置换", 'MOD_DISPLACE'),
+        ('HOOK', "钩子", 'HOOK'),
+        ('LAPLACIANSMOOTH', "拉普拉斯平滑", 'MOD_LAPLACIANSMOOTH'),
+        ('LATTICE', "晶格", 'MOD_LATTICE'),
+        ('MESH_DEFORM', "网格变形", 'MOD_MESHDEFORM'),
+        ('SHRINKWRAP', "收缩包裹", 'MOD_SHRINKWRAP'),
+        ('SIMPLE_DEFORM', "简易变形", 'MOD_SIMPLEDEFORM'),
+        ('SMOOTH', "平滑", 'MOD_SMOOTH'),
+        ('WARP', "扭曲", 'MOD_WARP'),
+        ('WAVE', "波浪", 'MOD_WAVE'),
+    ],
+    "修改": [
+        ('DATA_TRANSFER', "数据传递", 'MOD_DATATRANSFER'),
+        ('NORMAL_EDIT', "编辑法向", 'MOD_NORMALEDIT'),
+        ('UV_PROJECT', "UV投射", 'MOD_UVPROJECT'),
+        ('UV_WARP', "UV扭曲", 'MOD_UVWARP'),
+        ('VERTEX_WEIGHT_EDIT', "顶点权重编辑", 'MOD_VERTEX_WEIGHT'),
+        ('VERTEX_WEIGHT_MIX', "顶点权重混合", 'MOD_VERTEX_WEIGHT'),
+        ('VERTEX_WEIGHT_PROXIMITY', "顶点权重邻近", 'MOD_VERTEX_WEIGHT'),
+    ],
+    "物理": [
+        ('CLOTH', "布料", 'MOD_CLOTH'),
+        ('COLLISION', "碰撞", 'MOD_COLLISION'),
+        ('DYNAMIC_PAINT', "动态绘画", 'MOD_DYNAMICPAINT'),
+        ('EXPLODE', "爆炸", 'MOD_EXPLODE'),
+        ('FLUID', "流体", 'MOD_FLUIDSIM'),
+        ('OCEAN', "海洋", 'MOD_OCEAN'),
+        ('PARTICLE_INSTANCE', "粒子实例", 'MOD_PARTICLE_INSTANCE'),
+        ('PARTICLE_SYSTEM', "粒子系统", 'MOD_PARTICLES'),
+        ('SOFT_BODY', "软体", 'MOD_SOFT'),
+    ],
+}
+
+
 # 存储每个修改器的显隐状态（使用对象自定义属性）
 def _save_modifier_visibility(obj):
     """保存修改器显隐状态到对象属性"""
     if not obj:
         return
-
-    # 创建状态字典
     state = {}
     for mod in obj.modifiers:
         state[mod.name] = mod.show_viewport
-
-    # 存储到对象属性
     obj["mmy_modifier_visibility"] = str(state)
 
 
@@ -22,14 +79,12 @@ def _restore_modifier_visibility(obj):
     """从对象属性恢复修改器显隐状态"""
     if not obj or "mmy_modifier_visibility" not in obj:
         return False
-
     try:
         import ast
         state = ast.literal_eval(obj["mmy_modifier_visibility"])
         for mod in obj.modifiers:
             if mod.name in state:
                 mod.show_viewport = state[mod.name]
-        # 清除存储
         del obj["mmy_modifier_visibility"]
         return True
     except:
@@ -40,6 +95,35 @@ def _has_saved_visibility(obj):
     """检查是否有保存的显隐状态"""
     return obj and "mmy_modifier_visibility" in obj
 
+
+# ============ 自定义修改器菜单 ============
+
+class MMY_MT_AddModifierMenu(bpy.types.Menu):
+    """自定义添加修改器菜单（按类别分组）"""
+    bl_idname = "MMY_MT_add_modifier"
+    bl_label = "添加修改器"
+
+    def draw(self, context):
+        layout = self.layout
+        obj = context.active_object
+
+        if not obj or obj.type != 'MESH':
+            layout.label(text="仅网格对象可用")
+            return
+
+        # 按类别分列显示
+        for category, modifiers in MODIFIER_CATEGORIES.items():
+            col = layout.column()
+            col.label(text=category, icon='DOT')
+
+            for mod_type, mod_name, mod_icon in modifiers:
+                op = col.operator("object.modifier_add", text=mod_name, icon=mod_icon)
+                op.type = mod_type
+
+            layout.separator()
+
+
+# ============ 工具按钮行 ============
 
 def draw_modifier_buttons_panel(self, context):
     """绘制修改器面板工具按钮行"""
@@ -55,8 +139,8 @@ def draw_modifier_buttons_panel(self, context):
     row = box.row(align=True)
     row.scale_y = 1.5
 
-    # 1. 添加修改器
-    row.menu("OBJECT_MT_modifier_add", text="添加", icon='ADD')
+    # 1. 添加修改器（自定义菜单）
+    row.menu("MMY_MT_add_modifier", text="添加", icon='ADD')
 
     # 以下按钮仅在有修改器时显示
     if obj.modifiers:
@@ -106,7 +190,7 @@ def _init_header_locations():
     global HEADER_LOCATIONS
     HEADER_LOCATIONS = []
 
-    # 优先：DATA_PT_modifiers Panel（按钮显示在修改器列表上方）
+    # 优先：DATA_PT_modifiers Panel
     if hasattr(bpy.types, 'DATA_PT_modifiers'):
         HEADER_LOCATIONS.append({
             'menu': bpy.types.DATA_PT_modifiers,
@@ -185,3 +269,9 @@ def update_modifier_buttons(self, context):
             use_prepend=loc.get('use_prepend', False),
             use_append=loc.get('use_append', False)
         )
+
+
+# 模块级菜单类
+_classes_ui = (
+    MMY_MT_AddModifierMenu,
+)
