@@ -42,7 +42,7 @@ def _has_saved_visibility(obj):
 
 
 def draw_modifier_buttons_panel(self, context):
-    """绘制修改器面板工具按钮（Panel 内部）"""
+    """绘制修改器面板工具按钮行"""
     layout = self.layout
     obj = context.active_object
 
@@ -50,23 +50,32 @@ def draw_modifier_buttons_panel(self, context):
     if not obj or obj.type != 'MESH':
         return
 
-    # 仅在有修改器时显示工具行
-    if not obj.modifiers:
-        return
-
-    # 工具按钮行：显隐开关 + 应用
+    # 工具按钮行（5个按钮）
     row = layout.row(align=True)
 
-    # 显隐开关
-    if _has_saved_visibility(obj):
-        # 有保存状态 → 恢复按钮
-        row.operator("mmy.restore_modifier_visibility", text="", icon='HIDE_OFF')
-    else:
-        # 无保存状态 → 隐藏按钮
-        row.operator("mmy.hide_all_modifiers", text="", icon='HIDE_ON')
+    # 1. 添加修改器（自定义菜单，稍后设计）
+    row.menu("OBJECT_MT_modifier_add", text="", icon='ADD')
 
-    # 应用修改器（保留形态键）
-    row.operator("mmy.apply_all_modifiers_with_shapekeys", text="", icon='CHECKMARK')
+    # 以下按钮仅在有修改器时显示
+    if obj.modifiers:
+        # 2. 显隐开关
+        if _has_saved_visibility(obj):
+            row.operator("mmy.restore_modifier_visibility", text="", icon='HIDE_OFF')
+        else:
+            row.operator("mmy.hide_all_modifiers", text="", icon='HIDE_ON')
+
+        # 3. 应用修改器
+        row.operator("mmy.apply_all_modifiers_with_shapekeys", text="", icon='CHECKMARK')
+
+        # 4. 删除所有修改器
+        row.operator("mmy.delete_all_modifiers", text="", icon='X')
+
+        # 5. 展开/折叠
+        all_expanded = all(mod.show_expanded for mod in obj.modifiers)
+        if all_expanded:
+            row.operator("mmy.collapse_all_modifiers", text="", icon='DISCLOSURE_TRI_DOWN')
+        else:
+            row.operator("mmy.expand_all_modifiers", text="", icon='DISCLOSURE_TRI_RIGHT')
 
     layout.separator()  # 与下方修改器列表分隔
 
