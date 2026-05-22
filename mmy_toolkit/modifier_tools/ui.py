@@ -50,14 +50,18 @@ def draw_modifier_buttons_panel(self, context):
     if not obj or obj.type != 'MESH':
         return
 
-    # 工具按钮行（5个按钮）
-    row = layout.row(align=True)
+    # 工具按钮行（带背景框）
+    box = layout.box()
+    row = box.row(align=True)
+    row.scale_y = 1.5  # 增大按钮高度
 
     # 1. 添加修改器（自定义菜单，稍后设计）
     row.menu("OBJECT_MT_modifier_add", text="", icon='ADD')
 
     # 以下按钮仅在有修改器时显示
     if obj.modifiers:
+        row.separator(factor=0.5)  # 间距分隔
+
         # 2. 显隐开关
         if _has_saved_visibility(obj):
             row.operator("mmy.restore_modifier_visibility", text="", icon='HIDE_OFF')
@@ -70,6 +74,8 @@ def draw_modifier_buttons_panel(self, context):
         # 4. 删除所有修改器
         row.operator("mmy.delete_all_modifiers", text="", icon='X')
 
+        row.separator(factor=0.5)  # 间距分隔
+
         # 5. 展开/折叠
         all_expanded = all(mod.show_expanded for mod in obj.modifiers)
         if all_expanded:
@@ -77,7 +83,7 @@ def draw_modifier_buttons_panel(self, context):
         else:
             row.operator("mmy.expand_all_modifiers", text="", icon='DISCLOSURE_TRI_RIGHT')
 
-    layout.separator()  # 与下方修改器列表分隔
+    layout.separator(factor=0.3)  # 与下方修改器列表分隔
 
 
 def draw_modifier_buttons_header(self, context):
