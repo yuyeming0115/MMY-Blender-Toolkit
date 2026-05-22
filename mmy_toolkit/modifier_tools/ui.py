@@ -81,10 +81,20 @@ def _build_modifier_icons_cache():
     _modifier_icons_cache = {}
 
     try:
-        # 从 Operator 子类中找到 modifier_add
+        # 方法1: 从 Modifier 子类获取图标
+        for cls in bpy.types.Modifier.__subclasses__():
+            try:
+                if hasattr(cls, 'bl_rna') and hasattr(cls.bl_rna, 'identifier'):
+                    # Modifier 类名如 ArrayModifier -> ARRAY
+                    mod_type = cls.bl_rna.identifier
+                    if hasattr(cls.bl_rna, 'icon'):
+                        _modifier_icons_cache[mod_type] = cls.bl_rna.icon
+            except:
+                continue
+
+        # 方法2: 从 operator enum_items 补充
         for cls in bpy.types.Operator.__subclasses__():
             try:
-                # 跳过没有 bl_idname 的类
                 if not hasattr(cls, 'bl_idname'):
                     continue
                 if cls.bl_idname == "OBJECT_OT_modifier_add":
@@ -96,6 +106,7 @@ def _build_modifier_icons_cache():
                     break
             except:
                 continue
+
     except Exception as e:
         print(f"[MMY] 获取修改器图标失败: {e}")
 
