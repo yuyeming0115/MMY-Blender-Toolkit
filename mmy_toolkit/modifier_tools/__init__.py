@@ -3,10 +3,10 @@
 
 import bpy
 
-from .operators import MMY_OT_ToggleAllModifiersViewport, _classes as _op_classes
+from .operators import _classes as _op_classes
 from .ui import (
-    draw_modifier_toggle_button_panel,
-    draw_modifier_toggle_button_header,
+    draw_modifier_buttons_panel,
+    draw_modifier_buttons_header,
     update_visual_settings,
     _init_header_locations,
 )

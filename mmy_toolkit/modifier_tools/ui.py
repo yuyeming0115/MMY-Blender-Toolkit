@@ -1,43 +1,90 @@
-# Header 按钮绘制
+# 修改器面板按钮绘制
 
 import bpy
 
 
-def draw_modifier_toggle_button_panel(self, context):
-    """绘制修改器显示切换按钮（Panel 内部）"""
-    layout = self.layout
-
-    # 仅在有修改器时显示
-    obj = context.active_object
-    if not obj or not obj.modifiers:
+# 存储每个修改器的显隐状态（使用对象自定义属性）
+def _save_modifier_visibility(obj):
+    """保存修改器显隐状态到对象属性"""
+    if not obj:
         return
 
-    # 检测当前状态
-    all_visible = all(mod.show_viewport for mod in obj.modifiers)
-    icon = 'HIDE_OFF' if all_visible else 'HIDE_ON'
-    text = "全部隐藏" if all_visible else "全部显示"
+    # 创建状态字典
+    state = {}
+    for mod in obj.modifiers:
+        state[mod.name] = mod.show_viewport
 
+    # 存储到对象属性
+    obj["mmy_modifier_visibility"] = str(state)
+
+
+def _restore_modifier_visibility(obj):
+    """从对象属性恢复修改器显隐状态"""
+    if not obj or "mmy_modifier_visibility" not in obj:
+        return False
+
+    try:
+        import ast
+        state = ast.literal_eval(obj["mmy_modifier_visibility"])
+        for mod in obj.modifiers:
+            if mod.name in state:
+                mod.show_viewport = state[mod.name]
+        # 清除存储
+        del obj["mmy_modifier_visibility"]
+        return True
+    except:
+        return False
+
+
+def _has_saved_visibility(obj):
+    """检查是否有保存的显隐状态"""
+    return obj and "mmy_modifier_visibility" in obj
+
+
+def draw_modifier_buttons_panel(self, context):
+    """绘制修改器面板按钮（Panel 内部，一行布局）"""
+    layout = self.layout
+    obj = context.active_object
+
+    # 仅对网格对象显示
+    if not obj or obj.type != 'MESH':
+        return
+
+    # 一行布局：添加修改器 + 显隐开关 + 应用
     row = layout.row(align=True)
-    row.operator("mmy.toggle_all_modifiers_viewport", text=text, icon=icon)
-    layout.separator()  # 与下方"添加修改器"分隔
+
+    # 1. 添加修改器（使用原生菜单）
+    row.menu("OBJECT_MT_modifier_add", text="", icon='ADD')
+
+    # 2. 显隐开关（仅在有修改器时显示）
+    if obj.modifiers:
+        if _has_saved_visibility(obj):
+            # 有保存状态 → 恢复按钮
+            row.operator("mmy.restore_modifier_visibility", text="", icon='HIDE_OFF')
+        else:
+            # 无保存状态 → 隐藏按钮
+            row.operator("mmy.hide_all_modifiers", text="", icon='HIDE_ON')
+
+    # 3. 应用修改器（仅在有修改器时显示）
+    if obj.modifiers:
+        row.operator("mmy.apply_all_modifiers_with_shapekeys", text="", icon='CHECKMARK')
+
+    layout.separator()  # 与下方修改器列表分隔
 
 
-def draw_modifier_toggle_button_header(self, context):
+def draw_modifier_buttons_header(self, context):
     """Header 绘制（备用位置）"""
     layout = self.layout
-
-    # 仅在有修改器时显示
     obj = context.active_object
+
     if not obj or not obj.modifiers:
         return
 
-    # 检测当前状态
-    all_visible = all(mod.show_viewport for mod in obj.modifiers)
-    icon = 'HIDE_OFF' if all_visible else 'HIDE_ON'
-    text = "全部隐藏" if all_visible else "全部显示"
-
     row = layout.row(align=True)
-    row.operator("mmy.toggle_all_modifiers_viewport", text=text, icon=icon)
+    if _has_saved_visibility(obj):
+        row.operator("mmy.restore_modifier_visibility", text="", icon='HIDE_OFF')
+    else:
+        row.operator("mmy.hide_all_modifiers", text="", icon='HIDE_ON')
 
 
 # 挂载位置配置（延迟初始化）
@@ -54,19 +101,19 @@ def _init_header_locations():
         HEADER_LOCATIONS.append({
             'menu': bpy.types.DATA_PT_modifiers,
             'attr': 'modifier_panel',
-            'drawing_func': draw_modifier_toggle_button_panel,
+            'drawing_func': draw_modifier_buttons_panel,
             'default_show': True,
-            'use_prepend': True  # Panel 使用 prepend 放在最上方
+            'use_prepend': True
         })
 
-    # 备用：PROPERTIES_HT_header（Header 右侧）
+    # 备用：PROPERTIES_HT_header
     if hasattr(bpy.types, 'PROPERTIES_HT_header'):
         HEADER_LOCATIONS.append({
             'menu': bpy.types.PROPERTIES_HT_header,
             'attr': 'modifier_properties_header',
-            'drawing_func': draw_modifier_toggle_button_header,
+            'drawing_func': draw_modifier_buttons_header,
             'default_show': False,
-            'use_append': True  # Header 使用 append 放在右侧
+            'use_append': True
         })
 
     return HEADER_LOCATIONS
@@ -83,7 +130,6 @@ def update_visual_settings(menu, attr, drawing_func, default_show=True, use_prep
 
     addon = bpy.context.preferences.addons.get("mmy_toolkit")
     if not addon or not addon.preferences:
-        # preferences 未初始化时使用默认值
         if default_show:
             try:
                 if use_prepend:
@@ -97,7 +143,6 @@ def update_visual_settings(menu, attr, drawing_func, default_show=True, use_prep
         return
 
     show = getattr(addon.preferences, attr, default_show)
-    # 处理 None 的情况
     if show is None:
         show = default_show
 
