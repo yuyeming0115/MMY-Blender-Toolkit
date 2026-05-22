@@ -99,7 +99,7 @@ def _has_saved_visibility(obj):
 # ============ 自定义修改器菜单 ============
 
 class MMY_MT_AddModifierMenu(bpy.types.Menu):
-    """自定义添加修改器菜单（按类别分组）"""
+    """自定义添加修改器菜单（按类别分组，多列显示）"""
     bl_idname = "MMY_MT_add_modifier"
     bl_label = "添加修改器"
 
@@ -111,16 +111,21 @@ class MMY_MT_AddModifierMenu(bpy.types.Menu):
             layout.label(text="仅网格对象可用")
             return
 
-        # 按类别分列显示
-        for category, modifiers in MODIFIER_CATEGORIES.items():
-            col = layout.column()
-            col.label(text=category, icon='DOT')
+        # 按类别分列显示（使用 split 分成多列）
+        split = layout.split(factor=0.25)
 
+        for category, modifiers in MODIFIER_CATEGORIES.items():
+            col = split.column()
+
+            # 类别标题
+            row = col.row()
+            row.label(text=category)
+            row.scale_y = 0.8
+
+            # 修改器列表（紧凑排列）
             for mod_type, mod_name, mod_icon in modifiers:
                 op = col.operator("object.modifier_add", text=mod_name, icon=mod_icon)
                 op.type = mod_type
-
-            layout.separator()
 
 
 # ============ 工具按钮行 ============
