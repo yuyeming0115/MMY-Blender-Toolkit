@@ -183,9 +183,6 @@ def draw_modifier_buttons_panel(self, context):
         sub.label(text="展开", icon='DISCLOSURE_TRI_RIGHT')
 
     layout.separator(factor=0.3)
-            row.operator("mmy.expand_all_modifiers", text="展开", icon='DISCLOSURE_TRI_RIGHT')
-
-    layout.separator(factor=0.3)
 
 
 def draw_modifier_buttons_header(self, context):
