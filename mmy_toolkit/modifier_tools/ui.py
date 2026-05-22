@@ -110,6 +110,11 @@ def _build_modifier_icons_cache():
     except Exception as e:
         print(f"[MMY] 获取修改器图标失败: {e}")
 
+    # 调试打印
+    print(f"[MMY] 图标缓存数量: {len(_modifier_icons_cache)}")
+    if len(_modifier_icons_cache) > 0:
+        print(f"[MMY] 图标缓存示例: {list(_modifier_icons_cache.items())[:5]}")
+
     return _modifier_icons_cache
 
 
