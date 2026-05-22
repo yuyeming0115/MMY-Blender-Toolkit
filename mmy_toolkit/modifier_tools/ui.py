@@ -137,20 +137,8 @@ class MMY_MT_AddModifierMenu(bpy.types.Menu):
             layout.label(text="仅网格对象可用")
             return
 
-        # 使用 split 分成4列
-        split = layout.split(factor=0.25)
-
-        for category, modifiers in MODIFIER_CATEGORIES.items():
-            col = split.column()
-
-            # 类别标题
-            col.label(text=category)
-
-            # 修改器列表（动态获取图标值）
-            for mod_type, mod_name in modifiers:
-                icon_value = _get_modifier_icon_value(mod_type)
-                op = col.operator("object.modifier_add", text=mod_name, icon_value=icon_value)
-                op.type = mod_type
+        # 直接调用原生菜单（已有正确图标）
+        layout.menu("OBJECT_MT_modifier_add", text="选择修改器...")
 
 
 # ============ 工具按钮行 ============
