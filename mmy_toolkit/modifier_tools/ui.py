@@ -72,20 +72,22 @@ MODIFIER_CATEGORIES = {
 }
 
 
-def _get_modifier_icon(mod_type):
-    """动态获取修改器的图标值（整数）"""
-    # 尝试从 Modifier 类型获取图标值
+def _get_modifier_icon_value(mod_type):
+    """从 modifier_add 操作符的 enum 属性获取图标值"""
     try:
-        mod_class_name = f'{mod_type}Modifier'
-        mod_class = getattr(bpy.types, mod_class_name, None)
-        if mod_class and hasattr(mod_class, 'bl_rna'):
-            rna = mod_class.bl_rna
-            if hasattr(rna, 'icon'):
-                # rna.icon 返回整数图标值
-                return rna.icon
+        # 获取 object.modifier_add 操作符的 type 属性
+        op_class = bpy.types.ObjectModifierAdd
+        if op_class and hasattr(op_class, 'bl_rna'):
+            rna = op_class.bl_rna
+            type_prop = rna.properties.get('type')
+            if type_prop:
+                # 获取 enum items
+                for item in type_prop.enum_items:
+                    if item.identifier == mod_type:
+                        return item.icon
     except:
         pass
-    return 0  # 默认图标值
+    return 0
 
 
 # 存储每个修改器的显隐状态（使用对象自定义属性）
@@ -146,7 +148,7 @@ class MMY_MT_AddModifierMenu(bpy.types.Menu):
 
             # 修改器列表（动态获取图标值）
             for mod_type, mod_name in modifiers:
-                icon_value = _get_modifier_icon(mod_type)
+                icon_value = _get_modifier_icon_value(mod_type)
                 op = col.operator("object.modifier_add", text=mod_name, icon_value=icon_value)
                 op.type = mod_type
 
