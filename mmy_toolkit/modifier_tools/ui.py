@@ -119,11 +119,11 @@ class MMY_MT_AddModifierMenu(bpy.types.Menu):
             layout.label(text="仅网格对象可用")
             return
 
-        # 使用 column_flow 实现4列布局
-        flow = layout.column_flow(columns=4)
+        # 使用 split 分成4列
+        split = layout.split(factor=0.25)
 
         for category, modifiers in MODIFIER_CATEGORIES.items():
-            col = flow.column()
+            col = split.column()
 
             # 类别标题
             col.label(text=category)
