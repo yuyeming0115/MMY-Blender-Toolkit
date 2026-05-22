@@ -9,6 +9,7 @@ import bpy
 MODIFIER_CATEGORIES = {
     "生成": [
         ('ARRAY', "阵列", 'MOD_ARRAY'),
+        ('BEVEL', "倒角", 'MOD_BEVEL'),
         ('BOOLEAN', "布尔", 'MOD_BOOLEAN'),
         ('BUILD', "构建", 'MOD_BUILD'),
         ('DECIMATE', "精简", 'MOD_DECIM'),
@@ -16,6 +17,7 @@ MODIFIER_CATEGORIES = {
         ('MASK', "遮罩", 'MOD_MASK'),
         ('MIRROR', "镜像", 'MOD_MIRROR'),
         ('MULTIRES', "多级精度", 'MOD_MULTIRES'),
+        ('NODES', "几何节点", 'NODETREE'),
         ('REMESH', "重构网格", 'MOD_REMESH'),
         ('SCREW', "螺旋", 'MOD_SCREW'),
         ('SKIN', "蒙皮", 'MOD_SKIN'),
@@ -24,7 +26,7 @@ MODIFIER_CATEGORIES = {
         ('TRIANGULATE', "三角化", 'MOD_TRIANGULATE'),
         ('WIREFRAME', "线框", 'MOD_WIREFRAME'),
         ('WELD', "焊接", 'AUTOMERGE_OFF'),
-        ('GEOMETRY_NODES', "几何节点", 'NODETREE'),
+        ('VOLUME_TO_MESH', "体积转网格", 'VOLUME_DATA'),
     ],
     "变形": [
         ('ARMATURE', "骨架", 'MOD_ARMATURE'),
@@ -38,12 +40,16 @@ MODIFIER_CATEGORIES = {
         ('SHRINKWRAP', "收缩包裹", 'MOD_SHRINKWRAP'),
         ('SIMPLE_DEFORM', "简易变形", 'MOD_SIMPLEDEFORM'),
         ('SMOOTH', "平滑", 'MOD_SMOOTH'),
+        ('CORRECTIVE_SMOOTH', "矫正平滑", 'MOD_SMOOTH'),
+        ('LAPLACIANDEFORM', "拉普拉斯变形", 'MOD_MESHDEFORM'),
+        ('SURFACE_DEFORM', "表面变形", 'MOD_MESHDEFORM'),
         ('WARP', "扭曲", 'MOD_WARP'),
         ('WAVE', "波浪", 'MOD_WAVE'),
     ],
     "修改": [
         ('DATA_TRANSFER', "数据传递", 'MOD_DATATRANSFER'),
         ('NORMAL_EDIT', "编辑法向", 'MOD_NORMALEDIT'),
+        ('WEIGHTED_NORMAL', "加权法向", 'MOD_NORMALEDIT'),
         ('UV_PROJECT', "UV投射", 'MOD_UVPROJECT'),
         ('UV_WARP', "UV扭曲", 'MOD_UVWARP'),
         ('VERTEX_WEIGHT_EDIT', "顶点权重编辑", 'MOD_VERTEX_WEIGHT'),
