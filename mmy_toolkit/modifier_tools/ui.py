@@ -35,7 +35,7 @@ MODIFIER_CATEGORIES = {
         ('DISPLACE', "置换", 'MOD_DISPLACE'),
         ('HOOK', "钩子", 'HOOK'),
         ('LAPLACIANDEFORM', "拉普拉斯变形", 'MOD_MESHDEFORM'),
-        ('LAPLACIANSMOOTH', "拉普拉斯平滑", 'MOD_LAPLACIANSMOOTH'),
+        ('LAPLACIANSMOOTH', "拉普拉斯平滑", 'MOD_SMOOTH'),
         ('LATTICE', "晶格", 'MOD_LATTICE'),
         ('MESH_DEFORM', "网格变形", 'MOD_MESHDEFORM'),
         ('SHRINKWRAP', "收缩包裹", 'MOD_SHRINKWRAP'),
@@ -48,8 +48,8 @@ MODIFIER_CATEGORIES = {
     ],
     "修改": [
         ('DATA_TRANSFER', "数据传递", 'MOD_DATATRANSFER'),
-        ('MESH_CACHE', "网格缓存", 'MOD_MESHDEFORM'),
-        ('MESH_SEQUENCE_CACHE', "网格序列缓存", 'MOD_MESHDEFORM'),
+        ('MESH_CACHE', "网格缓存", 'FILE'),
+        ('MESH_SEQUENCE_CACHE', "网格序列缓存", 'FILE'),
         ('NORMAL_EDIT', "编辑法向", 'MOD_NORMALEDIT'),
         ('WEIGHTED_NORMAL', "加权法向", 'MOD_NORMALEDIT'),
         ('UV_PROJECT', "UV投射", 'MOD_UVPROJECT'),
@@ -145,33 +145,44 @@ def draw_modifier_buttons_panel(self, context):
     if not obj or obj.type != 'MESH':
         return
 
+    has_modifiers = bool(obj.modifiers)
+
     # 工具按钮行（带背景框，自适应宽度）
     box = layout.box()
     row = box.row(align=True)
     row.scale_y = 1.5
 
-    # 1. 添加修改器（自定义菜单）
+    # 1. 添加修改器（始终可用）
     row.menu("MMY_MT_add_modifier", text="添加", icon='ADD')
 
-    # 以下按钮仅在有修改器时显示
-    if obj.modifiers:
-        # 2. 显隐开关
-        if _has_saved_visibility(obj):
-            row.operator("mmy.restore_modifier_visibility", text="显隐", icon='HIDE_OFF')
-        else:
-            row.operator("mmy.hide_all_modifiers", text="显隐", icon='HIDE_ON')
+    # 以下按钮始终显示，无修改器时禁用
+    sub = row.row(align=True)
+    sub.active = has_modifiers  # 无修改器时禁用
 
-        # 3. 应用修改器
-        row.operator("mmy.apply_all_modifiers_with_shapekeys", text="应用", icon='CHECKMARK')
+    # 2. 显隐开关
+    if has_modifiers and _has_saved_visibility(obj):
+        sub.operator("mmy.restore_modifier_visibility", text="显隐", icon='HIDE_OFF')
+    else:
+        sub.operator("mmy.hide_all_modifiers", text="显隐", icon='HIDE_ON')
 
-        # 4. 删除所有修改器
-        row.operator("mmy.delete_all_modifiers", text="删除", icon='X')
+    # 3. 应用修改器
+    sub.operator("mmy.apply_all_modifiers_with_shapekeys", text="应用", icon='CHECKMARK')
 
-        # 5. 展开/折叠
+    # 4. 删除所有修改器
+    sub.operator("mmy.delete_all_modifiers", text="删除", icon='X')
+
+    # 5. 展开/折叠
+    if has_modifiers:
         all_expanded = all(mod.show_expanded for mod in obj.modifiers)
         if all_expanded:
-            row.operator("mmy.collapse_all_modifiers", text="折叠", icon='DISCLOSURE_TRI_DOWN')
+            sub.operator("mmy.collapse_all_modifiers", text="折叠", icon='DISCLOSURE_TRI_DOWN')
         else:
+            sub.operator("mmy.expand_all_modifiers", text="展开", icon='DISCLOSURE_TRI_RIGHT')
+    else:
+        # 无修改器时显示占位按钮（禁用状态）
+        sub.label(text="展开", icon='DISCLOSURE_TRI_RIGHT')
+
+    layout.separator(factor=0.3)
             row.operator("mmy.expand_all_modifiers", text="展开", icon='DISCLOSURE_TRI_RIGHT')
 
     layout.separator(factor=0.3)
