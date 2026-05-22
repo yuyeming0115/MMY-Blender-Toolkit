@@ -72,49 +72,44 @@ MODIFIER_CATEGORIES = {
 }
 
 
-# 修改器图标缓存（延迟初始化）
-_modifier_icons_cache = None
+# 修改器图标缓存
+_modifier_icons_cache = {}
 
 def _build_modifier_icons_cache():
     """构建修改器图标缓存"""
     global _modifier_icons_cache
-    _modifier_icons_cache = {}
 
+    # 尝试直接访问 modifier_add 操作符
     try:
-        # 方法1: 从 Modifier 子类获取图标
-        for cls in bpy.types.Modifier.__subclasses__():
-            try:
-                if hasattr(cls, 'bl_rna') and hasattr(cls.bl_rna, 'identifier'):
-                    # Modifier 类名如 ArrayModifier -> ARRAY
-                    mod_type = cls.bl_rna.identifier
-                    if hasattr(cls.bl_rna, 'icon'):
-                        _modifier_icons_cache[mod_type] = cls.bl_rna.icon
-            except:
-                continue
-
-        # 方法2: 从 operator enum_items 补充
-        for cls in bpy.types.Operator.__subclasses__():
-            try:
-                if not hasattr(cls, 'bl_idname'):
-                    continue
-                if cls.bl_idname == "OBJECT_OT_modifier_add":
-                    rna = cls.bl_rna
-                    type_prop = rna.properties.get('type')
-                    if type_prop:
-                        for item in type_prop.enum_items:
-                            _modifier_icons_cache[item.identifier] = item.icon
-                    break
-            except:
-                continue
-
+        # 方法1: 直接通过类型名获取
+        op_rna = bpy.types.ObjectModifierAdd.bl_rna
+        print(f"[MMY] 找到 ObjectModifierAdd: {op_rna}")
+        type_prop = op_rna.properties.get('type')
+        if type_prop:
+            print(f"[MMY] 找到 type 属性")
+            for item in type_prop.enum_items:
+                _modifier_icons_cache[item.identifier] = item.icon
+                print(f"[MMY] {item.identifier}: icon={item.icon}, name={item.name}")
     except Exception as e:
-        print(f"[MMY] 获取修改器图标失败: {e}")
+        print(f"[MMY] 方法1失败: {e}")
 
-    # 调试打印
-    print(f"[MMY] 图标缓存数量: {len(_modifier_icons_cache)}")
-    if len(_modifier_icons_cache) > 0:
-        print(f"[MMY] 图标缓存示例: {list(_modifier_icons_cache.items())[:5]}")
+    # 方法2: 遍历所有 Operator
+    if len(_modifier_icons_cache) == 0:
+        try:
+            for attr_name in dir(bpy.types):
+                if 'ModifierAdd' in attr_name or 'modifier_add' in attr_name.lower():
+                    print(f"[MMY] 发现相关类: {attr_name}")
+                    cls = getattr(bpy.types, attr_name)
+                    if hasattr(cls, 'bl_rna'):
+                        rna = cls.bl_rna
+                        type_prop = rna.properties.get('type')
+                        if type_prop:
+                            for item in type_prop.enum_items:
+                                _modifier_icons_cache[item.identifier] = item.icon
+        except Exception as e:
+            print(f"[MMY] 方法2失败: {e}")
 
+    print(f"[MMY] 最终图标缓存数量: {len(_modifier_icons_cache)}")
     return _modifier_icons_cache
 
 
@@ -165,8 +160,8 @@ class MMY_MT_AddModifierMenu(bpy.types.Menu):
             layout.label(text="仅网格对象可用")
             return
 
-        # 初始化图标缓存
-        if _modifier_icons_cache is None:
+        # 初始化图标缓存（如果为空则构建）
+        if len(_modifier_icons_cache) == 0:
             _build_modifier_icons_cache()
 
         # 使用 split 分成4列
