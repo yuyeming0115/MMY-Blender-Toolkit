@@ -42,7 +42,7 @@ def _has_saved_visibility(obj):
 
 
 def draw_modifier_buttons_panel(self, context):
-    """绘制修改器面板按钮（Panel 内部，一行布局）"""
+    """绘制修改器面板工具按钮（Panel 内部）"""
     layout = self.layout
     obj = context.active_object
 
@@ -50,24 +50,23 @@ def draw_modifier_buttons_panel(self, context):
     if not obj or obj.type != 'MESH':
         return
 
-    # 一行布局：添加修改器 + 显隐开关 + 应用
+    # 仅在有修改器时显示工具行
+    if not obj.modifiers:
+        return
+
+    # 工具按钮行：显隐开关 + 应用
     row = layout.row(align=True)
 
-    # 1. 添加修改器（使用原生菜单）
-    row.menu("OBJECT_MT_modifier_add", text="", icon='ADD')
+    # 显隐开关
+    if _has_saved_visibility(obj):
+        # 有保存状态 → 恢复按钮
+        row.operator("mmy.restore_modifier_visibility", text="", icon='HIDE_OFF')
+    else:
+        # 无保存状态 → 隐藏按钮
+        row.operator("mmy.hide_all_modifiers", text="", icon='HIDE_ON')
 
-    # 2. 显隐开关（仅在有修改器时显示）
-    if obj.modifiers:
-        if _has_saved_visibility(obj):
-            # 有保存状态 → 恢复按钮
-            row.operator("mmy.restore_modifier_visibility", text="", icon='HIDE_OFF')
-        else:
-            # 无保存状态 → 隐藏按钮
-            row.operator("mmy.hide_all_modifiers", text="", icon='HIDE_ON')
-
-    # 3. 应用修改器（仅在有修改器时显示）
-    if obj.modifiers:
-        row.operator("mmy.apply_all_modifiers_with_shapekeys", text="", icon='CHECKMARK')
+    # 应用修改器（保留形态键）
+    row.operator("mmy.apply_all_modifiers_with_shapekeys", text="", icon='CHECKMARK')
 
     layout.separator()  # 与下方修改器列表分隔
 
