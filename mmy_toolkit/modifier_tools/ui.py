@@ -3,117 +3,8 @@
 import bpy
 
 
-# ============ 修改器分类定义 ============
-# 按类别分组，便于快速查找
+# ============ 存储每个修改器的显隐状态（使用对象自定义属性）============
 
-MODIFIER_CATEGORIES = {
-    "生成": [
-        ('ARRAY', "阵列"),
-        ('BEVEL', "倒角"),
-        ('BOOLEAN', "布尔"),
-        ('BUILD', "构建"),
-        ('DECIMATE', "精简"),
-        ('EDGE_SPLIT', "拆边"),
-        ('MASK', "遮罩"),
-        ('MIRROR', "镜像"),
-        ('MULTIRES', "多级精度"),
-        ('NODES', "几何节点"),
-        ('REMESH', "重构网格"),
-        ('SCREW', "螺旋"),
-        ('SKIN', "蒙皮"),
-        ('SOLIDIFY', "实体化"),
-        ('SUBSURF', "细分"),
-        ('TRIANGULATE', "三角化"),
-        ('VOLUME_TO_MESH', "体积转网格"),
-        ('WELD', "焊接"),
-        ('WIREFRAME', "线框"),
-    ],
-    "变形": [
-        ('ARMATURE', "骨架"),
-        ('CAST', "投射"),
-        ('CURVE', "曲线"),
-        ('DISPLACE', "置换"),
-        ('HOOK', "钩子"),
-        ('LAPLACIANDEFORM', "拉普拉斯变形"),
-        ('LAPLACIANSMOOTH', "拉普拉斯平滑"),
-        ('LATTICE', "晶格"),
-        ('MESH_DEFORM', "网格变形"),
-        ('SHRINKWRAP', "收缩包裹"),
-        ('SIMPLE_DEFORM', "简易变形"),
-        ('SMOOTH', "平滑"),
-        ('CORRECTIVE_SMOOTH', "矫正平滑"),
-        ('SURFACE_DEFORM', "表面变形"),
-        ('WARP', "扭曲"),
-        ('WAVE', "波浪"),
-    ],
-    "修改": [
-        ('DATA_TRANSFER', "数据传递"),
-        ('MESH_CACHE', "网格缓存"),
-        ('MESH_SEQUENCE_CACHE', "网格序列缓存"),
-        ('NORMAL_EDIT', "编辑法向"),
-        ('WEIGHTED_NORMAL', "加权法向"),
-        ('UV_PROJECT', "UV投射"),
-        ('UV_WARP', "UV扭曲"),
-        ('VERTEX_WEIGHT_EDIT', "顶点权重编辑"),
-        ('VERTEX_WEIGHT_MIX', "顶点权重混合"),
-        ('VERTEX_WEIGHT_PROXIMITY', "顶点权重邻近"),
-    ],
-    "物理": [
-        ('CLOTH', "布料"),
-        ('COLLISION', "碰撞"),
-        ('DYNAMIC_PAINT', "动态绘画"),
-        ('EXPLODE', "爆炸"),
-        ('FLUID', "流体"),
-        ('OCEAN', "海洋"),
-        ('PARTICLE_INSTANCE', "粒子实例"),
-        ('PARTICLE_SYSTEM', "粒子系统"),
-        ('SOFT_BODY', "软体"),
-    ],
-}
-
-
-# 修改器图标缓存
-_modifier_icons_cache = {}
-
-def _build_modifier_icons_cache():
-    """构建修改器图标缓存"""
-    global _modifier_icons_cache
-
-    # 尝试直接访问 modifier_add 操作符
-    try:
-        # 方法1: 直接通过类型名获取
-        op_rna = bpy.types.ObjectModifierAdd.bl_rna
-        print(f"[MMY] 找到 ObjectModifierAdd: {op_rna}")
-        type_prop = op_rna.properties.get('type')
-        if type_prop:
-            print(f"[MMY] 找到 type 属性")
-            for item in type_prop.enum_items:
-                _modifier_icons_cache[item.identifier] = item.icon
-                print(f"[MMY] {item.identifier}: icon={item.icon}, name={item.name}")
-    except Exception as e:
-        print(f"[MMY] 方法1失败: {e}")
-
-    # 方法2: 遍历所有 Operator
-    if len(_modifier_icons_cache) == 0:
-        try:
-            for attr_name in dir(bpy.types):
-                if 'ModifierAdd' in attr_name or 'modifier_add' in attr_name.lower():
-                    print(f"[MMY] 发现相关类: {attr_name}")
-                    cls = getattr(bpy.types, attr_name)
-                    if hasattr(cls, 'bl_rna'):
-                        rna = cls.bl_rna
-                        type_prop = rna.properties.get('type')
-                        if type_prop:
-                            for item in type_prop.enum_items:
-                                _modifier_icons_cache[item.identifier] = item.icon
-        except Exception as e:
-            print(f"[MMY] 方法2失败: {e}")
-
-    print(f"[MMY] 最终图标缓存数量: {len(_modifier_icons_cache)}")
-    return _modifier_icons_cache
-
-
-# 存储每个修改器的显隐状态（使用对象自定义属性）
 def _save_modifier_visibility(obj):
     """保存修改器显隐状态到对象属性"""
     if not obj:
@@ -145,10 +36,10 @@ def _has_saved_visibility(obj):
     return obj and "mmy_modifier_visibility" in obj
 
 
-# ============ 自定义修改器菜单 ============
+# ============ 自定义修改器菜单（使用原生分类） ============
 
 class MMY_MT_AddModifierMenu(bpy.types.Menu):
-    """自定义添加修改器菜单（按类别分组，多列显示）"""
+    """自定义添加修改器菜单（调用原生分类菜单）"""
     bl_idname = "MMY_MT_add_modifier"
     bl_label = "添加修改器"
 
@@ -160,24 +51,12 @@ class MMY_MT_AddModifierMenu(bpy.types.Menu):
             layout.label(text="仅网格对象可用")
             return
 
-        # 初始化图标缓存（如果为空则构建）
-        if len(_modifier_icons_cache) == 0:
-            _build_modifier_icons_cache()
-
-        # 使用 split 分成4列
-        split = layout.split(factor=0.25)
-
-        for category, modifiers in MODIFIER_CATEGORIES.items():
-            col = split.column()
-
-            # 类别标题
-            col.label(text=category)
-
-            # 修改器列表
-            for mod_type, mod_name in modifiers:
-                icon_value = _modifier_icons_cache.get(mod_type, 0)
-                op = col.operator("object.modifier_add", text=mod_name, icon_value=icon_value)
-                op.type = mod_type
+        # 直接调用原生分类菜单（已有正确图标）
+        layout.menu("OBJECT_MT_modifier_add_generate", text="生成", icon='MODIFIER_DATA')
+        layout.menu("OBJECT_MT_modifier_add_deform", text="变形", icon='MODIFIER_DATA')
+        layout.menu("OBJECT_MT_modifier_add_edit", text="修改", icon='MODIFIER_DATA')
+        layout.menu("OBJECT_MT_modifier_add_normals", text="法向", icon='NORMALS_FACE')
+        layout.menu("OBJECT_MT_modifier_add_physics", text="物理", icon='PHYSICS')
 
 
 # ============ 工具按钮行 ============
