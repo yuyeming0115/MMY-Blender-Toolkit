@@ -120,7 +120,7 @@ class MMY_MT_AddModifierMenu(bpy.types.Menu):
             return
 
         # 使用 column_flow 实现4列布局
-        flow = layout.column_flow(columns=4, even_columns=True)
+        flow = layout.column_flow(columns=4)
 
         for category, modifiers in MODIFIER_CATEGORIES.items():
             col = flow.column()
