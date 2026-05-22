@@ -72,22 +72,28 @@ MODIFIER_CATEGORIES = {
 }
 
 
-def _get_modifier_icon_value(mod_type):
-    """从 modifier_add 操作符的 enum 属性获取图标值"""
+# 修改器图标缓存（延迟初始化）
+_modifier_icons_cache = None
+
+def _build_modifier_icons_cache():
+    """构建修改器图标缓存"""
+    global _modifier_icons_cache
+    _modifier_icons_cache = {}
+
     try:
-        # 获取 object.modifier_add 操作符的 type 属性
-        op_class = bpy.types.ObjectModifierAdd
-        if op_class and hasattr(op_class, 'bl_rna'):
-            rna = op_class.bl_rna
-            type_prop = rna.properties.get('type')
-            if type_prop:
-                # 获取 enum items
-                for item in type_prop.enum_items:
-                    if item.identifier == mod_type:
-                        return item.icon
-    except:
-        pass
-    return 0
+        # 从 Operator 子类中找到 modifier_add
+        for cls in bpy.types.Operator.__subclasses__():
+            if cls.bl_idname == "OBJECT_OT_modifier_add":
+                rna = cls.bl_rna
+                type_prop = rna.properties.get('type')
+                if type_prop:
+                    for item in type_prop.enum_items:
+                        _modifier_icons_cache[item.identifier] = item.icon
+                break
+    except Exception as e:
+        print(f"[MMY] 获取修改器图标失败: {e}")
+
+    return _modifier_icons_cache
 
 
 # 存储每个修改器的显隐状态（使用对象自定义属性）
@@ -137,8 +143,24 @@ class MMY_MT_AddModifierMenu(bpy.types.Menu):
             layout.label(text="仅网格对象可用")
             return
 
-        # 直接调用原生菜单（已有正确图标）
-        layout.menu("OBJECT_MT_modifier_add", text="选择修改器...")
+        # 初始化图标缓存
+        if _modifier_icons_cache is None:
+            _build_modifier_icons_cache()
+
+        # 使用 split 分成4列
+        split = layout.split(factor=0.25)
+
+        for category, modifiers in MODIFIER_CATEGORIES.items():
+            col = split.column()
+
+            # 类别标题
+            col.label(text=category)
+
+            # 修改器列表
+            for mod_type, mod_name in modifiers:
+                icon_value = _modifier_icons_cache.get(mod_type, 0)
+                op = col.operator("object.modifier_add", text=mod_name, icon_value=icon_value)
+                op.type = mod_type
 
 
 # ============ 工具按钮行 ============
