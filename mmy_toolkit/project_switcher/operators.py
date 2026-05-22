@@ -7,7 +7,7 @@ import platform
 
 
 class MMY_OT_OpenProjectFile(bpy.types.Operator):
-    """打开项目文件"""
+    """打开项目文件（自动保存当前文件）"""
     bl_idname = "mmy.open_project_file"
     bl_label = "打开项目文件"
     bl_options = {'REGISTER'}
@@ -15,6 +15,16 @@ class MMY_OT_OpenProjectFile(bpy.types.Operator):
     filepath: bpy.props.StringProperty()
 
     def execute(self, context):
+        # 先保存当前文件（如果有路径）
+        current_filepath = bpy.data.filepath
+        if current_filepath:
+            try:
+                bpy.ops.wm.save_mainfile()
+                self.report({'INFO'}, "已保存当前文件")
+            except:
+                self.report({'WARNING'}, "保存失败，继续打开新文件")
+
+        # 打开目标文件
         bpy.ops.wm.open_mainfile(filepath=self.filepath)
         return {'FINISHED'}
 
