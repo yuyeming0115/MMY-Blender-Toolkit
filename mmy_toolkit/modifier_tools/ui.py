@@ -24,9 +24,9 @@ MODIFIER_CATEGORIES = {
         ('SOLIDIFY', "实体化", 'MOD_SOLIDIFY'),
         ('SUBSURF', "细分", 'MOD_SUBSURF'),
         ('TRIANGULATE', "三角化", 'MOD_TRIANGULATE'),
-        ('WIREFRAME', "线框", 'MOD_WIREFRAME'),
-        ('WELD', "焊接", 'AUTOMERGE_OFF'),
         ('VOLUME_TO_MESH', "体积转网格", 'VOLUME_DATA'),
+        ('WELD', "焊接", 'AUTOMERGE_OFF'),
+        ('WIREFRAME', "线框", 'MOD_WIREFRAME'),
     ],
     "变形": [
         ('ARMATURE', "骨架", 'MOD_ARMATURE'),
@@ -34,6 +34,7 @@ MODIFIER_CATEGORIES = {
         ('CURVE', "曲线", 'MOD_CURVE'),
         ('DISPLACE', "置换", 'MOD_DISPLACE'),
         ('HOOK', "钩子", 'HOOK'),
+        ('LAPLACIANDEFORM', "拉普拉斯变形", 'MOD_MESHDEFORM'),
         ('LAPLACIANSMOOTH', "拉普拉斯平滑", 'MOD_LAPLACIANSMOOTH'),
         ('LATTICE', "晶格", 'MOD_LATTICE'),
         ('MESH_DEFORM', "网格变形", 'MOD_MESHDEFORM'),
@@ -41,13 +42,14 @@ MODIFIER_CATEGORIES = {
         ('SIMPLE_DEFORM', "简易变形", 'MOD_SIMPLEDEFORM'),
         ('SMOOTH', "平滑", 'MOD_SMOOTH'),
         ('CORRECTIVE_SMOOTH', "矫正平滑", 'MOD_SMOOTH'),
-        ('LAPLACIANDEFORM', "拉普拉斯变形", 'MOD_MESHDEFORM'),
         ('SURFACE_DEFORM', "表面变形", 'MOD_MESHDEFORM'),
         ('WARP', "扭曲", 'MOD_WARP'),
         ('WAVE', "波浪", 'MOD_WAVE'),
     ],
     "修改": [
         ('DATA_TRANSFER', "数据传递", 'MOD_DATATRANSFER'),
+        ('MESH_CACHE', "网格缓存", 'MOD_MESHDEFORM'),
+        ('MESH_SEQUENCE_CACHE', "网格序列缓存", 'MOD_MESHDEFORM'),
         ('NORMAL_EDIT', "编辑法向", 'MOD_NORMALEDIT'),
         ('WEIGHTED_NORMAL', "加权法向", 'MOD_NORMALEDIT'),
         ('UV_PROJECT', "UV投射", 'MOD_UVPROJECT'),
@@ -117,18 +119,16 @@ class MMY_MT_AddModifierMenu(bpy.types.Menu):
             layout.label(text="仅网格对象可用")
             return
 
-        # 按类别分列显示（使用 split 分成多列）
-        split = layout.split(factor=0.25)
+        # 使用 column_flow 实现4列布局
+        flow = layout.column_flow(columns=4, even_columns=True)
 
         for category, modifiers in MODIFIER_CATEGORIES.items():
-            col = split.column()
+            col = flow.column()
 
             # 类别标题
-            row = col.row()
-            row.label(text=category)
-            row.scale_y = 0.8
+            col.label(text=category)
 
-            # 修改器列表（紧凑排列）
+            # 修改器列表
             for mod_type, mod_name, mod_icon in modifiers:
                 op = col.operator("object.modifier_add", text=mod_name, icon=mod_icon)
                 op.type = mod_type
