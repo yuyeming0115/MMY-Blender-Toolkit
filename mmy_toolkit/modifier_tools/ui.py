@@ -98,6 +98,33 @@ MODIFIER_ICON_NAMES = {
     'PARTICLE_INSTANCE': 'MOD_PARTICLE_INSTANCE',
     'PARTICLE_SYSTEM': 'MOD_PARTICLES',
     'SOFT_BODY': 'MOD_SOFT',
+    # 蜡笔修改器
+    'GREASE_PENCIL_ARRAY': 'MOD_ARRAY',
+    'GREASE_PENCIL_BUILD': 'MOD_BUILD',
+    'GREASE_PENCIL_LENGTH': 'MOD_LENGTH',
+    'GREASE_PENCIL_MIRROR': 'MOD_MIRROR',
+    'GREASE_PENCIL_MULTIPLY': 'MOD_ARRAY',
+    'GREASE_PENCIL_SIMPLIFY': 'MOD_SIMPLIFY',
+    'GREASE_PENCIL_SUBDIV': 'MOD_SUBSURF',
+    'GREASE_PENCIL_ENVELOPE': 'MOD_ENVELOPE',
+    'GREASE_PENCIL_OUTLINE': 'MOD_OUTLINE',
+    'GREASE_PENCIL_DASH': 'MOD_DASH',
+    'GREASE_PENCIL_HOOK': 'HOOK',
+    'GREASE_PENCIL_NOISE': 'MOD_NOISE',
+    'GREASE_PENCIL_OFFSET': 'MOD_OFFSET',
+    'GREASE_PENCIL_SMOOTH': 'MOD_SMOOTH',
+    'GREASE_PENCIL_THICKNESS': 'MOD_THICKNESS',
+    'GREASE_PENCIL_LATTICE': 'MOD_LATTICE',
+    'GREASE_PENCIL_ARMATURE': 'MOD_ARMATURE',
+    'GREASE_PENCIL_SHRINKWRAP': 'MOD_SHRINKWRAP',
+    'GREASE_PENCIL_COLOR': 'MOD_HUE_SATURATION',
+    'GREASE_PENCIL_TINT': 'MOD_TINT',
+    'GREASE_PENCIL_OPACITY': 'MOD_OPACITY',
+    'GREASE_PENCIL_VERTEX_WEIGHT_ANGLE': 'MOD_VERTEX_WEIGHT',
+    'GREASE_PENCIL_VERTEX_WEIGHT_PROXIMITY': 'MOD_VERTEX_WEIGHT',
+    'GREASE_PENCIL_TIME': 'MOD_TIME',
+    'LINEART': 'MOD_LINEART',
+    'GREASE_PENCIL_TEXTURE': 'TEXTURE',
 }
 
 # 修改器分类定义（与 Blender 5.1 原生分类一致）
@@ -168,11 +195,78 @@ MODIFIER_CATEGORIES = {
     ],
 }
 
+# 蜡笔修改器分类定义
+GPENCIL_MODIFIER_CATEGORIES = {
+    "生成": [
+        ('GREASE_PENCIL_ARRAY', "阵列"),
+        ('GREASE_PENCIL_BUILD', "构建"),
+        ('GREASE_PENCIL_LENGTH', "长度"),
+        ('GREASE_PENCIL_MIRROR', "镜像"),
+        ('GREASE_PENCIL_MULTIPLY', "多笔触"),
+        ('GREASE_PENCIL_SIMPLIFY', "简化"),
+        ('GREASE_PENCIL_SUBDIV', "细分"),
+        ('GREASE_PENCIL_ENVELOPE', "包络"),
+        ('GREASE_PENCIL_OUTLINE', "轮廓"),
+        ('GREASE_PENCIL_DASH', "点划线"),
+    ],
+    "变形": [
+        ('GREASE_PENCIL_HOOK', "钩子"),
+        ('GREASE_PENCIL_NOISE', "噪波"),
+        ('GREASE_PENCIL_OFFSET', "偏移"),
+        ('GREASE_PENCIL_SMOOTH', "平滑"),
+        ('GREASE_PENCIL_THICKNESS', "厚度"),
+        ('GREASE_PENCIL_LATTICE', "晶格"),
+        ('GREASE_PENCIL_ARMATURE', "骨架"),
+        ('GREASE_PENCIL_SHRINKWRAP', "收缩包裹"),
+    ],
+    "颜色": [
+        ('GREASE_PENCIL_COLOR', "色调饱和"),
+        ('GREASE_PENCIL_TINT', "着色"),
+        ('GREASE_PENCIL_OPACITY', "透明度"),
+    ],
+    "权重": [
+        ('GREASE_PENCIL_VERTEX_WEIGHT_ANGLE', "角度权重"),
+        ('GREASE_PENCIL_VERTEX_WEIGHT_PROXIMITY', "邻近权重"),
+    ],
+    "时间": [
+        ('GREASE_PENCIL_TIME', "时间偏移"),
+    ],
+    "线画": [
+        ('LINEART', "线画"),
+        ('GREASE_PENCIL_TEXTURE', "纹理映射"),
+    ],
+}
 
-# ============ 自定义修改器菜单（多列布局 + 图标） ============
+
+# ============ 资产库扫描 ============
+
+def get_geometry_nodes_assets():
+    """获取资产库中的几何节点资产列表"""
+    addon = bpy.context.preferences.addons.get("mmy_toolkit")
+    if not addon or not addon.preferences:
+        return []
+
+    asset_path = getattr(addon.preferences, "geometry_nodes_asset_path", "")
+    if not asset_path:
+        return []
+
+    assets = []
+    try:
+        with bpy.data.libraries.load(asset_path, link=False) as (data_from, _):
+            for ng_name in data_from.node_groups:
+                # 过滤掉以 '.' 开头的隐藏节点组
+                if not ng_name.startswith('.'):
+                    assets.append(ng_name)
+    except:
+        pass
+
+    return assets
+
+
+# ============ 自定义修改器菜单（智能切换 + 多列布局） ============
 
 class MMY_MT_AddModifierMenu(bpy.types.Menu):
-    """自定义添加修改器菜单（按类别分组，多列显示）"""
+    """自定义添加修改器菜单（智能切换：网格/蜡笔）"""
     bl_idname = "MMY_MT_add_modifier"
     bl_label = "添加修改器"
 
@@ -180,20 +274,58 @@ class MMY_MT_AddModifierMenu(bpy.types.Menu):
         layout = self.layout
         obj = context.active_object
 
-        if not obj or obj.type != 'MESH':
-            layout.label(text="仅网格对象可用")
+        if not obj:
+            layout.label(text="请选择对象")
             return
 
-        # 使用 split 分成5列（与 Blender 5.1 原生分类一致）
-        split = layout.split(factor=0.2)
+        if obj.type == 'MESH':
+            self.draw_mesh_modifiers(layout, obj)
+        elif obj.type == 'GREASE_PENCIL':
+            self.draw_gpencil_modifiers(layout, obj)
+        else:
+            layout.label(text="仅网格和蜡笔对象可用")
 
+    def draw_mesh_modifiers(self, layout, obj):
+        """绘制网格修改器菜单（5列 + 资产库）"""
+        # 获取几何节点资产
+        assets = get_geometry_nodes_assets()
+
+        # 计算列数（5列原生 + 1列资产库）
+        num_cols = 6 if assets else 5
+        factor = 1.0 / num_cols
+
+        split = layout.split(factor=factor)
+
+        # 绘制5列原生分类
         for category, modifiers in MODIFIER_CATEGORIES.items():
             col = split.column()
-
-            # 类别标题
             col.label(text=category)
 
-            # 修改器列表（使用正确的图标名称）
+            for mod_type, mod_name in modifiers:
+                icon_name = MODIFIER_ICON_NAMES.get(mod_type, 'MODIFIER_DATA')
+                op = col.operator("object.modifier_add", text=mod_name, icon=icon_name)
+                op.type = mod_type
+
+        # 绘制资产库列（如果有资产）
+        if assets:
+            col = split.column()
+            col.label(text="资产库")
+
+            for asset_name in assets[:15]:  # 限制显示数量
+                op = col.operator("mmy.add_geometry_nodes_asset", text=asset_name, icon='NODETREE')
+                op.asset_name = asset_name
+
+            if len(assets) > 15:
+                col.label(text=f"... 还有 {len(assets) - 15} 个")
+
+    def draw_gpencil_modifiers(self, layout, obj):
+        """绘制蜡笔修改器菜单（6列）"""
+        split = layout.split(factor=1.0 / 6)
+
+        for category, modifiers in GPENCIL_MODIFIER_CATEGORIES.items():
+            col = split.column()
+            col.label(text=category)
+
             for mod_type, mod_name in modifiers:
                 icon_name = MODIFIER_ICON_NAMES.get(mod_type, 'MODIFIER_DATA')
                 op = col.operator("object.modifier_add", text=mod_name, icon=icon_name)
@@ -203,12 +335,12 @@ class MMY_MT_AddModifierMenu(bpy.types.Menu):
 # ============ 工具按钮行 ============
 
 def draw_modifier_buttons_panel(self, context):
-    """绘制修改器面板工具按钮行"""
+    """绘制修改器面板工具按钮行（支持网格和蜡笔）"""
     layout = self.layout
     obj = context.active_object
 
-    # 仅对网格对象显示
-    if not obj or obj.type != 'MESH':
+    # 仅对网格和蜡笔对象显示
+    if not obj or obj.type not in ('MESH', 'GREASE_PENCIL'):
         return
 
     has_modifiers = bool(obj.modifiers)
@@ -231,8 +363,9 @@ def draw_modifier_buttons_panel(self, context):
     else:
         sub.operator("mmy.hide_all_modifiers", text="显隐", icon='HIDE_ON')
 
-    # 3. 应用修改器
-    sub.operator("mmy.apply_all_modifiers_with_shapekeys", text="应用", icon='CHECKMARK')
+    # 3. 应用修改器（仅网格对象）
+    if obj.type == 'MESH':
+        sub.operator("mmy.apply_all_modifiers_with_shapekeys", text="应用", icon='CHECKMARK')
 
     # 4. 删除所有修改器
     sub.operator("mmy.delete_all_modifiers", text="删除", icon='X')

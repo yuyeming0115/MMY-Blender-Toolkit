@@ -399,6 +399,14 @@ class MMY_Preferences(bpy.types.AddonPreferences):
         update=lambda self, ctx: _update_modifier_toggle_buttons()
     )
 
+    # === 几何节点资产库路径 ===
+    geometry_nodes_asset_path: bpy.props.StringProperty(
+        name="几何节点资产库",
+        description="几何节点资产库 .blend 文件路径，菜单将显示其中的节点组",
+        default="D:\\Blender资产库\\个人工作流\\个人工作流GN.blend",
+        subtype='FILE_PATH'
+    )
+
     def draw(self, context):
         layout = self.layout
 
@@ -558,6 +566,10 @@ class MMY_Preferences(bpy.types.AddonPreferences):
         row = box.row()
         row.prop(self, "modifier_panel")
         row.prop(self, "modifier_properties_header")
+
+        # 几何节点资产库路径
+        row = box.row()
+        row.prop(self, "geometry_nodes_asset_path", text="资产库路径")
         box.label(text="一键切换所有修改器的视口显示状态")
 
         layout.separator()

@@ -139,4 +139,5 @@ _classes = (
     MMY_OT_DeleteAllModifiers,
     MMY_OT_ExpandAllModifiers,
     MMY_OT_CollapseAllModifiers,
+    MMY_OT_AddGeometryNodesAsset,
 )
