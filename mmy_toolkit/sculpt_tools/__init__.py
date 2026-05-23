@@ -84,17 +84,16 @@ def _ensure_hud_modal_running():
         for area in screen.areas:
             if area.type != "VIEW_3D":
                 continue
-            space = area.spaces.active if area.spaces.active and area.spaces.active.type == "VIEW_3D" else None
-            if space is None:
-                continue
-            region = next((region for region in area.regions if region.type == "WINDOW"), None)
+            region = next((r for r in area.regions if r.type == "WINDOW"), None)
             if region is None:
                 continue
+
+            # 使用 invoke 方式启动 modal
             try:
-                with bpy.context.temp_override(window=window, area=area, region=region, space_data=space):
-                    bpy.ops.view3d.mmy_sculpt_hud_modal('EXEC_DEFAULT')
-            except Exception:
-                pass
+                with bpy.context.temp_override(window=window, area=area, region=region):
+                    bpy.ops.view3d.mmy_sculpt_hud_modal('INVOKE_DEFAULT')
+            except Exception as e:
+                print(f"[MMY Sculpt] Modal 启动失败: {e}")
             break
 
     return 1.0
@@ -131,7 +130,7 @@ def register():
             bpy.utils.unregister_class(cls)
             bpy.utils.register_class(cls)
 
-    # 注册 Modal Operator
+    # 注册 Modal Operator（必须先注册）
     register_modal()
 
     # 挂载绘制回调
@@ -151,10 +150,16 @@ def register():
     except Exception as e:
         print(f"[MMY Sculpt] 挂载右键菜单失败: {e}")
 
-    # 启动 Modal Timer
-    register_hud_modal_timer()
+    # 启动 Modal Timer（延迟启动，确保操作符已注册）
+    bpy.app.timers.register(_delayed_start_modal, first_interval=0.5)
 
     print("[MMY Sculpt] 悬浮按钮系统已启用")
+
+
+def _delayed_start_modal():
+    """延迟启动 Modal"""
+    register_hud_modal_timer()
+    return None  # 一次性 timer
 
 
 def unregister():
