@@ -100,7 +100,7 @@ MODIFIER_ICON_NAMES = {
     'SOFT_BODY': 'MOD_SOFT',
 }
 
-# 修改器分类定义
+# 修改器分类定义（与 Blender 5.1 原生分类一致）
 MODIFIER_CATEGORIES = {
     "生成": [
         ('ARRAY', "阵列"),
@@ -145,13 +145,15 @@ MODIFIER_CATEGORIES = {
         ('DATA_TRANSFER', "数据传递"),
         ('MESH_CACHE', "网格缓存"),
         ('MESH_SEQUENCE_CACHE', "网格序列缓存"),
-        ('NORMAL_EDIT', "编辑法向"),
-        ('WEIGHTED_NORMAL', "加权法向"),
         ('UV_PROJECT', "UV投射"),
         ('UV_WARP', "UV扭曲"),
         ('VERTEX_WEIGHT_EDIT', "顶点权重编辑"),
         ('VERTEX_WEIGHT_MIX', "顶点权重混合"),
         ('VERTEX_WEIGHT_PROXIMITY', "顶点权重邻近"),
+    ],
+    "法向": [
+        ('NORMAL_EDIT', "编辑法向"),
+        ('WEIGHTED_NORMAL', "加权法向"),
     ],
     "物理": [
         ('CLOTH', "布料"),
@@ -182,8 +184,8 @@ class MMY_MT_AddModifierMenu(bpy.types.Menu):
             layout.label(text="仅网格对象可用")
             return
 
-        # 使用 split 分成4列
-        split = layout.split(factor=0.25)
+        # 使用 split 分成5列（与 Blender 5.1 原生分类一致）
+        split = layout.split(factor=0.2)
 
         for category, modifiers in MODIFIER_CATEGORIES.items():
             col = split.column()
