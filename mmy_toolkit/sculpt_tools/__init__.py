@@ -52,6 +52,19 @@ def _draw_sculpt_header_menu(self, context):
     row.menu("MMY_MT_sculpt_face_sets", text="", icon='GROUP_VERTEX')
 
 
+def _draw_sculpt_context_menu(self, context):
+    """扩展雕刻模式右键菜单"""
+    obj = context.active_object
+    if not obj or obj.type != 'MESH' or obj.mode != 'SCULPT':
+        return
+
+    layout = self.layout
+    layout.separator()
+
+    # 添加面组菜单
+    layout.menu("MMY_MT_sculpt_face_sets", text="面组", icon='GROUP_VERTEX')
+
+
 def register():
     """注册模块"""
     # 注册菜单类
@@ -65,13 +78,25 @@ def register():
     # 挂载到雕刻模式 Header
     try:
         bpy.types.VIEW3D_HT_header.append(_draw_sculpt_header_menu)
-        print("[MMY Sculpt] 面组菜单已添加到雕刻模式 Header")
     except Exception as e:
         print(f"[MMY Sculpt] 挂载 Header 失败: {e}")
+
+    # 挂载到雕刻模式右键菜单
+    try:
+        bpy.types.VIEW3D_MT_sculpt_context_menu.append(_draw_sculpt_context_menu)
+        print("[MMY Sculpt] 面组菜单已添加到雕刻右键菜单")
+    except Exception as e:
+        print(f"[MMY Sculpt] 挂载右键菜单失败: {e}")
 
 
 def unregister():
     """注销模块"""
+    # 移除右键菜单挂载
+    try:
+        bpy.types.VIEW3D_MT_sculpt_context_menu.remove(_draw_sculpt_context_menu)
+    except:
+        pass
+
     # 移除 Header 挂载
     try:
         bpy.types.VIEW3D_HT_header.remove(_draw_sculpt_header_menu)
