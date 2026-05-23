@@ -407,6 +407,31 @@ class MMY_Preferences(bpy.types.AddonPreferences):
         subtype='FILE_PATH'
     )
 
+    # === 雕刻模式悬浮按钮 ===
+    sculpt_hud_layout: bpy.props.EnumProperty(
+        name="布局方向",
+        description="悬浮按钮的排列方式",
+        items=[
+            ('horizontal', "水平", "按钮水平排列"),
+            ('vertical', "垂直", "按钮垂直排列"),
+        ],
+        default='horizontal'
+    )
+    sculpt_hud_offset_x: bpy.props.FloatProperty(
+        name="水平偏移",
+        description="悬浮按钮的水平位置偏移比例",
+        default=0.0,
+        min=-0.5,
+        max=0.5
+    )
+    sculpt_hud_offset_y: bpy.props.FloatProperty(
+        name="垂直偏移",
+        description="悬浮按钮的垂直位置偏移比例",
+        default=0.0,
+        min=-1.5,
+        max=1.5
+    )
+
     def draw(self, context):
         layout = self.layout
 
