@@ -36,10 +36,141 @@ def _has_saved_visibility(obj):
     return obj and "mmy_modifier_visibility" in obj
 
 
-# ============ 自定义修改器菜单（使用原生分类菜单） ============
+# ============ 图标名称映射（Blender 5.1 验证可用） ============
+
+# 修改器类型 -> 图标名称（使用 Blender 5.1 实际可用的名称）
+MODIFIER_ICON_NAMES = {
+    # 生成类
+    'ARRAY': 'MOD_ARRAY',
+    'BEVEL': 'MOD_BEVEL',
+    'BOOLEAN': 'MOD_BOOLEAN',
+    'BUILD': 'MOD_BUILD',
+    'DECIMATE': 'MOD_DECIM',  # 注意：不是 MOD_DECIMATE
+    'EDGE_SPLIT': 'MOD_EDGESPLIT',
+    'MASK': 'MOD_MASK',
+    'MIRROR': 'MOD_MIRROR',
+    'MULTIRES': 'MOD_MULTIRES',
+    'NODES': 'NODETREE',  # 几何节点使用 NODETREE 图标
+    'REMESH': 'MOD_REMESH',
+    'SCREW': 'MOD_SCREW',
+    'SKIN': 'MOD_SKIN',
+    'SOLIDIFY': 'MOD_SOLIDIFY',
+    'SUBSURF': 'MOD_SUBSURF',
+    'TRIANGULATE': 'MOD_TRIANGULATE',
+    'VOLUME_TO_MESH': 'VOLUME_DATA',
+    'WELD': 'AUTOMERGE_ON',
+    'WIREFRAME': 'MOD_WIREFRAME',
+    # 变形类
+    'ARMATURE': 'MOD_ARMATURE',
+    'CAST': 'MOD_CAST',
+    'CURVE': 'MOD_CURVE',
+    'DISPLACE': 'MOD_DISPLACE',
+    'HOOK': 'HOOK',
+    'LAPLACIANDEFORM': 'MOD_MESHDEFORM',
+    'LAPLACIANSMOOTH': 'MOD_SMOOTH',
+    'LATTICE': 'MOD_LATTICE',
+    'MESH_DEFORM': 'MOD_MESHDEFORM',
+    'SHRINKWRAP': 'MOD_SHRINKWRAP',
+    'SIMPLE_DEFORM': 'MOD_SIMPLEDEFORM',
+    'SMOOTH': 'MOD_SMOOTH',
+    'CORRECTIVE_SMOOTH': 'MOD_SMOOTH',
+    'SURFACE_DEFORM': 'MOD_MESHDEFORM',
+    'WARP': 'MOD_WARP',
+    'WAVE': 'MOD_WAVE',
+    # 修改类
+    'DATA_TRANSFER': 'MOD_DATA_TRANSFER',
+    'MESH_CACHE': 'FILE',
+    'MESH_SEQUENCE_CACHE': 'FILE',
+    'NORMAL_EDIT': 'MOD_NORMALEDIT',
+    'WEIGHTED_NORMAL': 'MOD_NORMALEDIT',
+    'UV_PROJECT': 'MOD_UVPROJECT',
+    'UV_WARP': 'MOD_UVPROJECT',
+    'VERTEX_WEIGHT_EDIT': 'MOD_VERTEX_WEIGHT',
+    'VERTEX_WEIGHT_MIX': 'MOD_VERTEX_WEIGHT',
+    'VERTEX_WEIGHT_PROXIMITY': 'MOD_VERTEX_WEIGHT',
+    # 物理类
+    'CLOTH': 'MOD_CLOTH',
+    'COLLISION': 'MOD_PHYSICS',
+    'DYNAMIC_PAINT': 'MOD_DYNAMICPAINT',
+    'EXPLODE': 'MOD_EXPLODE',
+    'FLUID': 'MOD_FLUIDSIM',
+    'OCEAN': 'MOD_OCEAN',
+    'PARTICLE_INSTANCE': 'MOD_PARTICLE_INSTANCE',
+    'PARTICLE_SYSTEM': 'MOD_PARTICLES',
+    'SOFT_BODY': 'MOD_SOFT',
+}
+
+# 修改器分类定义
+MODIFIER_CATEGORIES = {
+    "生成": [
+        ('ARRAY', "阵列"),
+        ('BEVEL', "倒角"),
+        ('BOOLEAN', "布尔"),
+        ('BUILD', "构建"),
+        ('DECIMATE', "精简"),
+        ('EDGE_SPLIT', "拆边"),
+        ('MASK', "遮罩"),
+        ('MIRROR', "镜像"),
+        ('MULTIRES', "多级精度"),
+        ('NODES', "几何节点"),
+        ('REMESH', "重构网格"),
+        ('SCREW', "螺旋"),
+        ('SKIN', "蒙皮"),
+        ('SOLIDIFY', "实体化"),
+        ('SUBSURF', "细分"),
+        ('TRIANGULATE', "三角化"),
+        ('VOLUME_TO_MESH', "体积转网格"),
+        ('WELD', "焊接"),
+        ('WIREFRAME', "线框"),
+    ],
+    "变形": [
+        ('ARMATURE', "骨架"),
+        ('CAST', "投射"),
+        ('CURVE', "曲线"),
+        ('DISPLACE', "置换"),
+        ('HOOK', "钩子"),
+        ('LAPLACIANDEFORM', "拉普拉斯变形"),
+        ('LAPLACIANSMOOTH', "拉普拉斯平滑"),
+        ('LATTICE', "晶格"),
+        ('MESH_DEFORM', "网格变形"),
+        ('SHRINKWRAP', "收缩包裹"),
+        ('SIMPLE_DEFORM', "简易变形"),
+        ('SMOOTH', "平滑"),
+        ('CORRECTIVE_SMOOTH', "矫正平滑"),
+        ('SURFACE_DEFORM', "表面变形"),
+        ('WARP', "扭曲"),
+        ('WAVE', "波浪"),
+    ],
+    "修改": [
+        ('DATA_TRANSFER', "数据传递"),
+        ('MESH_CACHE', "网格缓存"),
+        ('MESH_SEQUENCE_CACHE', "网格序列缓存"),
+        ('NORMAL_EDIT', "编辑法向"),
+        ('WEIGHTED_NORMAL', "加权法向"),
+        ('UV_PROJECT', "UV投射"),
+        ('UV_WARP', "UV扭曲"),
+        ('VERTEX_WEIGHT_EDIT', "顶点权重编辑"),
+        ('VERTEX_WEIGHT_MIX', "顶点权重混合"),
+        ('VERTEX_WEIGHT_PROXIMITY', "顶点权重邻近"),
+    ],
+    "物理": [
+        ('CLOTH', "布料"),
+        ('COLLISION', "碰撞"),
+        ('DYNAMIC_PAINT', "动态绘画"),
+        ('EXPLODE', "爆炸"),
+        ('FLUID', "流体"),
+        ('OCEAN', "海洋"),
+        ('PARTICLE_INSTANCE', "粒子实例"),
+        ('PARTICLE_SYSTEM', "粒子系统"),
+        ('SOFT_BODY', "软体"),
+    ],
+}
+
+
+# ============ 自定义修改器菜单（多列布局 + 图标） ============
 
 class MMY_MT_AddModifierMenu(bpy.types.Menu):
-    """自定义添加修改器菜单（调用原生分类菜单）"""
+    """自定义添加修改器菜单（按类别分组，多列显示）"""
     bl_idname = "MMY_MT_add_modifier"
     bl_label = "添加修改器"
 
@@ -51,12 +182,20 @@ class MMY_MT_AddModifierMenu(bpy.types.Menu):
             layout.label(text="仅网格对象可用")
             return
 
-        # 直接调用原生分类菜单（已有正确图标）
-        layout.menu("OBJECT_MT_modifier_add_generate", text="生成", icon='MODIFIER_DATA')
-        layout.menu("OBJECT_MT_modifier_add_deform", text="变形", icon='MODIFIER_DATA')
-        layout.menu("OBJECT_MT_modifier_add_edit", text="修改", icon='MODIFIER_DATA')
-        layout.menu("OBJECT_MT_modifier_add_normals", text="法向", icon='NORMALS_FACE')
-        layout.menu("OBJECT_MT_modifier_add_physics", text="物理", icon='PHYSICS')
+        # 使用 split 分成4列
+        split = layout.split(factor=0.25)
+
+        for category, modifiers in MODIFIER_CATEGORIES.items():
+            col = split.column()
+
+            # 类别标题
+            col.label(text=category)
+
+            # 修改器列表（使用正确的图标名称）
+            for mod_type, mod_name in modifiers:
+                icon_name = MODIFIER_ICON_NAMES.get(mod_type, 'MODIFIER_DATA')
+                op = col.operator("object.modifier_add", text=mod_name, icon=icon_name)
+                op.type = mod_type
 
 
 # ============ 工具按钮行 ============
