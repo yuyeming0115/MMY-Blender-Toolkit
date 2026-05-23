@@ -133,6 +133,57 @@ class MMY_OT_CollapseAllModifiers(bpy.types.Operator):
         return {'FINISHED'}
 
 
+class MMY_OT_AddGeometryNodesAsset(bpy.types.Operator):
+    """从资产库添加几何节点修改器"""
+    bl_idname = "mmy.add_geometry_nodes_asset"
+    bl_label = "添加几何节点资产"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    asset_name: bpy.props.StringProperty()
+
+    @classmethod
+    def poll(cls, context):
+        obj = context.active_object
+        return obj and obj.type == 'MESH'
+
+    def execute(self, context):
+        # 从偏好设置获取资产库路径
+        addon = bpy.context.preferences.addons.get("mmy_toolkit")
+        asset_path = ""
+        if addon and addon.preferences:
+            asset_path = getattr(addon.preferences, "geometry_nodes_asset_path", "")
+
+        if not asset_path:
+            self.report({'ERROR'}, "未配置几何节点资产库路径")
+            return {'CANCELLED'}
+
+        # Append node group from asset library
+        try:
+            with bpy.data.libraries.load(asset_path, link=False) as (data_from, data_to):
+                if self.asset_name in data_from.node_groups:
+                    data_to.node_groups.append(self.asset_name)
+                else:
+                    self.report({'ERROR'}, f"资产 '{self.asset_name}' 不存在")
+                    return {'CANCELLED'}
+        except Exception as e:
+            self.report({'ERROR'}, f"加载资产库失败: {e}")
+            return {'CANCELLED'}
+
+        # Get the node group
+        node_group = bpy.data.node_groups.get(self.asset_name)
+        if not node_group:
+            self.report({'ERROR'}, "节点组导入失败")
+            return {'CANCELLED'}
+
+        # Add Geometry Nodes modifier
+        obj = context.active_object
+        mod = obj.modifiers.new(name=self.asset_name, type='NODES')
+        mod.node_group = node_group
+
+        self.report({'INFO'}, f"已添加几何节点修改器: {self.asset_name}")
+        return {'FINISHED'}
+
+
 _classes = (
     MMY_OT_HideAllModifiers,
     MMY_OT_RestoreModifierVisibility,
