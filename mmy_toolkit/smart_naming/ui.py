@@ -114,11 +114,16 @@ def _append_to_outliner_context_menu(self, context):
     """在大纲上下文菜单添加选项"""
     layout = self.layout
 
-    # 添加分隔线和智能复制选项
     layout.separator()
     layout.operator("mmy.smart_duplicate_collection", text="智能复制集合")
     layout.operator("mmy.create_lod_collections", text="创建高低模容器")
-    layout.operator("mmy.group_selected_objects", text="归组到新集合")
+
+    # 归组功能：设置 INVOKE_DEFAULT 确保弹出对话框
+    if context.selected_objects:
+        layout.separator()
+        op = layout.operator("mmy.group_selected_objects", text="归组到新集合", icon='GROUP')
+        # 设置操作上下文为 INVOKE_DEFAULT
+        layout.operator_context = 'INVOKE_DEFAULT'
 
 
 # ===================================================================
