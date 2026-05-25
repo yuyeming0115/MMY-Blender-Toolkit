@@ -110,8 +110,19 @@ def _append_to_outliner_menu(self, context):
         layout.operator("mmy.group_selected_objects", text="归组到新集合", icon='GROUP')
 
 
+def _append_to_outliner_object_menu(self, context):
+    """在大纲对象右键菜单添加选项"""
+    layout = self.layout
+
+    # 归组功能：只有选中对象时才显示
+    if context.selected_objects:
+        layout.separator()
+        layout.operator_context = 'INVOKE_DEFAULT'
+        layout.operator("mmy.group_selected_objects", text="归组到新集合", icon='GROUP')
+
+
 def _append_to_outliner_context_menu(self, context):
-    """在大纲上下文菜单添加选项"""
+    """在大纲上下文菜单添加选项（集合/空白区域）"""
     layout = self.layout
 
     layout.separator()
@@ -177,33 +188,46 @@ def register():
     for cls in _classes:
         bpy.utils.register_class(cls)
 
-    # 挂载大纲右键菜单（尝试多个位置）
-    menus_to_append = [
+    # 挂载大纲右键菜单（多个位置）
+    # 集合/空白区域菜单
+    collection_menus = [
         'OUTLINER_MT_context_menu',      # 主右键菜单（空白处）
         'OUTLINER_MT_collection',         # 集合右键菜单
         'OUTLINER_MT_collection_context_menu',  # 集合上下文菜单
     ]
-    for menu_name in menus_to_append:
+    for menu_name in collection_menus:
         try:
             menu = getattr(bpy.types, menu_name)
             menu.append(_append_to_outliner_context_menu)
         except:
             pass
 
+    # 对象右键菜单
+    try:
+        bpy.types.OUTLINER_MT_object.append(_append_to_outliner_object_menu)
+    except:
+        pass
+
 
 def unregister():
     # 移除大纲右键菜单
-    menus_to_remove = [
+    collection_menus = [
         'OUTLINER_MT_context_menu',
         'OUTLINER_MT_collection',
         'OUTLINER_MT_collection_context_menu',
     ]
-    for menu_name in menus_to_remove:
+    for menu_name in collection_menus:
         try:
             menu = getattr(bpy.types, menu_name)
             menu.remove(_append_to_outliner_context_menu)
         except:
             pass
+
+    # 移除对象右键菜单
+    try:
+        bpy.types.OUTLINER_MT_object.remove(_append_to_outliner_object_menu)
+    except:
+        pass
 
     # 注销面板和操作符
     for cls in reversed(_classes):
