@@ -193,9 +193,8 @@ class MMY_MT_BlenderBookmarks(bpy.types.Menu):
             layout.label(text="收藏目录", icon='BOOKMARKS')
             for path in bookmarks[:15]:  # 限制显示数量
                 display_name = os.path.basename(path) or path
-                row = layout.row(align=True)
-                row.label(text=display_name, icon='FILE_FOLDER')
-                op = row.operator("mmy.open_project_directory", text="", icon='ARROW_LEFTRIGHT')
+                # 直接显示路径名作为按钮，点击打开目录
+                op = layout.operator("mmy.open_project_directory", text=display_name, icon='FILE_FOLDER')
                 op.directory = path
 
         layout.separator()
@@ -205,9 +204,7 @@ class MMY_MT_BlenderBookmarks(bpy.types.Menu):
             layout.label(text="最近目录", icon='RECOVER_LAST')
             for path in recent_dirs[:10]:
                 display_name = os.path.basename(path) or path
-                row = layout.row(align=True)
-                row.label(text=display_name, icon='FILE_FOLDER')
-                op = row.operator("mmy.open_project_directory", text="", icon='ARROW_LEFTRIGHT')
+                op = layout.operator("mmy.open_project_directory", text=display_name, icon='FILE_FOLDER')
                 op.directory = path
 
         if not bookmarks and not recent_dirs:
@@ -236,13 +233,9 @@ class MMY_MT_BlenderRecentFiles(bpy.types.Menu):
             else:
                 text = filename
 
-            row = layout.row(align=True)
-            # 打开文件
-            op = row.operator("mmy.open_project_file", text=text, icon='FILE_BLEND')
+            # 直接显示文件名作为按钮，点击打开文件
+            op = layout.operator("mmy.open_project_file", text=text, icon='FILE_BLEND')
             op.filepath = filepath
-            # 打开目录
-            op2 = row.operator("mmy.open_project_directory", text="", icon='FILE_FOLDER')
-            op2.directory = os.path.dirname(filepath)
 
 
 class MMY_MT_ProjectFiles(bpy.types.Menu):
@@ -299,12 +292,6 @@ class MMY_MT_ProjectFiles(bpy.types.Menu):
             layout.separator()
             op = layout.operator("mmy.open_project_directory", text="打开目录", icon='FILE_FOLDER')
             op.directory = directory
-
-        layout.separator()
-
-        # === Blender 书签和最近文件 ===
-        layout.menu("MMY_MT_blender_bookmarks", text="书签", icon='BOOKMARKS')
-        layout.menu("MMY_MT_blender_recent_files", text="最近文件", icon='RECOVER_LAST')
 
 
 _classes = (
