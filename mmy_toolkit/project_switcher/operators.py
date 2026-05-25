@@ -4,6 +4,7 @@ import bpy
 import os
 import subprocess
 import platform
+from bpy_extras.io_utils import ImportHelper
 
 
 def get_blender_config_dir():
@@ -164,35 +165,39 @@ class MMY_OT_OpenProjectDirectory(bpy.types.Operator):
             return self._open_in_file_browser(context)
 
     def _open_in_file_browser(self, context):
-        """在 Blender File Browser 中打开目录"""
-        # 查找 FILE_BROWSER 区域
-        for window in context.window_manager.windows:
-            for area in window.screen.areas:
-                if area.type == 'FILE_BROWSER':
-                    for space in area.spaces:
-                        if space.type == 'FILE_BROWSER':
-                            params = space.params
-                            if params:
-                                # 使用字符串路径（Windows 需要带斜杠结尾）
-                                dir_path = self.directory.rstrip('\\/') + '\\'
-                                try:
+        """打开 File Browser 对话框并预设目录"""
+        # 方案：弹出 File Browser 对话框，预设到书签目录
+        # 用户可以在里面浏览并选择文件打开
+
+        # 确保目录路径格式正确（Windows 需要 \\ 结尾）
+        dir_path = self.directory.rstrip('\\/') + '\\'
+
+        # 使用 wm.file_browser 打开文件浏览器对话框
+        try:
+            # 方法：直接打开 File Browser 并设置目录
+            # 需要通过 context override 来设置初始目录
+            for window in context.window_manager.windows:
+                for area in window.screen.areas:
+                    if area.type == 'FILE_BROWSER':
+                        for space in area.spaces:
+                            if space.type == 'FILE_BROWSER':
+                                params = space.params
+                                if params:
                                     params.directory = dir_path
-                                    # 强制刷新
+                                    # 刷新显示
                                     for region in area.regions:
                                         region.tag_redraw()
-                                    self.report({'INFO'}, f"已切换到: {self.directory}")
                                     return {'FINISHED'}
-                                except Exception as e:
-                                    print(f"设置目录失败: {e}")
 
-        # 没有找到 File Browser，尝试打开文件选择对话框
-        try:
-            # 使用 Ctrl+O 打开 File Browser
-            bpy.ops.wm.file_external_operations(filepath=self.directory)
-        except:
-            pass
+            # 如果没有打开的 File Browser，尝试用文件操作触发
+            # 使用 filepath 参数触发 File Browser 打开
+            context.window_manager.fileselect_add(self)
+            return {'RUNNING_MODAL'}
 
-        # 最终 Fallback：使用系统文件管理器
+        except Exception as e:
+            print(f"File Browser 操作失败: {e}")
+
+        # Fallback：打开系统文件管理器
         self.report({'INFO'}, f"打开目录: {self.directory}")
         if platform.system() == 'Windows':
             subprocess.run(['explorer', self.directory])
@@ -262,6 +267,55 @@ class MMY_OT_CopyProjectPath(bpy.types.Operator):
         return {'FINISHED'}
 
 
+class MMY_OT_BrowseBookmarkDirectory(bpy.types.Operator, ImportHelper):
+    """在书签目录中浏览并打开文件"""
+    bl_idname = "mmy.browse_bookmark_directory"
+    bl_label = "浏览书签目录"
+    bl_options = {'REGISTER'}
+
+    # 隐藏扩展名筛选
+    filename_ext = ".blend"
+    filter_glob: bpy.props.StringProperty(
+        default="*.blend",
+        options={'HIDDEN'},
+        maxlen=255,
+    )
+
+    # 预设目录
+    directory: bpy.props.StringProperty(
+        default="",
+        subtype='DIR_PATH',
+    )
+
+    def invoke(self, context, event):
+        # 设置初始目录
+        if self.directory and os.path.exists(self.directory):
+            # 确保 File Browser 从这个目录开始
+            context.space_data.params.directory = self.directory
+        return ImportHelper.invoke(self, context, event)
+
+    def execute(self, context):
+        filepath = self.filepath
+
+        if not filepath.endswith('.blend'):
+            self.report({'WARNING'}, "请选择 .blend 文件")
+            return {'CANCELLED'}
+
+        # 保存当前文件（如果有路径）
+        current_filepath = bpy.data.filepath
+        if current_filepath:
+            try:
+                bpy.ops.wm.save_mainfile()
+                self.report({'INFO'}, "已保存当前文件")
+            except:
+                self.report({'WARNING'}, "保存失败，继续打开新文件")
+
+        # 打开选择的文件
+        bpy.ops.wm.open_mainfile(filepath=filepath)
+        self.report({'INFO'}, f"已打开: {os.path.basename(filepath)}")
+        return {'FINISHED'}
+
+
 class MMY_MT_BlenderBookmarks(bpy.types.Menu):
     """Blender 书签菜单"""
     bl_idname = "MMY_MT_blender_bookmarks"
@@ -276,8 +330,8 @@ class MMY_MT_BlenderBookmarks(bpy.types.Menu):
             layout.label(text="收藏目录", icon='BOOKMARKS')
             for path in bookmarks[:15]:  # 限制显示数量
                 display_name = os.path.basename(path) or path
-                # 直接显示路径名作为按钮，点击打开目录
-                op = layout.operator("mmy.open_project_directory", text=display_name, icon='FILE_FOLDER')
+                # 点击后弹出 File Browser 对话框，预设到该目录
+                op = layout.operator("mmy.browse_bookmark_directory", text=display_name, icon='FILE_FOLDER')
                 op.directory = path
 
         layout.separator()
@@ -287,7 +341,7 @@ class MMY_MT_BlenderBookmarks(bpy.types.Menu):
             layout.label(text="最近目录", icon='RECOVER_LAST')
             for path in recent_dirs[:10]:
                 display_name = os.path.basename(path) or path
-                op = layout.operator("mmy.open_project_directory", text=display_name, icon='FILE_FOLDER')
+                op = layout.operator("mmy.browse_bookmark_directory", text=display_name, icon='FILE_FOLDER')
                 op.directory = path
 
         if not bookmarks and not recent_dirs:
@@ -381,6 +435,7 @@ _classes = (
     MMY_OT_OpenProjectFile,
     MMY_OT_OpenProjectDirectory,
     MMY_OT_CopyProjectPath,
+    MMY_OT_BrowseBookmarkDirectory,
     MMY_MT_BlenderBookmarks,
     MMY_MT_BlenderRecentFiles,
     MMY_MT_ProjectFiles,
