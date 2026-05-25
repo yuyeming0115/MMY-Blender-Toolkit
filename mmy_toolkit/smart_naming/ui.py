@@ -121,9 +121,8 @@ def _append_to_outliner_context_menu(self, context):
     # 归组功能：设置 INVOKE_DEFAULT 确保弹出对话框
     if context.selected_objects:
         layout.separator()
-        op = layout.operator("mmy.group_selected_objects", text="归组到新集合", icon='GROUP')
-        # 设置操作上下文为 INVOKE_DEFAULT
         layout.operator_context = 'INVOKE_DEFAULT'
+        layout.operator("mmy.group_selected_objects", text="归组到新集合", icon='GROUP')
 
 
 # ===================================================================
