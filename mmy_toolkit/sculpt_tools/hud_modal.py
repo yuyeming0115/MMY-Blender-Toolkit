@@ -345,21 +345,24 @@ class VIEW3D_OT_mmy_sculpt_hud_modal(bpy.types.Operator):
         if not window:
             return
 
-        # 使用鼠标坐标查找 area 和 region
+        # 使用鼠标坐标查找鼠标所在的 area 和 region（而不是第一个 VIEW_3D）
         area, region = None, None
         screen = getattr(window, "screen", None)
         if screen:
             for a in screen.areas:
-                if a.type == "VIEW_3D":
+                # 检查鼠标是否在这个 area 内
+                if (a.x <= mouse_x <= a.x + a.width and
+                    a.y <= mouse_y <= a.y + a.height):
+                    area = a
+                    # 查找鼠标所在的 region
                     for r in a.regions:
-                        if r.type == "WINDOW":
-                            area = a
+                        if (r.x <= mouse_x <= r.x + r.width and
+                            r.y <= mouse_y <= r.y + r.height):
                             region = r
                             break
-                    if area:
-                        break
+                    break
 
-        if not area or not region:
+        if not area or not region or area.type != "VIEW_3D":
             return
 
         # 计算偏移变化（相对于 region 尺寸的比例）
