@@ -2,7 +2,7 @@
 
 import bpy
 from .hud_state import _HUD_STATE
-from .hud_draw import HUD_BUTTON_WIDTH, HUD_BUTTON_HEIGHT, HUD_BUTTON_GAP, HUD_MARGIN
+from .hud_draw import HUD_BUTTON_WIDTH, HUD_BUTTON_HEIGHT, HUD_BUTTON_GAP, HUD_MARGIN, HUD_HANDLE_WIDTH
 
 
 def get_region_key(window, area, region):
@@ -10,12 +10,41 @@ def get_region_key(window, area, region):
     return (window.as_pointer(), area.as_pointer(), region.as_pointer())
 
 
-def find_button_at_point(window, mouse_x, mouse_y):
-    """查找鼠标位置对应的按钮"""
+def find_button_at_point(window, mouse_x, mouse_y, area_id=None, region_id=None):
+    """查找鼠标位置对应的按钮或把手"""
     context = bpy.context
-    area = getattr(context, "area", None)
-    region = getattr(context, "region", None)
-    space = getattr(context, "space_data", None)
+
+    # 使用鼠标坐标查找 area 和 region（更可靠）
+    area = None
+    region = None
+
+    screen = getattr(window, "screen", None)
+    if screen:
+        for a in screen.areas:
+            # 检查鼠标是否在这个 area 内（使用全局坐标）
+            if (a.x <= mouse_x <= a.x + a.width and
+                a.y <= mouse_y <= a.y + a.height):
+                area = a
+                # 在这个 area 内查找具体的 region
+                for r in a.regions:
+                    if (r.x <= mouse_x <= r.x + r.width and
+                        r.y <= mouse_y <= r.y + r.height):
+                        region = r
+                        break
+                break
+
+    # 如果没找到，尝试从 context 获取
+    if area is None:
+        area = getattr(context, "area", None)
+    if region is None:
+        region = getattr(context, "region", None)
+
+    space = getattr(area, "spaces", None)
+    if space:
+        space = space.active if hasattr(space, 'active') else space[0] if len(space) > 0 else None
+    else:
+        space = getattr(context, "space_data", None)
+
     obj = getattr(context, "active_object", None)
 
     if area is None or region is None or space is None or obj is None:
@@ -34,15 +63,16 @@ def find_button_at_point(window, mouse_x, mouse_y):
 
     from .hud_state import _DEFAULT_BUTTONS
     buttons = _DEFAULT_BUTTONS
+    handle_width = HUD_HANDLE_WIDTH
 
     if layout_mode == "horizontal":
-        total_width = len(buttons) * HUD_BUTTON_WIDTH + (len(buttons) - 1) * HUD_BUTTON_GAP + HUD_MARGIN * 2
+        total_width = handle_width + len(buttons) * HUD_BUTTON_WIDTH + (len(buttons) - 1) * HUD_BUTTON_GAP + HUD_MARGIN * 2
         total_height = HUD_BUTTON_HEIGHT + HUD_MARGIN * 2
         start_x = region.width * 0.5 + offset_x * region.width - total_width * 0.5
         start_y = region.height * 0.5 + offset_y * region.height - total_height * 0.5
     else:
         total_width = HUD_BUTTON_WIDTH + HUD_MARGIN * 2
-        total_height = len(buttons) * HUD_BUTTON_HEIGHT + (len(buttons) - 1) * HUD_BUTTON_GAP + HUD_MARGIN * 2
+        total_height = handle_width + len(buttons) * HUD_BUTTON_HEIGHT + (len(buttons) - 1) * HUD_BUTTON_GAP + HUD_MARGIN * 2
         start_x = region.width * 0.5 + offset_x * region.width - total_width * 0.5
         start_y = region.height * 0.5 + offset_y * region.height - total_height * 0.5
 
@@ -55,20 +85,36 @@ def find_button_at_point(window, mouse_x, mouse_y):
             start_y <= region_mouse_y <= start_y + total_height):
         return None, None, None, None
 
+    # 先检查把手
+    if layout_mode == "horizontal":
+        handle_x = start_x
+        handle_y = start_y
+        handle_w = handle_width
+        handle_h = total_height
+    else:
+        handle_x = start_x
+        handle_y = start_y
+        handle_w = total_width
+        handle_h = handle_width
+
+    if (handle_x <= region_mouse_x <= handle_x + handle_w and
+        handle_y <= region_mouse_y <= handle_y + handle_h):
+        return area, region, space, "handle"
+
     # 查找具体按钮
     for i, button_id in enumerate(buttons):
         if layout_mode == "horizontal":
-            btn_x = start_x + HUD_MARGIN + i * (HUD_BUTTON_WIDTH + HUD_BUTTON_GAP)
+            btn_x = start_x + handle_width + HUD_MARGIN + i * (HUD_BUTTON_WIDTH + HUD_BUTTON_GAP)
             btn_y = start_y + HUD_MARGIN
         else:
             btn_x = start_x + HUD_MARGIN
-            btn_y = start_y + HUD_MARGIN + i * (HUD_BUTTON_HEIGHT + HUD_BUTTON_GAP)
+            btn_y = start_y + handle_width + HUD_MARGIN + i * (HUD_BUTTON_HEIGHT + HUD_BUTTON_GAP)
 
         if (btn_x <= region_mouse_x <= btn_x + HUD_BUTTON_WIDTH and
             btn_y <= region_mouse_y <= btn_y + HUD_BUTTON_HEIGHT):
             return area, region, space, button_id
 
-    # 在 HUD 区域内但没有点击到按钮
+    # 在 HUD 区域内但没有点击到按钮或把手
     return area, region, space, "HUD_AREA"
 
 
@@ -80,6 +126,13 @@ class VIEW3D_OT_mmy_sculpt_hud_modal(bpy.types.Operator):
     bl_options = {"INTERNAL"}
 
     _window_id = None
+    _area_id = None
+    _region_id = None
+    _dragging = False
+    _drag_start_x = 0
+    _drag_start_y = 0
+    _drag_start_offset_x = 0
+    _drag_start_offset_y = 0
 
     def invoke(self, context, event):
         if not _HUD_STATE["enabled"]:
@@ -87,10 +140,14 @@ class VIEW3D_OT_mmy_sculpt_hud_modal(bpy.types.Operator):
 
         window = getattr(context, "window", None)
         area = getattr(context, "area", None)
+        region = getattr(context, "region", None)
         if window is None or area is None or area.type != "VIEW_3D":
             return {'CANCELLED'}
 
         self._window_id = window.as_pointer()
+        self._area_id = area.as_pointer()
+        self._region_id = region.as_pointer() if region else None
+
         if self._window_id in _HUD_STATE["modal_windows"]:
             return {'CANCELLED'}
 
@@ -107,15 +164,29 @@ class VIEW3D_OT_mmy_sculpt_hud_modal(bpy.types.Operator):
         if window is None or window.as_pointer() != self._window_id:
             return self._finish()
 
+        # 处理拖拽
+        if self._dragging:
+            if event.type == 'MOUSEMOVE':
+                self._update_drag_position(context, event.mouse_x, event.mouse_y)
+                return {'RUNNING_MODAL'}
+            elif event.type == 'LEFTMOUSE' and event.value == 'RELEASE':
+                self._end_drag()
+                return {'RUNNING_MODAL'}
+
         if event.type == 'MOUSEMOVE':
             self._update_hover(window, event.mouse_x, event.mouse_y)
             return {'PASS_THROUGH'}
 
         if event.type == 'LEFTMOUSE' and event.value == 'PRESS':
-            area, region, space, button_id = find_button_at_point(window, event.mouse_x, event.mouse_y)
+            area, region, space, button_id = find_button_at_point(window, event.mouse_x, event.mouse_y, self._area_id, self._region_id)
 
             if button_id is None or button_id == "HUD_AREA":
                 return {'PASS_THROUGH'}
+
+            # 处理把手拖拽
+            if button_id == "handle":
+                self._start_drag(context, event.mouse_x, event.mouse_y)
+                return {'RUNNING_MODAL'}
 
             if area and region and space:
                 result = self._activate_button(context, space, button_id)
@@ -130,8 +201,62 @@ class VIEW3D_OT_mmy_sculpt_hud_modal(bpy.types.Operator):
 
         return {'PASS_THROUGH'}
 
+    def _start_drag(self, context, mouse_x, mouse_y):
+        """开始拖拽"""
+        addon = context.preferences.addons.get("mmy_toolkit")
+        prefs = addon.preferences if addon else None
+
+        self._dragging = True
+        self._drag_start_x = mouse_x
+        self._drag_start_y = mouse_y
+        self._drag_start_offset_x = getattr(prefs, "sculpt_hud_offset_x", 0) if prefs else 0
+        self._drag_start_offset_y = getattr(prefs, "sculpt_hud_offset_y", 0) if prefs else 0
+
+    def _update_drag_position(self, context, mouse_x, mouse_y):
+        """更新拖拽位置"""
+        addon = context.preferences.addons.get("mmy_toolkit")
+        prefs = addon.preferences if addon else None
+        if not prefs:
+            return
+
+        window = getattr(context, "window", None)
+        if not window:
+            return
+
+        # 使用鼠标坐标查找 area 和 region
+        area, region = None, None
+        screen = getattr(window, "screen", None)
+        if screen:
+            for a in screen.areas:
+                if a.type == "VIEW_3D":
+                    for r in a.regions:
+                        if r.type == "WINDOW":
+                            area = a
+                            region = r
+                            break
+                    if area:
+                        break
+
+        if not area or not region:
+            return
+
+        # 计算偏移变化（相对于 region 尺寸的比例）
+        delta_x = (mouse_x - self._drag_start_x) / region.width
+        delta_y = (mouse_y - self._drag_start_y) / region.height
+
+        # 更新偏好设置
+        prefs.sculpt_hud_offset_x = self._drag_start_offset_x + delta_x
+        prefs.sculpt_hud_offset_y = self._drag_start_offset_y + delta_y
+
+        # 刷新视图
+        area.tag_redraw()
+
+    def _end_drag(self):
+        """结束拖拽"""
+        self._dragging = False
+
     def _update_hover(self, window, mouse_x, mouse_y):
-        area, region, space, button_id = find_button_at_point(window, mouse_x, mouse_y)
+        area, region, space, button_id = find_button_at_point(window, mouse_x, mouse_y, self._area_id, self._region_id)
 
         if button_id is None or area is None or region is None:
             if _HUD_STATE["hover"] is not None:
@@ -140,7 +265,8 @@ class VIEW3D_OT_mmy_sculpt_hud_modal(bpy.types.Operator):
             return
 
         region_key = get_region_key(window, area, region)
-        hover_value = (region_key, button_id) if button_id != "HUD_AREA" else None
+        # 包含 handle 的 hover 值
+        hover_value = (region_key, button_id) if button_id not in ("HUD_AREA", None) else None
 
         if _HUD_STATE["hover"] != hover_value:
             _HUD_STATE["hover"] = hover_value
@@ -153,16 +279,25 @@ class VIEW3D_OT_mmy_sculpt_hud_modal(bpy.types.Operator):
 
         if button_id == "face_sets":
             if overlay:
-                overlay.sculpt_show_face_sets = not overlay.sculpt_show_face_sets
+                overlay.show_sculpt_face_sets = not overlay.show_sculpt_face_sets
             return True
         elif button_id == "mask":
             # 切换遮罩显示
             if overlay:
-                overlay.show_mode_face_sets = not overlay.show_mode_face_sets
+                overlay.show_sculpt_mask = not overlay.show_sculpt_mask
             return True
         elif button_id == "wireframe":
-            if obj:
-                obj.show_wire = not obj.show_wire
+            # 雕刻模式线框显示需要使用 overlay 属性
+            if overlay:
+                overlay.show_wireframes = not overlay.show_wireframes
+                # 刷新视图
+                window = getattr(context, "window", None)
+                if window:
+                    screen = getattr(window, "screen", None)
+                    if screen:
+                        for a in screen.areas:
+                            if a.type == 'VIEW_3D':
+                                a.tag_redraw()
             return True
         elif button_id == "add":
             # 添加自定义按钮（暂时不做）
