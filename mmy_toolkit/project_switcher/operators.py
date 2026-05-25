@@ -8,37 +8,43 @@ import platform
 
 def get_blender_config_dir():
     """获取 Blender 用户配置目录"""
-    # 尝试从 preferences 获取
+    # 方法1：直接从 bpy.app.binary_path 推断（portable 版本最可靠）
+    blender_exe = bpy.app.binary_path
+    if blender_exe:
+        # portable 版本结构: C:\BlenderAPP\Blender5.1\blender.exe
+        # 配置目录: C:\BlenderAPP\Blender5.1\portable\config
+        blender_root = os.path.dirname(blender_exe)
+        config_dir = os.path.join(blender_root, "portable", "config")
+        if os.path.exists(config_dir):
+            return config_dir
+
+        # 另一种结构: blender.exe 在子目录中
+        blender_root = os.path.dirname(os.path.dirname(blender_exe))
+        config_dir = os.path.join(blender_root, "portable", "config")
+        if os.path.exists(config_dir):
+            return config_dir
+
+    # 方法2：从 preferences.filepaths.temporary_directory 推断
     prefs = bpy.context.preferences
     if prefs and prefs.filepaths:
         temp_dir = prefs.filepaths.temporary_directory
         if temp_dir:
-            # portable 版本的 temp 目录通常在 portable/config
+            # temp 目录通常在 portable/temp
             parent = os.path.dirname(temp_dir)
             config_dir = os.path.join(parent, "config")
             if os.path.exists(config_dir):
                 return config_dir
 
-    # 尝试标准路径
+    # 方法3：Windows AppData 路径（非 portable 版本）
     if platform.system() == 'Windows':
-        # AppData 路径
         appdata = os.environ.get('APPDATA', '')
         blender_appdata = os.path.join(appdata, "Blender Foundation", "Blender")
         if os.path.exists(blender_appdata):
-            # 查找版本目录
-            for item in os.listdir(blender_appdata):
+            for item in sorted(os.listdir(blender_appdata), reverse=True):
                 if item.startswith("5.") or item.startswith("4."):
                     config_dir = os.path.join(blender_appdata, item, "config")
                     if os.path.exists(config_dir):
                         return config_dir
-
-        # portable 版本：从 bpy.app 可获取
-        blender_exe = bpy.app.binary_path
-        if blender_exe:
-            portable_root = os.path.dirname(os.path.dirname(blender_exe))
-            config_dir = os.path.join(portable_root, "portable", "config")
-            if os.path.exists(config_dir):
-                return config_dir
 
     return None
 
@@ -335,9 +341,15 @@ def _draw_project_switcher(self, context):
 
     filepath = bpy.data.filepath
     row = self.layout.row(align=True)
-    row.ui_units_x = 3.0  # 固定宽度容纳两个字
 
+    # 项目菜单按钮
     if filepath:
         row.menu("MMY_MT_project_files", text="项目", icon='FILE_FOLDER')
     else:
         row.label(text="", icon='FILE_BLEND')
+
+    # 书签按钮（只显示图标）
+    row.menu("MMY_MT_blender_bookmarks", text="", icon='BOOKMARKS')
+
+    # 最近文件按钮（只显示图标）
+    row.menu("MMY_MT_blender_recent_files", text="", icon='RECOVER_LAST')
