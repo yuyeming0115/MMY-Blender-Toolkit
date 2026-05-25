@@ -10,6 +10,7 @@ HUD_BUTTON_WIDTH = 60
 HUD_BUTTON_GAP = 4
 HUD_CORNER_RADIUS = 6
 HUD_MARGIN = 10
+HUD_HANDLE_WIDTH = 20  # 拖拽把手宽度
 
 # 颜色
 HUD_BG_COLOR = (0.15, 0.15, 0.15, 0.85)
@@ -24,7 +25,8 @@ def draw_sculpt_hud_callback():
     """雕刻模式悬浮按钮绘制回调"""
     try:
         _draw_sculpt_hud_inner()
-    except Exception:
+    except Exception as e:
+        # 静默处理绘制错误
         pass
 
 
@@ -56,16 +58,17 @@ def _draw_sculpt_hud_inner():
     offset_x = getattr(prefs, "sculpt_hud_offset_x", 0) if prefs else 0
     offset_y = getattr(prefs, "sculpt_hud_offset_y", 0) if prefs else 0
 
-    # 计算位置
+    # 计算位置（包含拖拽把手）
     buttons = _DEFAULT_BUTTONS
+    handle_width = HUD_HANDLE_WIDTH
     if layout_mode == "horizontal":
-        total_width = len(buttons) * HUD_BUTTON_WIDTH + (len(buttons) - 1) * HUD_BUTTON_GAP + HUD_MARGIN * 2
+        total_width = handle_width + len(buttons) * HUD_BUTTON_WIDTH + (len(buttons) - 1) * HUD_BUTTON_GAP + HUD_MARGIN * 2
         total_height = HUD_BUTTON_HEIGHT + HUD_MARGIN * 2
         start_x = region.width * 0.5 + offset_x * region.width - total_width * 0.5
         start_y = region.height * 0.5 + offset_y * region.height - total_height * 0.5
     else:
         total_width = HUD_BUTTON_WIDTH + HUD_MARGIN * 2
-        total_height = len(buttons) * HUD_BUTTON_HEIGHT + (len(buttons) - 1) * HUD_BUTTON_GAP + HUD_MARGIN * 2
+        total_height = handle_width + len(buttons) * HUD_BUTTON_HEIGHT + (len(buttons) - 1) * HUD_BUTTON_GAP + HUD_MARGIN * 2
         start_x = region.width * 0.5 + offset_x * region.width - total_width * 0.5
         start_y = region.height * 0.5 + offset_y * region.height - total_height * 0.5
 
@@ -74,17 +77,41 @@ def _draw_sculpt_hud_inner():
     draw_rounded_rect(start_x, start_y, total_width, total_height, HUD_BG_COLOR, HUD_CORNER_RADIUS)
     draw_rounded_rect_outline(start_x, start_y, total_width, total_height, HUD_BORDER_COLOR, HUD_CORNER_RADIUS)
 
-    # 绘制按钮
+    # 绘制拖拽把手
     hovered = _HUD_STATE.get("hover")
     region_key = (window.as_pointer(), area.as_pointer(), region.as_pointer())
+    is_handle_hovered = hovered == (region_key, "handle")
+
+    if layout_mode == "horizontal":
+        handle_x = start_x
+        handle_y = start_y
+        handle_w = handle_width
+        handle_h = total_height
+    else:
+        handle_x = start_x
+        handle_y = start_y
+        handle_w = total_width
+        handle_h = handle_width
+
+    handle_color = HUD_HOVER_COLOR if is_handle_hovered else HUD_HANDLE_COLOR
+    draw_rounded_rect(handle_x, handle_y, handle_w, handle_h, handle_color, HUD_CORNER_RADIUS)
+    # 绘制把手图标（两条竖线或横线）
+    if layout_mode == "horizontal":
+        # 竖线把手
+        line_x = handle_x + handle_w * 0.5
+        draw_text("│", line_x - 4, handle_y + handle_h * 0.5 - 6, HUD_TEXT_COLOR, HUD_TEXT_SIZE)
+    else:
+        # 横线把手
+        line_y = handle_y + handle_h * 0.5
+        draw_text("─", handle_x + handle_w * 0.5 - 4, line_y - 6, HUD_TEXT_COLOR, HUD_TEXT_SIZE)
 
     for i, button_id in enumerate(buttons):
         if layout_mode == "horizontal":
-            btn_x = start_x + HUD_MARGIN + i * (HUD_BUTTON_WIDTH + HUD_BUTTON_GAP)
+            btn_x = start_x + handle_width + HUD_MARGIN + i * (HUD_BUTTON_WIDTH + HUD_BUTTON_GAP)
             btn_y = start_y + HUD_MARGIN
         else:
             btn_x = start_x + HUD_MARGIN
-            btn_y = start_y + HUD_MARGIN + i * (HUD_BUTTON_HEIGHT + HUD_BUTTON_GAP)
+            btn_y = start_y + handle_width + HUD_MARGIN + i * (HUD_BUTTON_HEIGHT + HUD_BUTTON_GAP)
 
         # 检查状态
         is_active = _check_button_active(space, obj, button_id)
@@ -114,12 +141,12 @@ def _check_button_active(space, obj, button_id):
     overlay = space.overlay if space else None
 
     if button_id == "face_sets":
-        return overlay.sculpt_show_face_sets if overlay else False
+        return overlay.show_sculpt_face_sets if overlay else False
     elif button_id == "mask":
-        # 遮罩显示：检查是否有遮罩且可见
-        return overlay.show_mode_face_sets if overlay else False  # Blender 5.1 可能用这个
+        # 遮罩显示
+        return overlay.show_sculpt_mask if overlay else False
     elif button_id == "wireframe":
-        return obj.show_wire if obj else False
+        return overlay.show_wireframes if overlay else False
     elif button_id == "add":
         return False
 
@@ -139,4 +166,9 @@ def _get_button_label(button_id, is_active):
 
 __all__ = [
     'draw_sculpt_hud_callback',
+    'HUD_BUTTON_WIDTH',
+    'HUD_BUTTON_HEIGHT',
+    'HUD_BUTTON_GAP',
+    'HUD_MARGIN',
+    'HUD_HANDLE_WIDTH',
 ]

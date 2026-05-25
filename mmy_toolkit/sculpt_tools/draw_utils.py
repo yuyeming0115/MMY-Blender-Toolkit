@@ -1,7 +1,8 @@
 """GPU 绘制工具函数"""
 
 import gpu
-from gpu.types import GPUBatch, GPUVertBuf
+from gpu.types import GPUBatch, GPUVertBuf, GPUVertFormat, GPUIndexBuf
+from gpu.state import blend_set
 
 
 def draw_rounded_rect(x, y, width, height, color, radius):
@@ -9,10 +10,12 @@ def draw_rounded_rect(x, y, width, height, color, radius):
     if width <= 0 or height <= 0:
         return
 
-    # Blender 5.1 可能没有 GPUExtrasGrid2D，使用简单矩形
-    shader = gpu.shader.from_builtin('UNIFORM_COLOR_2D')
+    # 启用混合模式（支持透明度）
+    blend_set('ALPHA')
+
+    shader = gpu.shader.from_builtin('UNIFORM_COLOR')
     shader.bind()
-    shader.uniform_set("color", color)
+    shader.uniform_float("color", color)
 
     vertices = (
         (x, y),
@@ -23,11 +26,14 @@ def draw_rounded_rect(x, y, width, height, color, radius):
 
     indices = ((0, 1, 2), (0, 2, 3))
 
-    vbo = GPUVertBuf(len(vertices), 2)
-    vbo.attr_fill(0, vertices)
+    # Blender 5.1 API: 先创建 GPUVertFormat
+    format = GPUVertFormat()
+    format.attr_add(id="pos", comp_type='F32', len=2, fetch_mode='FLOAT')
 
-    ibo = GPUVertBuf(len(indices), 1)
-    ibo.attr_fill(0, indices)
+    vbo = GPUVertBuf(format, len(vertices))
+    vbo.attr_fill("pos", vertices)
+
+    ibo = GPUIndexBuf(type='TRIS', seq=indices)
 
     batch = GPUBatch(type='TRIS', buf=vbo, elem=ibo)
     batch.draw(shader)
@@ -38,9 +44,12 @@ def draw_rounded_rect_outline(x, y, width, height, color, radius):
     if width <= 0 or height <= 0:
         return
 
-    shader = gpu.shader.from_builtin('UNIFORM_COLOR_2D')
+    # 启用混合模式（支持透明度）
+    blend_set('ALPHA')
+
+    shader = gpu.shader.from_builtin('UNIFORM_COLOR')
     shader.bind()
-    shader.uniform_set("color", color)
+    shader.uniform_float("color", color)
 
     vertices = (
         (x, y),
@@ -50,8 +59,12 @@ def draw_rounded_rect_outline(x, y, width, height, color, radius):
         (x, y),  # 闭合
     )
 
-    vbo = GPUVertBuf(len(vertices), 2)
-    vbo.attr_fill(0, vertices)
+    # Blender 5.1 API: 先创建 GPUVertFormat
+    format = GPUVertFormat()
+    format.attr_add(id="pos", comp_type='F32', len=2, fetch_mode='FLOAT')
+
+    vbo = GPUVertBuf(format, len(vertices))
+    vbo.attr_fill("pos", vertices)
 
     batch = GPUBatch(type='LINE_STRIP', buf=vbo)
     batch.draw(shader)
@@ -66,7 +79,8 @@ def draw_text(text, x, y, color, size):
 
     blf.position(font_id, x, y, 0)
     blf.size(font_id, size)
-    blf.color(font_id, color[0], color[1], color[2], color[3])
+    # Blender 5.1: color 参数顺序可能变了
+    blf.color(font_id, *color)
     blf.draw(font_id, text)
 
 
