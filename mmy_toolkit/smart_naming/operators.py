@@ -375,6 +375,54 @@ class MMY_OT_RemoveSuffixPreset(bpy.types.Operator):
         return {'FINISHED'}
 
 
+class MMY_OT_CreateLODCollections(bpy.types.Operator):
+    """创建 LOD 子集合"""
+    bl_idname = "mmy.create_lod_collections"
+    bl_label = "创建 LOD 子集合"
+    bl_description = "为选中集合创建 _low 和 _high 子集合"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    low_suffix: StringProperty(name="Low 后缀", default="_low")
+    high_suffix: StringProperty(name="High 后缀", default="_high")
+
+    def execute(self, context):
+        # 获取选中的集合
+        parent_coll = None
+
+        # 尝试从大纲视图获取
+        if context.area and context.area.type == 'OUTLINER':
+            if context.collection:
+                parent_coll = context.collection
+
+        # 备用：从场景集合层级查找
+        if not parent_coll:
+            active_coll = context.collection
+            if active_coll and active_coll.name != "Scene Collection":
+                parent_coll = active_coll
+
+        if not parent_coll:
+            self.report({'WARNING'}, "请先选中一个集合")
+            return {'CANCELLED'}
+
+        # 创建 _low 子集合
+        low_name = f"{parent_coll.name}{self.low_suffix}"
+        low_coll = bpy.data.collections.new(low_name)
+        parent_coll.children.link(low_coll)
+
+        # 创建 _high 子集合
+        high_name = f"{parent_coll.name}{self.high_suffix}"
+        high_coll = bpy.data.collections.new(high_name)
+        parent_coll.children.link(high_coll)
+
+        self.report({'INFO'}, f"已创建: {low_name}, {high_name}")
+        return {'FINISHED'}
+
+    @classmethod
+    def poll(cls, context):
+        # 在大纲视图或3D视图中可用
+        return context.area and (context.area.type in ('OUTLINER', 'VIEW_3D'))
+
+
 _classes = (
     MMY_OT_SmartDuplicateCollection,
     MMY_OT_SmartDuplicateObject,
@@ -384,6 +432,7 @@ _classes = (
     MMY_OT_RemovePrefixPreset,
     MMY_OT_AddSuffixPreset,
     MMY_OT_RemoveSuffixPreset,
+    MMY_OT_CreateLODCollections,
 )
 
 
