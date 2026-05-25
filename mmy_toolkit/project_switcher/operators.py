@@ -165,26 +165,48 @@ class MMY_OT_OpenProjectDirectory(bpy.types.Operator):
 
     def _open_in_file_browser(self, context):
         """在 Blender File Browser 中打开目录"""
-        # 使用 wm.file_browser 操作
+        # 查找或创建 FILE_BROWSER 区域
+        for window in context.window_manager.windows:
+            for area in window.screen.areas:
+                if area.type == 'FILE_BROWSER':
+                    # 找到了 File Browser，设置目录
+                    for space in area.spaces:
+                        if space.type == 'FILE_BROWSER':
+                            params = space.params
+                            if params:
+                                # 设置目录路径
+                                params.directory = self.directory
+                                # 刷新显示
+                                area.tag_redraw()
+                                self.report({'INFO'}, f"已切换到: {self.directory}")
+                                return {'FINISHED'}
+
+        # 如果没有找到 FILE_BROWSER，打开一个新的
         try:
-            # 方法1：直接打开 File Browser
-            bpy.ops.wm.file_browser(filepath=self.directory)
-            self.report({'INFO'}, f"已切换到: {self.directory}")
+            # 切换到文件浏览器区域
+            bpy.ops.screen.area_split(direction='VERTICAL', factor=0.5)
+            # 尝试打开 File Browser
+            bpy.ops.wm.call_menu(name='SCREEN_MT_user_menu')
         except:
-            # 方法2：如果方法1失败，用系统文件管理器
-            if platform.system() == 'Windows':
-                subprocess.run(['explorer', self.directory])
-            elif platform.system() == 'Darwin':
-                subprocess.run(['open', self.directory])
-            else:
-                subprocess.run(['xdg-open', self.directory])
+            pass
+
+        # Fallback：使用系统文件管理器
+        self.report({'INFO'}, f"打开目录: {self.directory}")
+        if platform.system() == 'Windows':
+            subprocess.run(['explorer', self.directory])
+        elif platform.system() == 'Darwin':
+            subprocess.run(['open', self.directory])
+        else:
+            subprocess.run(['xdg-open', self.directory])
+
         return {'FINISHED'}
 
     def _open_recent_blend(self, context):
         """保存当前文件，打开目录下最近的 .blend 文件"""
-        # 获取目录下的 .blend 文件列表
+        # 获取目录及其子目录下的 .blend 文件列表
         blend_files = []
         try:
+            # 先检查当前目录
             for f in os.listdir(self.directory):
                 if f.endswith('.blend') and not f.startswith('.'):
                     full_path = os.path.join(self.directory, f)
@@ -195,8 +217,9 @@ class MMY_OT_OpenProjectDirectory(bpy.types.Operator):
             return {'CANCELLED'}
 
         if not blend_files:
-            self.report({'WARNING'}, "目录下没有 .blend 文件")
-            return {'CANCELLED'}
+            # 没有找到 .blend 文件，fallback 到打开 File Browser
+            self.report({'INFO'}, "目录下无 .blend 文件，打开 File Browser")
+            return self._open_in_file_browser(context)
 
         # 按修改时间排序，获取最近的文件
         blend_files.sort(key=lambda x: x[1], reverse=True)
