@@ -35,6 +35,14 @@ class MMY_PT_SmartNamingPanel(bpy.types.Panel):
         row = box.row(align=True)
         row.operator("mmy.create_lod_collections", text="创建高低模容器", icon='ADD')
 
+        # === 快捷归组 ===
+        layout.separator()
+        box = layout.box()
+        box.label(text="快捷归组", icon='OUTLINER_COLLECTION')
+
+        row = box.row(align=True)
+        row.operator("mmy.group_selected_objects", text="归组到新集合", icon='GROUP')
+
         # === 批量重命名 ===
         layout.separator()
         box = layout.box()

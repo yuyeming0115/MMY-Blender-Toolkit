@@ -423,6 +423,77 @@ class MMY_OT_CreateLODCollections(bpy.types.Operator):
         return context.area and (context.area.type in ('OUTLINER', 'VIEW_3D'))
 
 
+class MMY_OT_GroupSelectedObjects(bpy.types.Operator):
+    """将选中对象归组到新集合"""
+    bl_idname = "mmy.group_selected_objects"
+    bl_label = "归组到新集合"
+    bl_description = "创建新集合并将选中对象放入"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    collection_name: StringProperty(name="集合名称", default="NewGroup")
+
+    def invoke(self, context, event):
+        # 预填充建议名称
+        if context.active_object:
+            self.collection_name = context.active_object.name
+        return context.window_manager.invoke_props_dialog(self)
+
+    def draw(self, context):
+        layout = self.layout
+        layout.prop(self, "collection_name")
+
+    def execute(self, context):
+        selected_objs = context.selected_objects
+
+        if not selected_objs:
+            self.report({'WARNING'}, "请先选中对象")
+            return {'CANCELLED'}
+
+        if not self.collection_name:
+            self.report({'WARNING'}, "请输入集合名称")
+            return {'CANCELLED'}
+
+        # 获取当前激活的集合（作为父集合）
+        parent_coll = context.collection
+        if not parent_coll or parent_coll.name == "Scene Collection":
+            # 使用场景根集合
+            parent_coll = context.scene.collection
+
+        # 创建新集合
+        new_coll = bpy.data.collections.new(self.collection_name)
+
+        # 检查名称冲突，自动添加后缀
+        if parent_coll.children.get(new_coll.name):
+            new_coll.name = f"{self.collection_name}.001"
+
+        # 将新集合链接到父集合
+        parent_coll.children.link(new_coll)
+
+        # 将选中对象移动到新集合
+        moved_count = 0
+        for obj in selected_objs:
+            # 从原有集合中取消链接
+            for coll in bpy.data.collections:
+                if coll.objects.get(obj.name):
+                    coll.objects.unlink(obj)
+                    break
+
+            # 从场景根集合取消链接
+            if context.scene.collection.objects.get(obj.name):
+                context.scene.collection.objects.unlink(obj)
+
+            # 链接到新集合
+            new_coll.objects.link(obj)
+            moved_count += 1
+
+        self.report({'INFO'}, f"已创建集合 '{new_coll.name}'，移入 {moved_count} 个对象")
+        return {'FINISHED'}
+
+    @classmethod
+    def poll(cls, context):
+        return context.selected_objects
+
+
 _classes = (
     MMY_OT_SmartDuplicateCollection,
     MMY_OT_SmartDuplicateObject,
@@ -433,6 +504,7 @@ _classes = (
     MMY_OT_AddSuffixPreset,
     MMY_OT_RemoveSuffixPreset,
     MMY_OT_CreateLODCollections,
+    MMY_OT_GroupSelectedObjects,
 )
 
 
