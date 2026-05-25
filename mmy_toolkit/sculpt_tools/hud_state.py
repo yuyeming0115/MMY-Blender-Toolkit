@@ -11,7 +11,7 @@ _HUD_STATE = {
     "drag_region_key": None, # 当前拖拽的 region key
     "modal_windows": set(),  # 运行中的 modal operator 窗口 ID
     "modal_running": False,
-    "timer_registered": False,
+    "timer_active": False,   # Timer 是否激活
     "draw_handler": None,
     # 视窗特定的偏移值存储 (window_id -> (offset_x, offset_y))
     "window_offsets": {},
@@ -29,7 +29,7 @@ def reset_hud_runtime_state():
     _HUD_STATE["drag_region_key"] = None
     _HUD_STATE["modal_windows"].clear()
     _HUD_STATE["modal_running"] = False
-    _HUD_STATE["timer_registered"] = False
+    # 注意：不重置 timer_active，由 Timer 管理器控制
 
 
 def get_window_offset(window_id):

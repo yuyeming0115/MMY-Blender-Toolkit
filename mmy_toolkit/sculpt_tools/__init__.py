@@ -60,77 +60,82 @@ def _draw_sculpt_context_menu(self, context):
     layout.menu("MMY_MT_sculpt_face_sets", text="面组", icon='GROUP_VERTEX')
 
 
-# ============ HUD Modal Timer ============
+# ============ HUD Modal 管理器（单一 Timer） ============
 
-def _ensure_hud_modal_running():
-    """确保 HUD Modal Operator 在所有窗口运行"""
-    print(f"[MMY Sculpt] Timer 触发: enabled={_HUD_STATE['enabled']}")
+_HUD_TIMER_NAME = "mmy_sculpt_hud_timer"
 
+
+def _hud_modal_manager():
+    """单一 Timer：管理 HUD Modal 生命周期"""
+    # 检查是否启用
     if not _HUD_STATE["enabled"]:
-        _HUD_STATE["timer_registered"] = False
-        return None
+        return None  # 停止 Timer
 
-    # 文件加载后 context 可能不完整，需要等待
     context = bpy.context
     if context is None:
-        print(f"[MMY Sculpt] context 为 None，等待下次触发")
-        return 0.5
+        return 2.0
 
     wm = getattr(context, "window_manager", None)
-    if wm is None:
-        print(f"[MMY Sculpt] window_manager 为 None，等待下次触发")
-        return 0.5
+    if wm is None or len(wm.windows) == 0:
+        return 2.0
 
-    # 检查是否有可用的窗口
-    if len(wm.windows) == 0:
-        print(f"[MMY Sculpt] 没有窗口，等待下次触发")
-        return 0.5
-
-    print(f"[MMY Sculpt] 检查窗口数量: {len(wm.windows)}")
-
+    # 检查每个窗口
     for window in wm.windows:
         window_id = window.as_pointer()
+
+        # 如果这个窗口已有 Modal 运行，跳过
         if window_id in _HUD_STATE["modal_windows"]:
-            print(f"[MMY Sculpt] 窗口 {window_id} 已有 Modal 运行")
             continue
 
         screen = getattr(window, "screen", None)
         if screen is None:
-            print(f"[MMY Sculpt] 窗口 {window_id} 无 screen")
             continue
 
+        # 查找 3D 视图区域
         for area in screen.areas:
             if area.type != "VIEW_3D":
                 continue
+
             region = next((r for r in area.regions if r.type == "WINDOW"), None)
             if region is None:
                 continue
 
-            # 使用 invoke 方式启动 modal
+            # 尝试启动 Modal
             try:
                 with context.temp_override(window=window, area=area, region=region):
                     result = bpy.ops.view3d.mmy_sculpt_hud_modal('INVOKE_DEFAULT')
-                    print(f"[MMY Sculpt] Modal 启动结果: {result}, 窗口: {window_id}")
+                    print(f"[MMY Sculpt] Modal 启动: {result}, 窗口: {window_id}")
             except Exception as e:
                 print(f"[MMY Sculpt] Modal 启动失败: {e}")
             break
 
-    return 1.0
+    return 2.0  # 每 2 秒检查一次
 
 
-def register_hud_modal_timer():
-    if _HUD_STATE["timer_registered"]:
+def _start_hud_timer():
+    """启动 HUD Timer"""
+    # 使用标志避免重复注册
+    if _HUD_STATE.get("timer_active"):
         return
-    bpy.app.timers.register(_ensure_hud_modal_running, first_interval=0.2)
-    _HUD_STATE["timer_registered"] = True
 
-
-def unregister_hud_modal_timer():
     try:
-        bpy.app.timers.unregister(_ensure_hud_modal_running)
-    except:
-        pass
-    _HUD_STATE["timer_registered"] = False
+        bpy.app.timers.register(_hud_modal_manager, first_interval=0.5, persistent=True)
+        _HUD_STATE["timer_active"] = True
+        print("[MMY Sculpt] Timer 已注册")
+    except Exception as e:
+        print(f"[MMY Sculpt] Timer 注册失败: {e}")
+
+
+def _stop_hud_timer():
+    """停止 HUD Timer"""
+    try:
+        bpy.app.timers.unregister(_hud_modal_manager)
+        _HUD_STATE["timer_active"] = False
+        print("[MMY Sculpt] Timer 已注销")
+    except Exception as e:
+        # Timer 可能已被 Blender 清除（文件加载后）
+        _HUD_STATE["timer_active"] = False
+        print(f"[MMY Sculpt] Timer 注销: {e}")
 
 
 # ============ 注册/注销 ============
@@ -169,10 +174,10 @@ def register():
     except Exception as e:
         print(f"[MMY Sculpt] 挂载右键菜单失败: {e}")
 
-    # 启动 Modal Timer（延迟启动，确保操作符已注册）
-    bpy.app.timers.register(_delayed_start_modal, first_interval=0.5)
+    # 启动持久 Timer
+    _start_hud_timer()
 
-    # 添加文件加载后处理（重新启动 Modal）
+    # 添加文件加载后处理
     if _on_file_loaded not in bpy.app.handlers.load_post:
         bpy.app.handlers.load_post.append(_on_file_loaded)
 
@@ -180,12 +185,16 @@ def register():
 
 
 def _on_file_loaded(dummy):
-    """文件加载后重新启动 HUD Modal"""
-    print(f"[MMY Sculpt] 文件加载完成，重新初始化 HUD")
+    """文件加载后重新启动 HUD"""
+    print("[MMY Sculpt] 文件加载完成，重新初始化 HUD")
 
-    # 完全重置状态（但保持 enabled）
-    reset_hud_runtime_state()
-    _HUD_STATE["timer_registered"] = False  # 确保可以重新注册 Timer
+    # 重置运行状态（保持 enabled）
+    _HUD_STATE["modal_windows"].clear()
+    _HUD_STATE["hover"] = None
+
+    # Blender 文件加载会清除所有 Timer（包括 persistent）
+    # 需要重置标志并重新启动
+    _HUD_STATE["timer_active"] = False
 
     # 确保 draw handler 还在
     if _HUD_STATE["draw_handler"] is None:
@@ -196,65 +205,12 @@ def _on_file_loaded(dummy):
                 "WINDOW",
                 "POST_PIXEL",
             )
-            print(f"[MMY Sculpt] 重新挂载 draw_handler")
+            print("[MMY Sculpt] 重新挂载 draw_handler")
         except Exception as e:
             print(f"[MMY Sculpt] 挂载绘制回调失败: {e}")
 
-    # Blender 文件加载会清除所有 Timer，需要重新注册
-    # 使用稍长的延迟确保 Blender 完全加载完
-    try:
-        # 直接注册 Timer，不通过 register_hud_modal_timer（避免标志冲突）
-        bpy.app.timers.register(_ensure_hud_modal_running, first_interval=1.5)
-        print(f"[MMY Sculpt] 文件加载后重新启动 Timer")
-    except Exception as e:
-        print(f"[MMY Sculpt] 启动 Timer 失败: {e}")
-
-
-def _periodic_hud_check():
-    """定期检查 HUD 是否正常运行（备用机制）"""
-    if not _HUD_STATE["enabled"]:
-        return None  # 停止 Timer
-
-    # 检查是否在雕刻模式
-    context = bpy.context
-    if context is None:
-        return 5.0
-
-    obj = getattr(context, "active_object", None)
-    if obj and obj.mode == 'SCULPT':
-        # 确保 Modal 在运行
-        wm = getattr(context, "window_manager", None)
-        if wm:
-            for window in wm.windows:
-                window_id = window.as_pointer()
-                if window_id not in _HUD_STATE["modal_windows"]:
-                    screen = getattr(window, "screen", None)
-                    if screen:
-                        for area in screen.areas:
-                            if area.type == "VIEW_3D":
-                                region = next((r for r in area.regions if r.type == "WINDOW"), None)
-                                if region:
-                                    try:
-                                        with context.temp_override(window=window, area=area, region=region):
-                                            bpy.ops.view3d.mmy_sculpt_hud_modal('INVOKE_DEFAULT')
-                                            print(f"[MMY Sculpt] 周期检查启动 Modal: {window_id}")
-                                    except Exception as e:
-                                        print(f"[MMY Sculpt] 周期检查启动失败: {e}")
-                                break
-    return 5.0  # 每5秒检查一次
-
-
-def _delayed_start_modal():
-    """延迟启动 Modal"""
-    register_hud_modal_timer()
-
-    # 启动定期检查 Timer（备用机制）
-    try:
-        bpy.app.timers.register(_periodic_hud_check, first_interval=5.0, persistent=True)
-    except:
-        pass
-
-    return None  # 一次性 timer
+    # 重新启动 Timer
+    _start_hud_timer()
 
 
 def unregister():
@@ -269,8 +225,8 @@ def unregister():
     except:
         pass
 
-    # 停止 Modal Timer
-    unregister_hud_modal_timer()
+    # 停止 Timer
+    _stop_hud_timer()
 
     # 移除绘制回调
     if _HUD_STATE["draw_handler"] is not None:
