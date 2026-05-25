@@ -494,6 +494,148 @@ class MMY_OT_GroupSelectedObjects(bpy.types.Operator):
         return context.selected_objects
 
 
+class MMY_OT_GenerateCollectionTemplate(bpy.types.Operator):
+    """应用模板生成集合架构"""
+    bl_idname = "mmy.generate_collection_template"
+    bl_label = "生成集合架构"
+    bl_description = "根据模板创建集合层级结构"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    template_name: StringProperty(name="模板名称", default="")
+
+    def execute(self, context):
+        from .collection_templates import get_template, set_recent_template
+
+        if not self.template_name:
+            self.report({'WARNING'}, "请选择模板")
+            return {'CANCELLED'}
+
+        template = get_template(self.template_name)
+        root_name = template.get("root_name", "Assets")
+        children = template.get("children", [])
+        auto_lod = template.get("auto_lod", False)
+        lod_suffixes = template.get("lod_suffixes", ["_high", "_low"])
+
+        # 创建根集合
+        root_coll = bpy.data.collections.new(root_name)
+        context.scene.collection.children.link(root_coll)
+
+        # 创建子集合
+        created_count = 1
+        for child_name in children:
+            child_coll = bpy.data.collections.new(child_name)
+            root_coll.children.link(child_coll)
+            created_count += 1
+
+            # 自动创建 LOD 子集合
+            if auto_lod:
+                for suffix in lod_suffixes:
+                    lod_coll = bpy.data.collections.new(f"{child_name}{suffix}")
+                    child_coll.children.link(lod_coll)
+                    created_count += 1
+
+        # 记录最近使用的模板
+        set_recent_template(self.template_name)
+
+        self.report({'INFO'}, f"已创建 {created_count} 个集合")
+        return {'FINISHED'}
+
+    @classmethod
+    def poll(cls, context):
+        return True
+
+
+class MMY_OT_QuickGenerateCollections(bpy.types.Operator):
+    """快速生成集合架构"""
+    bl_idname = "mmy.quick_generate_collections"
+    bl_label = "快速生成集合"
+    bl_description = "自定义输入快速创建集合层级"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    root_name: StringProperty(name="父集合名称", default="Assets")
+    children_names: StringProperty(name="子集合列表", default="Char,Prop,Set", description="用逗号分隔多个名称")
+    auto_lod: BoolProperty(name="自动创建高低模容器", default=True)
+    batch_mode: BoolProperty(name="批量模式", default=False, description="子集合名作为资产名，批量生成完整结构")
+    batch_assets: StringProperty(name="批量资产名", default="Hero,Enemy,Boss", description="用逗号分隔多个资产名")
+
+    def invoke(self, context, event):
+        return context.window_manager.invoke_props_dialog(self, width=300)
+
+    def draw(self, context):
+        layout = self.layout
+
+        layout.prop(self, "root_name")
+        layout.prop(self, "children_names")
+
+        row = layout.row()
+        row.prop(self, "auto_lod")
+
+        layout.separator()
+
+        row = layout.row()
+        row.prop(self, "batch_mode")
+        if self.batch_mode:
+            layout.prop(self, "batch_assets")
+
+    def execute(self, context):
+        # 解析名称列表
+        children = [n.strip() for n in self.children_names.split(",") if n.strip()]
+
+        if not children:
+            self.report({'WARNING'}, "请输入子集合名称")
+            return {'CANCELLED'}
+
+        lod_suffixes = ["_high", "_low"]
+        created_count = 0
+
+        if self.batch_mode:
+            # 批量模式：每个资产名生成完整结构
+            batch_assets = [n.strip() for n in self.batch_assets.split(",") if n.strip()]
+            if not batch_assets:
+                self.report({'WARNING'}, "请输入批量资产名")
+                return {'CANCELLED'}
+
+            # 创建根集合
+            root_coll = bpy.data.collections.new(self.root_name)
+            context.scene.collection.children.link(root_coll)
+            created_count += 1
+
+            # 每个资产创建完整结构
+            for asset_name in batch_assets:
+                asset_coll = bpy.data.collections.new(asset_name)
+                root_coll.children.link(asset_coll)
+                created_count += 1
+
+                if self.auto_lod:
+                    for suffix in lod_suffixes:
+                        lod_coll = bpy.data.collections.new(f"{asset_name}{suffix}")
+                        asset_coll.children.link(lod_coll)
+                        created_count += 1
+        else:
+            # 普通模式：创建标准层级
+            root_coll = bpy.data.collections.new(self.root_name)
+            context.scene.collection.children.link(root_coll)
+            created_count += 1
+
+            for child_name in children:
+                child_coll = bpy.data.collections.new(child_name)
+                root_coll.children.link(child_coll)
+                created_count += 1
+
+                if self.auto_lod:
+                    for suffix in lod_suffixes:
+                        lod_coll = bpy.data.collections.new(f"{child_name}{suffix}")
+                        child_coll.children.link(lod_coll)
+                        created_count += 1
+
+        self.report({'INFO'}, f"已创建 {created_count} 个集合")
+        return {'FINISHED'}
+
+    @classmethod
+    def poll(cls, context):
+        return True
+
+
 _classes = (
     MMY_OT_SmartDuplicateCollection,
     MMY_OT_SmartDuplicateObject,
@@ -505,6 +647,8 @@ _classes = (
     MMY_OT_RemoveSuffixPreset,
     MMY_OT_CreateLODCollections,
     MMY_OT_GroupSelectedObjects,
+    MMY_OT_GenerateCollectionTemplate,
+    MMY_OT_QuickGenerateCollections,
 )
 
 

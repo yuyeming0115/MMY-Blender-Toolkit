@@ -1,7 +1,33 @@
 """智能命名 UI - N面板 + 大纲右键菜单"""
 
 import bpy
+from bpy.props import EnumProperty
 from .presets import get_prefix_presets, get_suffix_presets, get_separator, get_digits
+from .collection_templates import get_all_template_names, get_default_template_name
+
+
+# 模板选择缓存（避免 GC 回收）
+_TEMPLATE_ITEMS_CACHE = []
+
+
+def get_template_enum_items(self, context):
+    """动态生成模板选项列表"""
+    _TEMPLATE_ITEMS_CACHE.clear()
+    names = get_all_template_names()
+    for name in names:
+        # 使用 UTF-8 hex 编码作为安全 identifier
+        safe_id = 'c' + name.encode('utf-8').hex()
+        _TEMPLATE_ITEMS_CACHE.append((safe_id, name, ""))
+    return _TEMPLATE_ITEMS_CACHE
+
+
+class MMY_PT_CollectionTemplateProps(bpy.types.PropertyGroup):
+    """集合模板属性"""
+    selected_template: EnumProperty(
+        name="模板",
+        items=get_template_enum_items,
+        description="选择集合架构模板",
+    )
 
 
 # ===================================================================
@@ -34,6 +60,33 @@ class MMY_PT_SmartNamingPanel(bpy.types.Panel):
 
         row = box.row(align=True)
         row.operator("mmy.create_lod_collections", text="创建高低模容器", icon='ADD')
+
+        # === 集合架构 ===
+        layout.separator()
+        box = layout.box()
+        box.label(text="集合架构", icon='OUTLINER')
+
+        # 模板选择
+        props = context.scene.mmy_collection_template_props
+        row = box.row(align=True)
+        row.prop(props, "selected_template", text="")
+
+        # 从 enum identifier 解码回原始名称
+        selected_id = props.selected_template
+        if selected_id.startswith('c'):
+            try:
+                template_name = bytes.fromhex(selected_id[1:]).decode('utf-8')
+            except:
+                template_name = get_default_template_name()
+        else:
+            template_name = get_default_template_name()
+
+        # 生成按钮
+        op = box.operator("mmy.generate_collection_template", text="生成架构", icon='ADD')
+        op.template_name = template_name
+
+        # 快速生成器入口
+        box.operator("mmy.quick_generate_collections", text="快速生成器", icon='MODIFIER')
 
         # === 快捷归组 ===
         layout.separator()
@@ -177,6 +230,7 @@ class MMY_OT_ApplySuffix(bpy.types.Operator):
 
 
 _classes = (
+    MMY_PT_CollectionTemplateProps,
     MMY_PT_SmartNamingPanel,
     MMY_OT_ApplyPrefix,
     MMY_OT_ApplySuffix,
@@ -187,6 +241,11 @@ def register():
     # 注册面板和操作符
     for cls in _classes:
         bpy.utils.register_class(cls)
+
+    # 注册场景属性
+    bpy.types.Scene.mmy_collection_template_props = bpy.props.PointerProperty(
+        type=MMY_PT_CollectionTemplateProps
+    )
 
     # 挂载大纲右键菜单（多个位置）
     # 集合/空白区域菜单
@@ -226,6 +285,12 @@ def unregister():
     # 移除对象右键菜单
     try:
         bpy.types.OUTLINER_MT_object.remove(_append_to_outliner_object_menu)
+    except:
+        pass
+
+    # 移除场景属性
+    try:
+        del bpy.types.Scene.mmy_collection_template_props
     except:
         pass
 
