@@ -104,6 +104,11 @@ def _append_to_outliner_menu(self, context):
         layout.operator("mmy.smart_duplicate_collection", text="智能复制集合", icon='OUTLINER_COLLECTION')
         layout.operator("mmy.create_lod_collections", text="创建高低模容器", icon='GROUP')
 
+    # 如果选中了对象，显示归组选项
+    if context.selected_objects:
+        layout.separator()
+        layout.operator("mmy.group_selected_objects", text="归组到新集合", icon='GROUP')
+
 
 def _append_to_outliner_context_menu(self, context):
     """在大纲上下文菜单添加选项"""
@@ -113,6 +118,7 @@ def _append_to_outliner_context_menu(self, context):
     layout.separator()
     layout.operator("mmy.smart_duplicate_collection", text="智能复制集合")
     layout.operator("mmy.create_lod_collections", text="创建高低模容器")
+    layout.operator("mmy.group_selected_objects", text="归组到新集合")
 
 
 # ===================================================================
