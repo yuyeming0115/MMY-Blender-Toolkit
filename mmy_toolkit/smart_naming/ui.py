@@ -27,13 +27,13 @@ class MMY_PT_SmartNamingPanel(bpy.types.Panel):
         row.operator("mmy.smart_duplicate_collection", text="复制集合", icon='OUTLINER_COLLECTION')
         row.operator("mmy.smart_duplicate_object", text="复制对象", icon='OBJECT_DATAMODE')
 
-        # === LOD 子集合 ===
+        # === 烘焙分组 ===
         layout.separator()
         box = layout.box()
-        box.label(text="LOD 子集合", icon='GROUP')
+        box.label(text="烘焙分组", icon='GROUP')
 
         row = box.row(align=True)
-        row.operator("mmy.create_lod_collections", text="创建 LOD", icon='ADD')
+        row.operator("mmy.create_lod_collections", text="创建高低模容器", icon='ADD')
 
         # === 批量重命名 ===
         layout.separator()
@@ -94,7 +94,7 @@ def _append_to_outliner_menu(self, context):
     if context.collection:
         layout.separator()
         layout.operator("mmy.smart_duplicate_collection", text="智能复制集合", icon='OUTLINER_COLLECTION')
-        layout.operator("mmy.create_lod_collections", text="创建 LOD 子集合", icon='GROUP')
+        layout.operator("mmy.create_lod_collections", text="创建高低模容器", icon='GROUP')
 
 
 def _append_to_outliner_context_menu(self, context):
@@ -104,7 +104,7 @@ def _append_to_outliner_context_menu(self, context):
     # 添加分隔线和智能复制选项
     layout.separator()
     layout.operator("mmy.smart_duplicate_collection", text="智能复制集合")
-    layout.operator("mmy.create_lod_collections", text="创建 LOD 子集合")
+    layout.operator("mmy.create_lod_collections", text="创建高低模容器")
 
 
 # ===================================================================
