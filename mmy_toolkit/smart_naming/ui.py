@@ -178,19 +178,33 @@ def register():
     for cls in _classes:
         bpy.utils.register_class(cls)
 
-    # 挂载大纲主右键菜单（OUTLINER_MT_context_menu）
-    try:
-        bpy.types.OUTLINER_MT_context_menu.append(_append_to_outliner_context_menu)
-    except:
-        pass
+    # 挂载大纲右键菜单（尝试多个位置）
+    menus_to_append = [
+        'OUTLINER_MT_context_menu',      # 主右键菜单（空白处）
+        'OUTLINER_MT_collection',         # 集合右键菜单
+        'OUTLINER_MT_collection_context_menu',  # 集合上下文菜单
+    ]
+    for menu_name in menus_to_append:
+        try:
+            menu = getattr(bpy.types, menu_name)
+            menu.append(_append_to_outliner_context_menu)
+        except:
+            pass
 
 
 def unregister():
     # 移除大纲右键菜单
-    try:
-        bpy.types.OUTLINER_MT_context_menu.remove(_append_to_outliner_context_menu)
-    except:
-        pass
+    menus_to_remove = [
+        'OUTLINER_MT_context_menu',
+        'OUTLINER_MT_collection',
+        'OUTLINER_MT_collection_context_menu',
+    ]
+    for menu_name in menus_to_remove:
+        try:
+            menu = getattr(bpy.types, menu_name)
+            menu.remove(_append_to_outliner_context_menu)
+        except:
+            pass
 
     # 注销面板和操作符
     for cls in reversed(_classes):
