@@ -120,13 +120,16 @@ def find_button_at_point(window, mouse_x, mouse_y, area_id=None, region_id=None)
     if obj.mode != 'SCULPT':
         return None, None, None, None
 
-    # 获取偏好设置计算位置
+    # 获取偏好设置（布局模式）
     addon = context.preferences.addons.get("mmy_toolkit")
     prefs = addon.preferences if addon else None
 
     layout_mode = getattr(prefs, "sculpt_hud_layout", "horizontal") if prefs else "horizontal"
-    offset_x = getattr(prefs, "sculpt_hud_offset_x", 0) if prefs else 0
-    offset_y = getattr(prefs, "sculpt_hud_offset_y", 0) if prefs else 0
+
+    # 使用视窗特定的偏移值（与 HUD 绘制保持一致）
+    window_id = window.as_pointer()
+    from .hud_state import get_window_offset
+    offset_x, offset_y = get_window_offset(window_id)
 
     from .hud_state import _DEFAULT_BUTTONS
     buttons = _DEFAULT_BUTTONS
@@ -146,6 +149,25 @@ def find_button_at_point(window, mouse_x, mouse_y, area_id=None, region_id=None)
     # 转换鼠标坐标（region 相对）
     region_mouse_x = mouse_x - region.x
     region_mouse_y = mouse_y - region.y
+
+    # 计算 HUD 位置
+    from .hud_state import _DEFAULT_BUTTONS
+    buttons = _DEFAULT_BUTTONS
+    handle_width = HUD_HANDLE_WIDTH
+
+    if layout_mode == "horizontal":
+        total_width = handle_width + len(buttons) * HUD_BUTTON_WIDTH + (len(buttons) - 1) * HUD_BUTTON_GAP + HUD_MARGIN * 2
+        total_height = HUD_BUTTON_HEIGHT + HUD_MARGIN * 2
+        start_x = region.width * 0.5 + offset_x * region.width - total_width * 0.5
+        start_y = region.height * 0.5 + offset_y * region.height - total_height * 0.5
+    else:
+        total_width = HUD_BUTTON_WIDTH + HUD_MARGIN * 2
+        total_height = handle_width + len(buttons) * HUD_BUTTON_HEIGHT + (len(buttons) - 1) * HUD_BUTTON_GAP + HUD_MARGIN * 2
+        start_x = region.width * 0.5 + offset_x * region.width - total_width * 0.5
+        start_y = region.height * 0.5 + offset_y * region.height - total_height * 0.5
+
+    # 调试输出（仅在点击时）
+    # print(f"[MMY Sculpt] HUD位置: start_x={start_x:.1f}, start_y={start_y:.1f}, 鼠标: ({region_mouse_x:.1f}, {region_mouse_y:.1f})")
 
     # 检查是否在 HUD 区域内
     if not (start_x <= region_mouse_x <= start_x + total_width and
@@ -262,6 +284,12 @@ class VIEW3D_OT_mmy_sculpt_hud_modal(bpy.types.Operator):
         # 点击事件
         if event.type == 'LEFTMOUSE' and event.value == 'PRESS':
             area, region, space, button_id = find_button_at_point(window, event.mouse_x, event.mouse_y, self._area_id, self._region_id)
+
+            # 详细调试
+            if area and region:
+                hud_x = event.mouse_x - region.x
+                hud_y = event.mouse_y - region.y
+                print(f"[MMY Sculpt] 点击坐标: 全局({event.mouse_x}, {event.mouse_y}) -> region内({hud_x:.0f}, {hud_y:.0f}), region尺寸({region.width}, {region.height})")
             print(f"[MMY Sculpt] 左键点击: button_id={button_id}")
 
             if button_id is None or button_id == "HUD_AREA":
