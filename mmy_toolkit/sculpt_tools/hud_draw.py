@@ -50,13 +50,16 @@ def _draw_sculpt_hud_inner():
     if obj is None or obj.mode != 'SCULPT':
         return
 
-    # 获取偏好设置
+    # 获取偏好设置（布局模式）
     addon = context.preferences.addons.get("mmy_toolkit")
     prefs = addon.preferences if addon else None
 
     layout_mode = getattr(prefs, "sculpt_hud_layout", "horizontal") if prefs else "horizontal"
-    offset_x = getattr(prefs, "sculpt_hud_offset_x", 0) if prefs else 0
-    offset_y = getattr(prefs, "sculpt_hud_offset_y", 0) if prefs else 0
+
+    # 使用视窗特定的偏移值
+    window_id = window.as_pointer()
+    from .hud_state import get_window_offset
+    offset_x, offset_y = get_window_offset(window_id)
 
     # 计算位置（包含拖拽把手）
     buttons = _DEFAULT_BUTTONS
@@ -83,13 +86,15 @@ def _draw_sculpt_hud_inner():
     is_handle_hovered = hovered == (region_key, "handle")
 
     if layout_mode == "horizontal":
+        # 水平布局：把手在左边
         handle_x = start_x
         handle_y = start_y
         handle_w = handle_width
         handle_h = total_height
     else:
+        # 垂直布局：把手在底部
         handle_x = start_x
-        handle_y = start_y
+        handle_y = start_y + total_height - handle_width
         handle_w = total_width
         handle_h = handle_width
 
@@ -101,17 +106,24 @@ def _draw_sculpt_hud_inner():
         line_x = handle_x + handle_w * 0.5
         draw_text("│", line_x - 4, handle_y + handle_h * 0.5 - 6, HUD_TEXT_COLOR, HUD_TEXT_SIZE)
     else:
-        # 横线把手
+        # 横线把手（在底部）
         line_y = handle_y + handle_h * 0.5
         draw_text("─", handle_x + handle_w * 0.5 - 4, line_y - 6, HUD_TEXT_COLOR, HUD_TEXT_SIZE)
 
-    for i, button_id in enumerate(buttons):
+    # 绘制按钮（垂直布局时反转顺序）
+    if layout_mode == "horizontal":
+        button_order = buttons
+    else:
+        button_order = list(reversed(buttons))  # 反转：+, 线框, 遮罩, 面组
+
+    for i, button_id in enumerate(button_order):
         if layout_mode == "horizontal":
             btn_x = start_x + handle_width + HUD_MARGIN + i * (HUD_BUTTON_WIDTH + HUD_BUTTON_GAP)
             btn_y = start_y + HUD_MARGIN
         else:
+            # 垂直布局：按钮从上往下，把手在底部
             btn_x = start_x + HUD_MARGIN
-            btn_y = start_y + handle_width + HUD_MARGIN + i * (HUD_BUTTON_HEIGHT + HUD_BUTTON_GAP)
+            btn_y = start_y + HUD_MARGIN + i * (HUD_BUTTON_HEIGHT + HUD_BUTTON_GAP)
 
         # 检查状态
         is_active = _check_button_active(space, obj, button_id)
