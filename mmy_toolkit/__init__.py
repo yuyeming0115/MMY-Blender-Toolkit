@@ -696,6 +696,13 @@ def draw_suffix_menu(self, context):
     row.operator("mmy.open_prefs", text="", icon="SETTINGS")
     row.menu("MMY_MT_preset_menu", text="", icon="DOWNARROW_HLT")
 
+    # 新增：打开项目目录按钮
+    filepath = bpy.data.filepath
+    if filepath:
+        row.operator("mmy.open_project_folder", text="", icon='FILE_FOLDER')
+    else:
+        row.label(text="", icon='FILE_FOLDER')
+
 
 def draw_statusbar_backup(self, context):
     """状态栏显示自动备份状态 - 能量条效果"""
@@ -778,6 +785,7 @@ from . import project_switcher
 from . import transform_check
 from . import sculpt_tools
 from . import modifier_tools
+from . import project_bookmarks
 
 
 # ============ 快捷键注册 ============
@@ -846,6 +854,7 @@ def register():
     transform_check.register()
     sculpt_tools.register()
     modifier_tools.register()
+    project_bookmarks.register()
 
     # 注册快捷键
     _register_keymaps()
@@ -925,6 +934,7 @@ def unregister():
     transform_check.unregister()
     sculpt_tools.unregister()
     modifier_tools.unregister()
+    project_bookmarks.unregister()
 
     # 移除绘制函数
     try:

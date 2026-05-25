@@ -7,6 +7,7 @@ PRESETS_DIR = os.path.join(os.path.dirname(__file__), "presets")
 PRESET_FILE = os.path.join(PRESETS_DIR, "suffix_presets.json")
 ASSET_PRESET_FILE = os.path.join(PRESETS_DIR, "asset_presets.json")
 LENS_PRESET_FILE = os.path.join(PRESETS_DIR, "lens_presets.json")
+PROJECT_PRESET_FILE = os.path.join(PRESETS_DIR, "project_presets.json")
 
 # 默认预设数据
 DEFAULT_PRESETS = {
@@ -269,3 +270,105 @@ def get_all_lens_preset_names() -> list:
     """获取所有焦距预设名称列表"""
     presets = get_lens_presets()
     return list(presets.keys())
+
+
+# ============ 项目路径预设配置 ============
+
+DEFAULT_PROJECT_PRESETS = {
+    "recent_project_paths": [],      # 最近打开的项目路径（完整文件路径）
+    "favorite_project_paths": [],    # 收藏的项目书签（包含 path 和 alias）
+    "max_recent": 10,                 # 最大历史记录数
+}
+
+
+def load_project_presets() -> dict:
+    """加载项目路径预设配置"""
+    ensure_presets_dir()
+    if os.path.exists(PROJECT_PRESET_FILE):
+        try:
+            with open(PROJECT_PRESET_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, IOError):
+            pass
+    save_project_presets(DEFAULT_PROJECT_PRESETS)
+    return DEFAULT_PROJECT_PRESETS.copy()
+
+
+def save_project_presets(data: dict):
+    """保存项目路径预设配置"""
+    ensure_presets_dir()
+    with open(PROJECT_PRESET_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+def add_recent_project_path(filepath: str, max_count: int = 10):
+    """添加最近打开的项目路径"""
+    if not filepath:
+        return
+
+    data = load_project_presets()
+    recent = data.get("recent_project_paths", [])
+
+    # 移除已存在的相同路径
+    if filepath in recent:
+        recent.remove(filepath)
+
+    # 添加到开头
+    recent.insert(0, filepath)
+
+    # 限制数量
+    max_count = data.get("max_recent", max_count)
+    data["recent_project_paths"] = recent[:max_count]
+
+    save_project_presets(data)
+
+
+def get_recent_project_paths() -> list:
+    """获取最近打开的项目路径列表"""
+    data = load_project_presets()
+    return data.get("recent_project_paths", [])
+
+
+def clear_recent_project_paths():
+    """清空最近打开的项目路径"""
+    data = load_project_presets()
+    data["recent_project_paths"] = []
+    save_project_presets(data)
+
+
+def add_project_bookmark(path: str, alias: str = ""):
+    """添加项目书签"""
+    if not path:
+        return False
+
+    data = load_project_presets()
+    bookmarks = data.get("favorite_project_paths", [])
+
+    # 检查是否已存在
+    for bookmark in bookmarks:
+        if bookmark.get("path") == path:
+            return False
+
+    # 使用路径名作为默认别名
+    display_alias = alias or os.path.basename(path) or path
+    bookmarks.append({
+        "path": path,
+        "alias": display_alias
+    })
+    data["favorite_project_paths"] = bookmarks
+    save_project_presets(data)
+    return True
+
+
+def remove_project_bookmark(path: str):
+    """移除项目书签"""
+    data = load_project_presets()
+    bookmarks = data.get("favorite_project_paths", [])
+    data["favorite_project_paths"] = [b for b in bookmarks if b.get("path") != path]
+    save_project_presets(data)
+
+
+def get_project_bookmarks() -> list:
+    """获取项目书签列表"""
+    data = load_project_presets()
+    return data.get("favorite_project_paths", [])

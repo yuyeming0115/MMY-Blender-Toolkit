@@ -62,6 +62,9 @@ class VIEW3D_PT_MMYMeshTools(bpy.types.Panel):
         obj = context.active_object
         mode = obj.mode if obj else 'OBJECT'
 
+        # === 项目快捷访问区块（新增）===
+        self._draw_project_quick_access(layout, context)
+
         # 对象模式：导入工具 + 资产创建
         if mode == 'OBJECT':
             # 导入工具
@@ -348,6 +351,37 @@ class VIEW3D_PT_MMYMeshTools(bpy.types.Panel):
                     src_short = mapping.source_mat_name[:12] + ".." if len(mapping.source_mat_name) > 12 else mapping.source_mat_name
                     row.label(text=src_short)
                     row.prop(mapping, "target_mat_id", text="")
+
+    def _draw_project_quick_access(self, layout, context):
+        """绘制项目快捷访问区块"""
+        import os
+
+        box = layout.box()
+        box.label(text="项目快捷访问", icon='FILE_FOLDER')
+
+        filepath = bpy.data.filepath
+        if filepath:
+            # 当前文件信息
+            row = box.row(align=True)
+            row.label(text=os.path.basename(filepath), icon='FILE_BLEND')
+            row.operator("mmy.open_project_folder", text="", icon='FILE_FOLDER')
+            row.operator("mmy.copy_project_path", text="", icon='COPYDOWN')
+
+            # 书签和最近路径菜单
+            if hasattr(context.scene, 'mmy_project_access'):
+                props = context.scene.mmy_project_access
+                row = box.row(align=True)
+                row.menu("MMY_MT_project_bookmarks", text="书签", icon='BOOKMARKS')
+                row.menu("MMY_MT_recent_project_paths", text="历史", icon='RECOVER_LAST')
+
+                # 添加书签按钮
+                row.operator("mmy.add_project_bookmark", text="", icon='ADD')
+
+            # 同目录文件列表（复用现有菜单）
+            row = box.row()
+            row.menu("MMY_MT_project_files", text="同目录文件", icon='FILE_BLEND')
+        else:
+            box.label(text="请先保存文件", icon='ERROR')
 
 
 _classes = (
