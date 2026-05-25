@@ -165,32 +165,47 @@ class MMY_OT_OpenProjectDirectory(bpy.types.Operator):
 
     def _open_in_file_browser(self, context):
         """在 Blender File Browser 中打开目录"""
-        # 查找或创建 FILE_BROWSER 区域
+        import bpy.path
+
+        # 查找 FILE_BROWSER 区域
         for window in context.window_manager.windows:
             for area in window.screen.areas:
                 if area.type == 'FILE_BROWSER':
-                    # 找到了 File Browser，设置目录
                     for space in area.spaces:
                         if space.type == 'FILE_BROWSER':
                             params = space.params
                             if params:
-                                # 设置目录路径
-                                params.directory = self.directory
-                                # 刷新显示
-                                area.tag_redraw()
-                                self.report({'INFO'}, f"已切换到: {self.directory}")
-                                return {'FINISHED'}
+                                # 正确设置目录：需要转换为 bytes 格式
+                                # Blender 的 params.directory 接受 bytes
+                                dir_bytes = self.directory.encode('utf-8') + b'/'
+                                try:
+                                    params.directory = dir_bytes
+                                    area.tag_redraw()
+                                    self.report({'INFO'}, f"已切换到: {self.directory}")
+                                    return {'FINISHED'}
+                                except Exception as e:
+                                    print(f"设置目录失败: {e}")
 
-        # 如果没有找到 FILE_BROWSER，打开一个新的
+        # 没有找到 File Browser，尝试打开文件打开对话框
         try:
-            # 切换到文件浏览器区域
-            bpy.ops.screen.area_split(direction='VERTICAL', factor=0.5)
-            # 尝试打开 File Browser
-            bpy.ops.wm.call_menu(name='SCREEN_MT_user_menu')
+            # 使用 Ctrl+O 效果打开 File Browser 并设置路径
+            bpy.ops.wm.call_panel(name="FILEBROWSER_PT_files", keep_open=True)
+            # 再次尝试设置目录
+            for window in context.window_manager.windows:
+                for area in window.screen.areas:
+                    if area.type == 'FILE_BROWSER':
+                        for space in area.spaces:
+                            if space.type == 'FILE_BROWSER':
+                                params = space.params
+                                if params:
+                                    dir_bytes = self.directory.encode('utf-8') + b'/'
+                                    params.directory = dir_bytes
+                                    area.tag_redraw()
+                                    return {'FINISHED'}
         except:
             pass
 
-        # Fallback：使用系统文件管理器
+        # 最终 Fallback：使用系统文件管理器
         self.report({'INFO'}, f"打开目录: {self.directory}")
         if platform.system() == 'Windows':
             subprocess.run(['explorer', self.directory])
