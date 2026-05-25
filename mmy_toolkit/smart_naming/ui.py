@@ -173,14 +173,9 @@ def register():
     for cls in _classes:
         bpy.utils.register_class(cls)
 
-    # 挂载大纲右键菜单
+    # 挂载大纲主右键菜单（OUTLINER_MT_context_menu）
     try:
-        bpy.types.OUTLINER_MT_collection.append(_append_to_outliner_menu)
-    except:
-        pass
-
-    try:
-        bpy.types.OUTLINER_MT_collection_context_menu.append(_append_to_outliner_context_menu)
+        bpy.types.OUTLINER_MT_context_menu.append(_append_to_outliner_context_menu)
     except:
         pass
 
@@ -188,12 +183,7 @@ def register():
 def unregister():
     # 移除大纲右键菜单
     try:
-        bpy.types.OUTLINER_MT_collection.remove(_append_to_outliner_menu)
-    except:
-        pass
-
-    try:
-        bpy.types.OUTLINER_MT_collection_context_menu.remove(_append_to_outliner_context_menu)
+        bpy.types.OUTLINER_MT_context_menu.remove(_append_to_outliner_context_menu)
     except:
         pass
 
