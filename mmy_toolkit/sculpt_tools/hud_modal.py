@@ -5,6 +5,73 @@ from .hud_state import _HUD_STATE
 from .hud_draw import HUD_BUTTON_WIDTH, HUD_BUTTON_HEIGHT, HUD_BUTTON_GAP, HUD_MARGIN, HUD_HANDLE_WIDTH
 
 
+# ============ 布局切换菜单 ============
+
+class MMY_MT_HUDLayoutMenu(bpy.types.Menu):
+    """HUD 布局切换菜单"""
+    bl_idname = "MMY_MT_hud_layout_menu"
+    bl_label = "HUD 布局"
+
+    def draw(self, context):
+        layout = self.layout
+        addon = context.preferences.addons.get("mmy_toolkit")
+        prefs = addon.preferences if addon else None
+        current_layout = getattr(prefs, "sculpt_hud_layout", "horizontal") if prefs else "horizontal"
+
+        layout.operator("mmy.hud_layout_horizontal", text="水平布局").layout_mode = "horizontal"
+        layout.operator("mmy.hud_layout_vertical", text="垂直布局").layout_mode = "vertical"
+
+        layout.separator()
+
+        # 重置位置
+        layout.operator("mmy.hud_layout_reset", text="重置位置")
+
+
+class MMY_OT_HUDLayoutHorizontal(bpy.types.Operator):
+    """切换为水平布局"""
+    bl_idname = "mmy.hud_layout_horizontal"
+    bl_label = "水平布局"
+    bl_options = {'INTERNAL'}
+
+    layout_mode: bpy.props.StringProperty(default="horizontal")
+
+    def execute(self, context):
+        addon = context.preferences.addons.get("mmy_toolkit")
+        prefs = addon.preferences if addon else None
+        if prefs:
+            prefs.sculpt_hud_layout = self.layout_mode
+        return {'FINISHED'}
+
+
+class MMY_OT_HUDLayoutVertical(bpy.types.Operator):
+    """切换为垂直布局"""
+    bl_idname = "mmy.hud_layout_vertical"
+    bl_label = "垂直布局"
+    bl_options = {'INTERNAL'}
+
+    layout_mode: bpy.props.StringProperty(default="vertical")
+
+    def execute(self, context):
+        addon = context.preferences.addons.get("mmy_toolkit")
+        prefs = addon.preferences if addon else None
+        if prefs:
+            prefs.sculpt_hud_layout = self.layout_mode
+        return {'FINISHED'}
+
+
+class MMY_OT_HUDLayoutReset(bpy.types.Operator):
+    """重置 HUD 位置"""
+    bl_idname = "mmy.hud_layout_reset"
+    bl_label = "重置位置"
+    bl_options = {'INTERNAL'}
+
+    def execute(self, context):
+        from .hud_state import _HUD_STATE
+        # 重置所有视窗的偏移值
+        _HUD_STATE["window_offsets"].clear()
+        return {'FINISHED'}
+
+
 def get_region_key(window, area, region):
     """获取 region 唯一标识"""
     return (window.as_pointer(), area.as_pointer(), region.as_pointer())
@@ -87,13 +154,15 @@ def find_button_at_point(window, mouse_x, mouse_y, area_id=None, region_id=None)
 
     # 先检查把手
     if layout_mode == "horizontal":
+        # 水平布局：把手在左边
         handle_x = start_x
         handle_y = start_y
         handle_w = handle_width
         handle_h = total_height
     else:
+        # 垂直布局：把手在底部
         handle_x = start_x
-        handle_y = start_y
+        handle_y = start_y + total_height - handle_width
         handle_w = total_width
         handle_h = handle_width
 
@@ -101,14 +170,20 @@ def find_button_at_point(window, mouse_x, mouse_y, area_id=None, region_id=None)
         handle_y <= region_mouse_y <= handle_y + handle_h):
         return area, region, space, "handle"
 
-    # 查找具体按钮
-    for i, button_id in enumerate(buttons):
+    # 查找具体按钮（垂直布局时反转顺序）
+    if layout_mode == "horizontal":
+        button_order = buttons
+    else:
+        button_order = list(reversed(buttons))  # 反转：+, 线框, 遮罩, 面组
+
+    for i, button_id in enumerate(button_order):
         if layout_mode == "horizontal":
             btn_x = start_x + handle_width + HUD_MARGIN + i * (HUD_BUTTON_WIDTH + HUD_BUTTON_GAP)
             btn_y = start_y + HUD_MARGIN
         else:
+            # 垂直布局：按钮从上往下，把手在底部
             btn_x = start_x + HUD_MARGIN
-            btn_y = start_y + handle_width + HUD_MARGIN + i * (HUD_BUTTON_HEIGHT + HUD_BUTTON_GAP)
+            btn_y = start_y + HUD_MARGIN + i * (HUD_BUTTON_HEIGHT + HUD_BUTTON_GAP)
 
         if (btn_x <= region_mouse_x <= btn_x + HUD_BUTTON_WIDTH and
             btn_y <= region_mouse_y <= btn_y + HUD_BUTTON_HEIGHT):
@@ -133,6 +208,7 @@ class VIEW3D_OT_mmy_sculpt_hud_modal(bpy.types.Operator):
     _drag_start_y = 0
     _drag_start_offset_x = 0
     _drag_start_offset_y = 0
+    _drag_window_id = None  # 拖拽时记录的视窗 ID
 
     def invoke(self, context, event):
         if not _HUD_STATE["enabled"]:
@@ -196,28 +272,38 @@ class VIEW3D_OT_mmy_sculpt_hud_modal(bpy.types.Operator):
             return {'PASS_THROUGH'}
 
         if event.type == 'RIGHTMOUSE' and event.value == 'PRESS':
-            # 右键菜单（布局切换等）
+            area, region, space, button_id = find_button_at_point(window, event.mouse_x, event.mouse_y, self._area_id, self._region_id)
+
+            # 右键点击把手弹出布局菜单
+            if button_id == "handle":
+                bpy.ops.wm.call_menu("INVOKE_DEFAULT", name="MMY_MT_hud_layout_menu")
+                return {'RUNNING_MODAL'}
+
             return {'PASS_THROUGH'}
 
         return {'PASS_THROUGH'}
 
     def _start_drag(self, context, mouse_x, mouse_y):
         """开始拖拽"""
-        addon = context.preferences.addons.get("mmy_toolkit")
-        prefs = addon.preferences if addon else None
+        from .hud_state import get_window_offset
+
+        window = getattr(context, "window", None)
+        if window:
+            self._drag_window_id = window.as_pointer()
+            offset_x, offset_y = get_window_offset(self._drag_window_id)
+        else:
+            self._drag_window_id = None
+            offset_x, offset_y = 0.0, 0.0
 
         self._dragging = True
         self._drag_start_x = mouse_x
         self._drag_start_y = mouse_y
-        self._drag_start_offset_x = getattr(prefs, "sculpt_hud_offset_x", 0) if prefs else 0
-        self._drag_start_offset_y = getattr(prefs, "sculpt_hud_offset_y", 0) if prefs else 0
+        self._drag_start_offset_x = offset_x
+        self._drag_start_offset_y = offset_y
 
     def _update_drag_position(self, context, mouse_x, mouse_y):
         """更新拖拽位置"""
-        addon = context.preferences.addons.get("mmy_toolkit")
-        prefs = addon.preferences if addon else None
-        if not prefs:
-            return
+        from .hud_state import set_window_offset
 
         window = getattr(context, "window", None)
         if not window:
@@ -244,9 +330,10 @@ class VIEW3D_OT_mmy_sculpt_hud_modal(bpy.types.Operator):
         delta_x = (mouse_x - self._drag_start_x) / region.width
         delta_y = (mouse_y - self._drag_start_y) / region.height
 
-        # 更新偏好设置
-        prefs.sculpt_hud_offset_x = self._drag_start_offset_x + delta_x
-        prefs.sculpt_hud_offset_y = self._drag_start_offset_y + delta_y
+        # 更新视窗特定的偏移值（使用开始拖拽时记录的窗口 ID）
+        new_offset_x = self._drag_start_offset_x + delta_x
+        new_offset_y = self._drag_start_offset_y + delta_y
+        set_window_offset(self._drag_window_id, new_offset_x, new_offset_y)
 
         # 刷新视图
         area.tag_redraw()
@@ -318,7 +405,13 @@ class VIEW3D_OT_mmy_sculpt_hud_modal(bpy.types.Operator):
         return {'CANCELLED'}
 
 
-_classes = (VIEW3D_OT_mmy_sculpt_hud_modal,)
+_classes = (
+    MMY_MT_HUDLayoutMenu,
+    MMY_OT_HUDLayoutHorizontal,
+    MMY_OT_HUDLayoutVertical,
+    MMY_OT_HUDLayoutReset,
+    VIEW3D_OT_mmy_sculpt_hud_modal,
+)
 
 
 def register():
