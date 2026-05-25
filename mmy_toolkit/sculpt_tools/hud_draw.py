@@ -1,12 +1,12 @@
 """雕刻 HUD GPU 绘制"""
 
 import bpy
-from .hud_state import _HUD_STATE, _DEFAULT_BUTTONS
+from .hud_state import _HUD_STATE, _AVAILABLE_BUTTONS, get_user_buttons
 
 # 常量
 HUD_TEXT_SIZE = 12
 HUD_BUTTON_HEIGHT = 24
-HUD_BUTTON_WIDTH = 60
+HUD_BUTTON_WIDTH = 80  # 加宽以容纳符号+文字
 HUD_BUTTON_GAP = 4
 HUD_CORNER_RADIUS = 6
 HUD_MARGIN = 10
@@ -60,17 +60,20 @@ def _draw_sculpt_hud_inner():
     from .hud_state import get_global_offset
     offset_x, offset_y = get_global_offset()
 
-    # 计算位置（包含拖拽把手）
-    buttons = _DEFAULT_BUTTONS
+    # 获取用户按钮列表，末尾添加 + 按钮
+    user_buttons = get_user_buttons()
+    buttons = user_buttons + ["add"]  # +按钮始终在末尾
+    button_count = len(buttons)
+
     handle_width = HUD_HANDLE_WIDTH
     if layout_mode == "horizontal":
-        total_width = handle_width + len(buttons) * HUD_BUTTON_WIDTH + (len(buttons) - 1) * HUD_BUTTON_GAP + HUD_MARGIN * 2
+        total_width = handle_width + button_count * HUD_BUTTON_WIDTH + (button_count - 1) * HUD_BUTTON_GAP + HUD_MARGIN * 2
         total_height = HUD_BUTTON_HEIGHT + HUD_MARGIN * 2
         start_x = region.width * 0.5 + offset_x * region.width - total_width * 0.5
         start_y = region.height * 0.5 + offset_y * region.height - total_height * 0.5
     else:
         total_width = HUD_BUTTON_WIDTH + HUD_MARGIN * 2
-        total_height = handle_width + len(buttons) * HUD_BUTTON_HEIGHT + (len(buttons) - 1) * HUD_BUTTON_GAP + HUD_MARGIN * 2
+        total_height = handle_width + button_count * HUD_BUTTON_HEIGHT + (button_count - 1) * HUD_BUTTON_GAP + HUD_MARGIN * 2
         start_x = region.width * 0.5 + offset_x * region.width - total_width * 0.5
         start_y = region.height * 0.5 + offset_y * region.height - total_height * 0.5
 
@@ -113,7 +116,7 @@ def _draw_sculpt_hud_inner():
     if layout_mode == "horizontal":
         button_order = buttons
     else:
-        button_order = list(reversed(buttons))  # 反转：+, 线框, 遮罩, 面组
+        button_order = list(reversed(buttons))  # 反转顺序
 
     for i, button_id in enumerate(button_order):
         if layout_mode == "horizontal":
@@ -142,22 +145,33 @@ def _draw_sculpt_hud_inner():
         draw_rounded_rect(btn_x, btn_y, HUD_BUTTON_WIDTH, HUD_BUTTON_HEIGHT, fill_color, HUD_CORNER_RADIUS - 2)
         draw_rounded_rect_outline(btn_x, btn_y, HUD_BUTTON_WIDTH, HUD_BUTTON_HEIGHT, HUD_BORDER_COLOR, HUD_CORNER_RADIUS - 2)
 
-        # 绘制文字
+        # 绘制符号+文字
         label = _get_button_label(button_id, is_active)
-        draw_text(label, btn_x + HUD_BUTTON_WIDTH * 0.5 - len(label) * 3, btn_y + HUD_BUTTON_HEIGHT * 0.5 - 6, HUD_TEXT_COLOR, HUD_TEXT_SIZE)
+        # 计算文字位置（居中）
+        text_offset = len(label) * 3.5  # 粗略估算字符宽度
+        draw_text(label, btn_x + HUD_BUTTON_WIDTH * 0.5 - text_offset, btn_y + HUD_BUTTON_HEIGHT * 0.5 - 6, HUD_TEXT_COLOR, HUD_TEXT_SIZE)
 
 
 def _check_button_active(space, obj, button_id):
     """检查按钮激活状态"""
     overlay = space.overlay if space else None
+    shading = space.shading if space else None
 
     if button_id == "face_sets":
         return overlay.show_sculpt_face_sets if overlay else False
     elif button_id == "mask":
-        # 遮罩显示
         return overlay.show_sculpt_mask if overlay else False
     elif button_id == "wireframe":
         return overlay.show_wireframes if overlay else False
+    elif button_id == "backface_culling":
+        # 背面遮罩（在 shading.type == 'SOLID' 时生效）
+        return shading.backface_culling if shading else False
+    elif button_id == "symmetry":
+        # 雕刻对称
+        return obj.data.use_sculpt_symmetry if obj and obj.type == 'MESH' else False
+    elif button_id == "dynamic_topology":
+        # 动态拓扑
+        return obj.data.use_dynamic_topology_sculpting if obj and obj.type == 'MESH' else False
     elif button_id == "add":
         return False
 
@@ -165,14 +179,22 @@ def _check_button_active(space, obj, button_id):
 
 
 def _get_button_label(button_id, is_active):
-    """获取按钮显示文字"""
-    labels = {
-        "face_sets": "面组" if is_active else "面组",
-        "mask": "遮罩" if is_active else "遮罩",
-        "wireframe": "线框" if is_active else "线框",
-        "add": "+",
-    }
-    return labels.get(button_id, "?")
+    """获取按钮显示文字（符号 + 文字）"""
+    # 从 _AVAILABLE_BUTTONS 获取符号和标签
+    from .hud_state import _AVAILABLE_BUTTONS
+
+    if button_id == "add":
+        return "+"
+
+    button_info = _AVAILABLE_BUTTONS.get(button_id, {})
+    symbol = button_info.get("symbol", "?")
+    label = button_info.get("label", "?")
+
+    # 符号 + 文字（激活状态加标记）
+    if is_active:
+        return f"{symbol} {label}"
+    else:
+        return f"{symbol} {label}"
 
 
 __all__ = [
