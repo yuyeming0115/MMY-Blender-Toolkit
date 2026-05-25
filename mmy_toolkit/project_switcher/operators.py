@@ -288,10 +288,11 @@ class MMY_OT_BrowseBookmarkDirectory(bpy.types.Operator, ImportHelper):
     )
 
     def invoke(self, context, event):
-        # 设置初始目录
+        # ImportHelper 会自动打开 File Browser
+        # 我们通过设置 filepath 属性来预设目录
         if self.directory and os.path.exists(self.directory):
-            # 确保 File Browser 从这个目录开始
-            context.space_data.params.directory = self.directory
+            # 设置初始文件路径为目录（这样 File Browser 会从该目录开始）
+            self.filepath = self.directory
         return ImportHelper.invoke(self, context, event)
 
     def execute(self, context):
