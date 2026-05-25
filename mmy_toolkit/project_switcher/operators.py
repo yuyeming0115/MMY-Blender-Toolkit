@@ -165,8 +165,6 @@ class MMY_OT_OpenProjectDirectory(bpy.types.Operator):
 
     def _open_in_file_browser(self, context):
         """在 Blender File Browser 中打开目录"""
-        import bpy.path
-
         # 查找 FILE_BROWSER 区域
         for window in context.window_manager.windows:
             for area in window.screen.areas:
@@ -175,33 +173,22 @@ class MMY_OT_OpenProjectDirectory(bpy.types.Operator):
                         if space.type == 'FILE_BROWSER':
                             params = space.params
                             if params:
-                                # 正确设置目录：需要转换为 bytes 格式
-                                # Blender 的 params.directory 接受 bytes
-                                dir_bytes = self.directory.encode('utf-8') + b'/'
+                                # 使用字符串路径（Windows 需要带斜杠结尾）
+                                dir_path = self.directory.rstrip('\\/') + '\\'
                                 try:
-                                    params.directory = dir_bytes
-                                    area.tag_redraw()
+                                    params.directory = dir_path
+                                    # 强制刷新
+                                    for region in area.regions:
+                                        region.tag_redraw()
                                     self.report({'INFO'}, f"已切换到: {self.directory}")
                                     return {'FINISHED'}
                                 except Exception as e:
                                     print(f"设置目录失败: {e}")
 
-        # 没有找到 File Browser，尝试打开文件打开对话框
+        # 没有找到 File Browser，尝试打开文件选择对话框
         try:
-            # 使用 Ctrl+O 效果打开 File Browser 并设置路径
-            bpy.ops.wm.call_panel(name="FILEBROWSER_PT_files", keep_open=True)
-            # 再次尝试设置目录
-            for window in context.window_manager.windows:
-                for area in window.screen.areas:
-                    if area.type == 'FILE_BROWSER':
-                        for space in area.spaces:
-                            if space.type == 'FILE_BROWSER':
-                                params = space.params
-                                if params:
-                                    dir_bytes = self.directory.encode('utf-8') + b'/'
-                                    params.directory = dir_bytes
-                                    area.tag_redraw()
-                                    return {'FINISHED'}
+            # 使用 Ctrl+O 打开 File Browser
+            bpy.ops.wm.file_external_operations(filepath=self.directory)
         except:
             pass
 
