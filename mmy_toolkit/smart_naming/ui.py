@@ -30,7 +30,7 @@ class MMY_PT_SmartNamingPanel(bpy.types.Panel):
         # === LOD 子集合 ===
         layout.separator()
         box = layout.box()
-        box.label(text="LOD 子集合", icon='MOD_LEVELSOFDETAIL')
+        box.label(text="LOD 子集合", icon='GROUP')
 
         row = box.row(align=True)
         row.operator("mmy.create_lod_collections", text="创建 LOD", icon='ADD')
@@ -94,7 +94,7 @@ def _append_to_outliner_menu(self, context):
     if context.collection:
         layout.separator()
         layout.operator("mmy.smart_duplicate_collection", text="智能复制集合", icon='OUTLINER_COLLECTION')
-        layout.operator("mmy.create_lod_collections", text="创建 LOD 子集合", icon='MOD_LEVELSOFDETAIL')
+        layout.operator("mmy.create_lod_collections", text="创建 LOD 子集合", icon='GROUP')
 
 
 def _append_to_outliner_context_menu(self, context):
