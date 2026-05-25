@@ -236,9 +236,14 @@ class VIEW3D_OT_mmy_sculpt_hud_modal(bpy.types.Operator):
         if not _HUD_STATE["enabled"]:
             return self._finish()
 
-        window = getattr(context, "window", None)
-        if window is None or window.as_pointer() != self._window_id:
+        # 不使用指针比较，因为 Blender 可能重新创建对象导致指针变化
+        # 只检查 enabled 状态和 modal_windows 中是否有记录
+        if self._window_id not in _HUD_STATE["modal_windows"]:
             return self._finish()
+
+        window = getattr(context, "window", None)
+        if window is None:
+            return {'PASS_THROUGH'}
 
         # 处理拖拽
         if self._dragging:
@@ -249,12 +254,15 @@ class VIEW3D_OT_mmy_sculpt_hud_modal(bpy.types.Operator):
                 self._end_drag()
                 return {'RUNNING_MODAL'}
 
+        # 鼠标移动时更新 hover（每 10 次打印一次避免日志过多）
         if event.type == 'MOUSEMOVE':
             self._update_hover(window, event.mouse_x, event.mouse_y)
             return {'PASS_THROUGH'}
 
+        # 点击事件
         if event.type == 'LEFTMOUSE' and event.value == 'PRESS':
             area, region, space, button_id = find_button_at_point(window, event.mouse_x, event.mouse_y, self._area_id, self._region_id)
+            print(f"[MMY Sculpt] 左键点击: button_id={button_id}")
 
             if button_id is None or button_id == "HUD_AREA":
                 return {'PASS_THROUGH'}
