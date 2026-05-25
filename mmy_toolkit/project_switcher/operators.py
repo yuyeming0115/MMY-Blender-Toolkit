@@ -129,12 +129,19 @@ class MMY_OT_OpenProjectFile(bpy.types.Operator):
 
 
 class MMY_OT_OpenProjectDirectory(bpy.types.Operator):
-    """打开项目目录"""
+    """打开项目目录（单击=File Browser，Ctrl+单击=打开最近文件）"""
     bl_idname = "mmy.open_project_directory"
     bl_label = "打开项目目录"
     bl_options = {'REGISTER'}
 
     directory: bpy.props.StringProperty(default="")
+    open_recent_file: bpy.props.BoolProperty(default=False)
+
+    def invoke(self, context, event):
+        # Ctrl+单击：打开目录下最近的文件
+        if event.ctrl:
+            self.open_recent_file = True
+        return self.execute(context)
 
     def execute(self, context):
         # 如果没有指定目录，使用当前文件目录
@@ -149,13 +156,64 @@ class MMY_OT_OpenProjectDirectory(bpy.types.Operator):
             self.report({'ERROR'}, f"目录不存在: {self.directory}")
             return {'CANCELLED'}
 
-        if platform.system() == 'Windows':
-            subprocess.run(['explorer', self.directory])
-        elif platform.system() == 'Darwin':
-            subprocess.run(['open', self.directory])
+        if self.open_recent_file:
+            # Ctrl 模式：保存当前文件，打开该目录下最近的 .blend 文件
+            return self._open_recent_blend(context)
         else:
-            subprocess.run(['xdg-open', self.directory])
+            # 普通模式：在 File Browser 中切换到该目录
+            return self._open_in_file_browser(context)
 
+    def _open_in_file_browser(self, context):
+        """在 Blender File Browser 中打开目录"""
+        # 使用 wm.file_browser 操作
+        try:
+            # 方法1：直接打开 File Browser
+            bpy.ops.wm.file_browser(filepath=self.directory)
+            self.report({'INFO'}, f"已切换到: {self.directory}")
+        except:
+            # 方法2：如果方法1失败，用系统文件管理器
+            if platform.system() == 'Windows':
+                subprocess.run(['explorer', self.directory])
+            elif platform.system() == 'Darwin':
+                subprocess.run(['open', self.directory])
+            else:
+                subprocess.run(['xdg-open', self.directory])
+        return {'FINISHED'}
+
+    def _open_recent_blend(self, context):
+        """保存当前文件，打开目录下最近的 .blend 文件"""
+        # 获取目录下的 .blend 文件列表
+        blend_files = []
+        try:
+            for f in os.listdir(self.directory):
+                if f.endswith('.blend') and not f.startswith('.'):
+                    full_path = os.path.join(self.directory, f)
+                    mtime = os.path.getmtime(full_path)
+                    blend_files.append((f, mtime, full_path))
+        except Exception:
+            self.report({'ERROR'}, "无法读取目录")
+            return {'CANCELLED'}
+
+        if not blend_files:
+            self.report({'WARNING'}, "目录下没有 .blend 文件")
+            return {'CANCELLED'}
+
+        # 按修改时间排序，获取最近的文件
+        blend_files.sort(key=lambda x: x[1], reverse=True)
+        target_file = blend_files[0][2]
+
+        # 保存当前文件（如果有路径）
+        current_filepath = bpy.data.filepath
+        if current_filepath:
+            try:
+                bpy.ops.wm.save_mainfile()
+                self.report({'INFO'}, "已保存当前文件")
+            except:
+                self.report({'WARNING'}, "保存失败，继续打开新文件")
+
+        # 打开目标文件
+        bpy.ops.wm.open_mainfile(filepath=target_file)
+        self.report({'INFO'}, f"已打开: {blend_files[0][0]}")
         return {'FINISHED'}
 
 
