@@ -66,9 +66,16 @@ class MMY_OT_HUDLayoutReset(bpy.types.Operator):
     bl_options = {'INTERNAL'}
 
     def execute(self, context):
-        from .hud_state import _HUD_STATE
-        # 重置所有视窗的偏移值
-        _HUD_STATE["window_offsets"].clear()
+        from .hud_state import reset_global_offset
+        # 重置全局偏移值
+        reset_global_offset()
+        # 刷新所有 3D 视图
+        for window in context.window_manager.windows:
+            screen = getattr(window, "screen", None)
+            if screen:
+                for area in screen.areas:
+                    if area.type == "VIEW_3D":
+                        area.tag_redraw()
         return {'FINISHED'}
 
 
@@ -126,10 +133,9 @@ def find_button_at_point(window, mouse_x, mouse_y, area_id=None, region_id=None)
 
     layout_mode = getattr(prefs, "sculpt_hud_layout", "horizontal") if prefs else "horizontal"
 
-    # 使用视窗特定的偏移值（与 HUD 绘制保持一致）
-    window_id = window.as_pointer()
-    from .hud_state import get_window_offset
-    offset_x, offset_y = get_window_offset(window_id)
+    # 使用全局偏移值（所有窗口同步）
+    from .hud_state import get_global_offset
+    offset_x, offset_y = get_global_offset()
 
     from .hud_state import _DEFAULT_BUTTONS
     buttons = _DEFAULT_BUTTONS
@@ -321,15 +327,10 @@ class VIEW3D_OT_mmy_sculpt_hud_modal(bpy.types.Operator):
 
     def _start_drag(self, context, mouse_x, mouse_y):
         """开始拖拽"""
-        from .hud_state import get_window_offset
+        from .hud_state import get_global_offset
 
-        window = getattr(context, "window", None)
-        if window:
-            self._drag_window_id = window.as_pointer()
-            offset_x, offset_y = get_window_offset(self._drag_window_id)
-        else:
-            self._drag_window_id = None
-            offset_x, offset_y = 0.0, 0.0
+        # 使用全局偏移值
+        offset_x, offset_y = get_global_offset()
 
         self._dragging = True
         self._drag_start_x = mouse_x
@@ -339,22 +340,20 @@ class VIEW3D_OT_mmy_sculpt_hud_modal(bpy.types.Operator):
 
     def _update_drag_position(self, context, mouse_x, mouse_y):
         """更新拖拽位置"""
-        from .hud_state import set_window_offset
+        from .hud_state import set_global_offset
 
         window = getattr(context, "window", None)
         if not window:
             return
 
-        # 使用鼠标坐标查找鼠标所在的 area 和 region（而不是第一个 VIEW_3D）
+        # 使用鼠标坐标查找鼠标所在的 area 和 region
         area, region = None, None
         screen = getattr(window, "screen", None)
         if screen:
             for a in screen.areas:
-                # 检查鼠标是否在这个 area 内
                 if (a.x <= mouse_x <= a.x + a.width and
                     a.y <= mouse_y <= a.y + a.height):
                     area = a
-                    # 查找鼠标所在的 region
                     for r in a.regions:
                         if (r.x <= mouse_x <= r.x + r.width and
                             r.y <= mouse_y <= r.y + r.height):
@@ -369,13 +368,17 @@ class VIEW3D_OT_mmy_sculpt_hud_modal(bpy.types.Operator):
         delta_x = (mouse_x - self._drag_start_x) / region.width
         delta_y = (mouse_y - self._drag_start_y) / region.height
 
-        # 更新视窗特定的偏移值（使用开始拖拽时记录的窗口 ID）
+        # 更新全局偏移值（所有窗口同步）
         new_offset_x = self._drag_start_offset_x + delta_x
         new_offset_y = self._drag_start_offset_y + delta_y
-        set_window_offset(self._drag_window_id, new_offset_x, new_offset_y)
+        set_global_offset(new_offset_x, new_offset_y)
 
-        # 刷新视图
-        area.tag_redraw()
+        # 刷新所有 3D 视图（确保同步）
+        screen = getattr(window, "screen", None)
+        if screen:
+            for a in screen.areas:
+                if a.type == "VIEW_3D":
+                    a.tag_redraw()
 
     def _end_drag(self):
         """结束拖拽"""

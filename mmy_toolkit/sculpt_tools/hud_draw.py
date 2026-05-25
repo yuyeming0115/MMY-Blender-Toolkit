@@ -56,10 +56,9 @@ def _draw_sculpt_hud_inner():
 
     layout_mode = getattr(prefs, "sculpt_hud_layout", "horizontal") if prefs else "horizontal"
 
-    # 使用视窗特定的偏移值
-    window_id = window.as_pointer()
-    from .hud_state import get_window_offset
-    offset_x, offset_y = get_window_offset(window_id)
+    # 使用全局偏移值（所有窗口同步）
+    from .hud_state import get_global_offset
+    offset_x, offset_y = get_global_offset()
 
     # 计算位置（包含拖拽把手）
     buttons = _DEFAULT_BUTTONS

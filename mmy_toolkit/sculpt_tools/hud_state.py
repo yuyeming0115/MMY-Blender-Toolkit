@@ -13,8 +13,9 @@ _HUD_STATE = {
     "modal_running": False,
     "timer_active": False,   # Timer 是否激活
     "draw_handler": None,
-    # 视窗特定的偏移值存储 (window_id -> (offset_x, offset_y))
-    "window_offsets": {},
+    # 全局 HUD 偏移值（所有窗口同步）
+    "global_offset_x": 0.0,
+    "global_offset_y": 0.0,
 }
 
 # 默认按钮列表
@@ -29,29 +30,30 @@ def reset_hud_runtime_state():
     _HUD_STATE["drag_region_key"] = None
     _HUD_STATE["modal_windows"].clear()
     _HUD_STATE["modal_running"] = False
-    # 注意：不重置 timer_active，由 Timer 管理器控制
 
 
-def get_window_offset(window_id):
-    """获取指定视窗的偏移值"""
-    return _HUD_STATE["window_offsets"].get(window_id, (0.0, 0.0))
+def get_global_offset():
+    """获取全局 HUD 偏移值"""
+    return _HUD_STATE["global_offset_x"], _HUD_STATE["global_offset_y"]
 
 
-def set_window_offset(window_id, offset_x, offset_y):
-    """设置指定视窗的偏移值"""
-    _HUD_STATE["window_offsets"][window_id] = (offset_x, offset_y)
+def set_global_offset(offset_x, offset_y):
+    """设置全局 HUD 偏移值"""
+    _HUD_STATE["global_offset_x"] = offset_x
+    _HUD_STATE["global_offset_y"] = offset_y
 
 
-def reset_window_offset(window_id):
-    """重置指定视窗的偏移值"""
-    _HUD_STATE["window_offsets"][window_id] = (0.0, 0.0)
+def reset_global_offset():
+    """重置全局 HUD 偏移值"""
+    _HUD_STATE["global_offset_x"] = 0.0
+    _HUD_STATE["global_offset_y"] = 0.0
 
 
 __all__ = [
     '_HUD_STATE',
     '_DEFAULT_BUTTONS',
     'reset_hud_runtime_state',
-    'get_window_offset',
-    'set_window_offset',
-    'reset_window_offset',
+    'get_global_offset',
+    'set_global_offset',
+    'reset_global_offset',
 ]
