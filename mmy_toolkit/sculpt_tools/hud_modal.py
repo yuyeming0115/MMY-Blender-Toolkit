@@ -586,8 +586,15 @@ class VIEW3D_OT_mmy_sculpt_hud_modal(bpy.types.Operator):
         if not area or not region or area.type != "VIEW_3D":
             return
 
-        delta_x = (mouse_x - self._drag_start_x) / region.width
-        delta_y = (mouse_y - self._drag_start_y) / region.height
+        # 获取有效视口边界（使用实际可用空间）
+        space = area.spaces.active if area.spaces.active else None
+        if not space:
+            return
+        bounds = get_effective_viewport_bounds(area, space, region)
+
+        # 使用有效边界高度计算偏移（HUD 只能在这个范围内移动）
+        delta_x = (mouse_x - self._drag_start_x) / bounds["width"]
+        delta_y = (mouse_y - self._drag_start_y) / bounds["height"]
         set_global_offset(self._drag_start_offset_x + delta_x, self._drag_start_offset_y + delta_y)
 
         screen = getattr(window, "screen", None)
