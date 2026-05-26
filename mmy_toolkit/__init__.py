@@ -113,6 +113,46 @@ class MMY_SuffixItem(bpy.types.PropertyGroup):
 
 
 # ============ Operators ============
+class MMY_OT_GetDirectoryName(bpy.types.Operator):
+    """获取当前目录名称作为文件名"""
+    bl_idname = "mmy.get_directory_name"
+    bl_label = "获取目录名"
+    bl_description = "将当前文件夹名称设为保存文件名"
+    bl_options = {'REGISTER'}
+
+    def execute(self, context):
+        import os
+        params = context.space_data.params
+        if not params:
+            self.report({'WARNING'}, "无法获取参数")
+            return {'CANCELLED'}
+
+        directory = params.directory
+        if not directory:
+            self.report({'WARNING'}, "无法获取目录路径")
+            return {'CANCELLED'}
+
+        # params.directory 可能是 bytes 类型，需要解码
+        if isinstance(directory, bytes):
+            directory = directory.decode('utf-8')
+
+        directory = directory.rstrip('\\/').rstrip('/')
+        folder_name = os.path.basename(directory)
+
+        if not folder_name:
+            self.report({'WARNING'}, "无法提取文件夹名称")
+            return {'CANCELLED'}
+
+        params.filename = folder_name
+        self.report({'INFO'}, f"文件名已设为: {folder_name}")
+        return {'FINISHED'}
+
+    @classmethod
+    def poll(cls, context):
+        space = context.space_data
+        return space and space.type == 'FILE_BROWSER' and space.params
+
+
 class MMY_OT_SaveWithSuffix(bpy.types.Operator):
     bl_idname = "mmy.save_with_suffix"
     bl_label = "Save with suffix"
@@ -682,6 +722,9 @@ def draw_suffix_menu(self, context):
     row = layout.row(align=True)
     row.label(text="快速后缀:")
 
+    # 获取目录名按钮
+    row.operator("mmy.get_directory_name", text="", icon="FILE_FOLDER")
+
     # 从偏好设置获取后缀
     prefs = context.preferences.addons.get("mmy_toolkit")
     if prefs and prefs.preferences and len(prefs.preferences.current_suffixes) > 0:
@@ -743,6 +786,7 @@ def draw_statusbar_backup(self, context):
 # ============ 所有类 ============
 _classes = (
     MMY_SuffixItem,
+    MMY_OT_GetDirectoryName,
     MMY_OT_SaveWithSuffix,
     MMY_OT_SelectPreset,
     MMY_OT_AddSuffix,

@@ -1,4 +1,5 @@
 import bpy
+import os
 
 from ..config import (
     get_current_suffixes,
@@ -8,6 +9,43 @@ from ..config import (
     update_preset,
 )
 from ..utils import apply_suffix
+
+
+class MMY_OT_GetDirectoryName(bpy.types.Operator):
+    """获取当前目录名称作为文件名"""
+    bl_idname = "mmy.get_directory_name"
+    bl_label = "获取目录名"
+    bl_description = "将当前文件夹名称设为保存文件名"
+
+    def execute(self, context):
+        params = context.space_data.params
+        if not params:
+            self.report({'WARNING'}, "无法获取参数")
+            return {'CANCELLED'}
+
+        # 获取当前目录路径
+        directory = params.directory
+        if not directory:
+            self.report({'WARNING'}, "无法获取目录路径")
+            return {'CANCELLED'}
+
+        # 提取文件夹名称（去除路径分隔符）
+        directory = directory.rstrip('\\/').rstrip('/')
+        folder_name = os.path.basename(directory)
+
+        if not folder_name:
+            self.report({'WARNING'}, "无法提取文件夹名称")
+            return {'CANCELLED'}
+
+        # 设置文件名
+        params.filename = folder_name
+        self.report({'INFO'}, f"文件名已设为: {folder_name}")
+        return {'FINISHED'}
+
+    @classmethod
+    def poll(cls, context):
+        space = context.space_data
+        return space and space.type == 'FILE_BROWSER' and space.params
 
 
 class MMY_OT_SaveWithSuffix(bpy.types.Operator):
@@ -93,6 +131,9 @@ def draw_suffix_menu(self, context):
     layout = self.layout
     row = layout.row(align=True)
     row.label(text="快速后缀:")
+
+    # 获取目录名按钮
+    row.operator("mmy.get_directory_name", text="", icon="FILE_FOLDER")
 
     # 从偏好设置获取后缀
     prefs = context.preferences.addons.get("mmy_toolkit")
