@@ -178,14 +178,22 @@ def _check_button_active(space, obj, button_id):
         # 动态拓扑状态检查
         try:
             if sculpt:
-                # 检查多种可能的属性
-                detail_type_method = getattr(sculpt, 'detail_type_method', None)
-                print(f"[MMY Sculpt] 动态拓扑 detail_type_method={detail_type_method}")
-                # 动态拓扑开启时可能有特定的值
-                # 如果方法存在且不是 NONE，则认为开启
-                return detail_type_method is not None
-        except:
-            pass
+                # 尝试多种检查方式
+                attrs = [a for a in dir(sculpt) if 'dyn' in a.lower() or 'topo' in a.lower()]
+                print(f"[MMY Sculpt] 动态拓扑相关属性(dyn/topo): {attrs}")
+
+                # 检查 use_dyntopo 或类似属性
+                for attr in attrs:
+                    val = getattr(sculpt, attr, None)
+                    print(f"[MMY Sculpt] {attr}={val}")
+
+                # 尝试检查 constant_detail_resolution 是否有意义
+                constant_detail = getattr(sculpt, 'constant_detail_resolution', None)
+                print(f"[MMY Sculpt] constant_detail_resolution={constant_detail}")
+
+                return False  # 暂时返回 False，等确定正确判断方式
+        except Exception as e:
+            print(f"[MMY Sculpt] 动态拓扑检查失败: {e}")
         return False
     elif button_id == "add":
         return False
