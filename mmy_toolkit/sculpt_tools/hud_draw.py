@@ -177,21 +177,29 @@ def _check_button_active(space, obj, button_id):
     elif button_id == "dynamic_topology":
         # 动态拓扑状态检查
         try:
+            # 方法1：检查 mesh 对象是否有 dyntopo 属性
+            mesh = obj.data if obj and obj.type == 'MESH' else None
+            if mesh:
+                mesh_attrs = [a for a in dir(mesh) if 'dyn' in a.lower() or 'topo' in a.lower() or 'sculpt' in a.lower()]
+                for attr in mesh_attrs:
+                    val = getattr(mesh, attr, None)
+                    if val is not None and not callable(val):
+                        print(f"[MMY Sculpt] mesh.{attr}={val}")
+
+                # Blender 4.x+: mesh.use_dynamic_topology_sculpting
+                dyntopo_mesh = getattr(mesh, 'use_dynamic_topology_sculpting', None)
+                print(f"[MMY Sculpt] mesh.use_dynamic_topology_sculpting={dyntopo_mesh}")
+
+            # 方法2：检查 sculpt.use_dyntopo
             if sculpt:
-                # 尝试多种检查方式
-                attrs = [a for a in dir(sculpt) if 'dyn' in a.lower() or 'topo' in a.lower()]
-                print(f"[MMY Sculpt] 动态拓扑相关属性(dyn/topo): {attrs}")
+                dyntopo_sculpt = getattr(sculpt, 'use_dyntopo', None)
+                print(f"[MMY Sculpt] sculpt.use_dyntopo={dyntopo_sculpt}")
 
-                # 检查 use_dyntopo 或类似属性
-                for attr in attrs:
-                    val = getattr(sculpt, attr, None)
-                    print(f"[MMY Sculpt] {attr}={val}")
+                # 方法3：检查 sculpt.detail_type_method（开/关可能不同）
+                detail_type = getattr(sculpt, 'detail_type_method', None)
+                print(f"[MMY Sculpt] sculpt.detail_type_method={detail_type}")
 
-                # 尝试检查 constant_detail_resolution 是否有意义
-                constant_detail = getattr(sculpt, 'constant_detail_resolution', None)
-                print(f"[MMY Sculpt] constant_detail_resolution={constant_detail}")
-
-                return False  # 暂时返回 False，等确定正确判断方式
+            return False  # 暂时返回 False，等确定正确属性
         except Exception as e:
             print(f"[MMY Sculpt] 动态拓扑检查失败: {e}")
         return False
