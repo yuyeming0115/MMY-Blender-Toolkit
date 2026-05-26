@@ -10,8 +10,17 @@ _AVAILABLE_BUTTONS = {
     "dynamic_topology": {"symbol": "⚡", "label": "动态", "action": "toggle_dyntopo"},
 }
 
-# 用户当前启用的按钮列表（默认配置）
+# 默认用户按钮列表
 _DEFAULT_USER_BUTTONS = ["face_sets", "mask", "wireframe"]
+
+# HUD 常量（用于计算高度）
+_HUD_BUTTON_HEIGHT = 24
+_HUD_HANDLE_WIDTH = 20
+_HUD_MARGIN = 10
+_HUD_BUTTON_GAP = 4
+
+# 预留的顶部安全区域（Header 高度约 30-40px，加上透明层约 50px）
+_TOP_SAFE_MARGIN = 50
 
 # HUD 运行时状态
 _HUD_STATE = {
@@ -55,13 +64,27 @@ def get_global_offset():
 
 
 def set_global_offset(offset_x, offset_y):
-    """设置全局 HUD 偏移值（限制范围确保 HUD 不超出屏幕）"""
-    # 限制 offset 范围，确保 HUD 基本在屏幕内
-    # 水平方向允许较大范围
+    """设置全局 HUD 偏移值（动态计算边界确保 HUD 不超出屏幕）"""
+    # 水平方向限制
     _HUD_STATE["global_offset_x"] = max(-0.35, min(0.35, offset_x))
-    # 向上（负值）限制非常严格，防止被多层 Header 遮挡
-    # Blender Header 有透明层，需要预留更多空间
-    _HUD_STATE["global_offset_y"] = max(-0.15, min(0.30, offset_y))
+
+    # 动态计算垂直方向限制（根据按钮数量）
+    button_count = len(_HUD_STATE["user_buttons"]) + 1  # +1 for add button
+
+    # 计算 HUD 高度（垂直布局）
+    total_height = _HUD_HANDLE_WIDTH + button_count * _HUD_BUTTON_HEIGHT + (button_count - 1) * _HUD_BUTTON_GAP + 2 * _HUD_MARGIN
+
+    # 估算 region 高度（假设典型值 800px）
+    estimated_region_height = 800
+
+    # 计算最小 offset_y（确保 HUD 顶部 >= _TOP_SAFE_MARGIN）
+    # 公式：region.height * 0.5 + offset_y * region.height - total_height * 0.5 >= _TOP_SAFE_MARGIN
+    min_offset_y = (_TOP_SAFE_MARGIN + total_height * 0.5 - estimated_region_height * 0.5) / estimated_region_height
+
+    # 确保限制值合理（不能太大，否则 HUD 无法移动）
+    min_offset_y = max(-0.35, min(0, min_offset_y))
+
+    _HUD_STATE["global_offset_y"] = max(min_offset_y, min(0.30, offset_y))
 
 
 def reset_global_offset():
