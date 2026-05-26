@@ -566,7 +566,7 @@ class VIEW3D_OT_mmy_sculpt_hud_modal(bpy.types.Operator):
         self._drag_start_offset_y = offset_y
 
     def _update_drag_position(self, context, mouse_x, mouse_y):
-        from .hud_state import set_global_offset
+        from .hud_state import set_global_offset, get_global_offset
         window = getattr(context, "window", None)
         if not window:
             return
@@ -592,10 +592,38 @@ class VIEW3D_OT_mmy_sculpt_hud_modal(bpy.types.Operator):
             return
         bounds = get_effective_viewport_bounds(area, space, region)
 
-        # 使用有效边界高度计算偏移（HUD 只能在这个范围内移动）
+        # 使用有效边界高度计算偏移
         delta_x = (mouse_x - self._drag_start_x) / bounds["width"]
         delta_y = (mouse_y - self._drag_start_y) / bounds["height"]
-        set_global_offset(self._drag_start_offset_x + delta_x, self._drag_start_offset_y + delta_y)
+
+        new_offset_x = self._drag_start_offset_x + delta_x
+        new_offset_y = self._drag_start_offset_y + delta_y
+
+        # 限制 offset 范围，防止超出边界后"卡住"
+        # 当到达边界时，更新起点以保持响应
+        max_offset = 0.5
+        min_offset = -0.5
+
+        # 如果超出边界，更新起点位置
+        if new_offset_y > max_offset:
+            new_offset_y = max_offset
+            self._drag_start_y = mouse_y
+            self._drag_start_offset_y = max_offset
+        elif new_offset_y < min_offset:
+            new_offset_y = min_offset
+            self._drag_start_y = mouse_y
+            self._drag_start_offset_y = min_offset
+
+        if new_offset_x > max_offset:
+            new_offset_x = max_offset
+            self._drag_start_x = mouse_x
+            self._drag_start_offset_x = max_offset
+        elif new_offset_x < min_offset:
+            new_offset_x = min_offset
+            self._drag_start_x = mouse_x
+            self._drag_start_offset_x = min_offset
+
+        set_global_offset(new_offset_x, new_offset_y)
 
         screen = getattr(window, "screen", None)
         if screen:
