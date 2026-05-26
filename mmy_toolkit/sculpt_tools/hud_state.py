@@ -1,5 +1,7 @@
 """雕刻 HUD 状态管理"""
 
+import bpy
+
 # 所有可用按钮定义（id -> {symbol, label, action_type}）
 _AVAILABLE_BUTTONS = {
     "face_sets": {"symbol": "◈", "label": "面组", "action": "toggle_overlay"},
@@ -35,9 +37,6 @@ _HUD_STATE = {
     "modal_running": False,
     "timer_active": False,   # Timer 是否激活
     "draw_handler": None,
-    # 全局 HUD 偏移值（所有窗口同步）
-    "global_offset_x": 0.0,
-    "global_offset_y": 0.0,
     # 用户按钮配置（存储用户选择的按钮列表）
     "user_buttons": ["face_sets", "mask", "wireframe", "backface_culling", "symmetry", "dynamic_topology"],
     # 手动跟踪状态（Blender API 不直接暴露）
@@ -46,6 +45,36 @@ _HUD_STATE = {
     "symmetry_y": False,      # 对称 Y 轴状态
     "symmetry_z": False,      # 对称 Z 轴状态
 }
+
+
+# ============ Scene 属性（按文件记忆） ============
+
+def register_scene_properties():
+    """注册 Scene 属性用于按文件记忆 HUD 位置"""
+    bpy.types.Scene.sculpt_hud_offset_x = bpy.props.FloatProperty(
+        name="HUD 水平偏移",
+        default=0.0,
+        min=-0.5,
+        max=0.5
+    )
+    bpy.types.Scene.sculpt_hud_offset_y = bpy.props.FloatProperty(
+        name="HUD 垂直偏移",
+        default=0.0,
+        min=-1.5,
+        max=1.5
+    )
+
+
+def unregister_scene_properties():
+    """注销 Scene 属性"""
+    try:
+        del bpy.types.Scene.sculpt_hud_offset_x
+    except:
+        pass
+    try:
+        del bpy.types.Scene.sculpt_hud_offset_y
+    except:
+        pass
 
 
 def reset_hud_runtime_state():
@@ -59,26 +88,53 @@ def reset_hud_runtime_state():
 
 
 def get_global_offset():
-    """获取全局 HUD 偏移值"""
-    return _HUD_STATE["global_offset_x"], _HUD_STATE["global_offset_y"]
+    """获取 HUD 偏移值（根据偏好设置选择全局或按文件）"""
+    context = bpy.context
+    addon = context.preferences.addons.get("mmy_toolkit")
+    prefs = addon.preferences if addon else None
+
+    if prefs and prefs.sculpt_hud_per_file_position:
+        # 按文件记忆：从 Scene 属性获取
+        scene = context.scene
+        return scene.sculpt_hud_offset_x, scene.sculpt_hud_offset_y
+    else:
+        # 全局记忆：从偏好设置获取
+        if prefs:
+            return prefs.sculpt_hud_global_offset_x, prefs.sculpt_hud_global_offset_y
+        else:
+            return _HUD_STATE.get("global_offset_x", 0.0), _HUD_STATE.get("global_offset_y", 0.0)
 
 
 def set_global_offset(offset_x, offset_y):
-    """设置全局 HUD 偏移值
+    """设置 HUD 偏移值（根据偏好设置选择全局或按文件）"""
+    context = bpy.context
+    addon = context.preferences.addons.get("mmy_toolkit")
+    prefs = addon.preferences if addon else None
 
-    边界限制放宽，实际的边缘吸附和安全距离在绘制时处理。
-    """
     # 水平方向限制
-    _HUD_STATE["global_offset_x"] = max(-0.5, min(0.5, offset_x))
+    offset_x = max(-0.5, min(0.5, offset_x))
+    # 垂直方向放宽限制
+    offset_y = max(-1.0, min(1.0, offset_y))
 
-    # 垂直方向放宽限制（边缘吸附在绘制时处理）
-    _HUD_STATE["global_offset_y"] = max(-1.0, min(1.0, offset_y))
+    if prefs and prefs.sculpt_hud_per_file_position:
+        # 按文件记忆：存储到 Scene 属性
+        scene = context.scene
+        scene.sculpt_hud_offset_x = offset_x
+        scene.sculpt_hud_offset_y = offset_y
+    else:
+        # 全局记忆：存储到偏好设置
+        if prefs:
+            prefs.sculpt_hud_global_offset_x = offset_x
+            prefs.sculpt_hud_global_offset_y = offset_y
+        else:
+            # 偏好设置不可用时，存储到内存
+            _HUD_STATE["global_offset_x"] = offset_x
+            _HUD_STATE["global_offset_y"] = offset_y
 
 
 def reset_global_offset():
-    """重置全局 HUD 偏移值"""
-    _HUD_STATE["global_offset_x"] = 0.0
-    _HUD_STATE["global_offset_y"] = 0.0
+    """重置 HUD 偏移值为默认"""
+    set_global_offset(0.0, 0.0)
 
 
 def get_user_buttons():
@@ -112,6 +168,8 @@ __all__ = [
     '_HUD_STATE',
     '_AVAILABLE_BUTTONS',
     '_DEFAULT_USER_BUTTONS',
+    'register_scene_properties',
+    'unregister_scene_properties',
     'reset_hud_runtime_state',
     'get_global_offset',
     'set_global_offset',

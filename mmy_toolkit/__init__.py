@@ -457,19 +457,53 @@ class MMY_Preferences(bpy.types.AddonPreferences):
         ],
         default='horizontal'
     )
-    sculpt_hud_offset_x: bpy.props.FloatProperty(
-        name="水平偏移",
-        description="悬浮按钮的水平位置偏移比例",
+    # 全局位置记忆（默认方案）
+    sculpt_hud_global_offset_x: bpy.props.FloatProperty(
+        name="全局水平偏移",
+        description="悬浮按钮的全局水平位置偏移比例",
         default=0.0,
         min=-0.5,
         max=0.5
     )
-    sculpt_hud_offset_y: bpy.props.FloatProperty(
-        name="垂直偏移",
-        description="悬浮按钮的垂直位置偏移比例",
+    sculpt_hud_global_offset_y: bpy.props.FloatProperty(
+        name="全局垂直偏移",
+        description="悬浮按钮的全局垂直位置偏移比例",
         default=0.0,
         min=-1.5,
         max=1.5
+    )
+    # 按文件记忆开关
+    sculpt_hud_per_file_position: bpy.props.BoolProperty(
+        name="按文件记忆位置",
+        description="开启后每个文件有独立的HUD位置，关闭则全局共享位置",
+        default=False
+    )
+
+    # === 初始化面组快捷选项 ===
+    init_loose_parts: bpy.props.BoolProperty(
+        name="按松散块",
+        description="在右键菜单一级显示\"按松散块\"",
+        default=True
+    )
+    init_materials: bpy.props.BoolProperty(
+        name="按材质",
+        description="在右键菜单一级显示\"按材质\"",
+        default=True
+    )
+    init_uv_seams: bpy.props.BoolProperty(
+        name="按UV边界",
+        description="在右键菜单一级显示\"按UV边界\"",
+        default=True
+    )
+    init_creases: bpy.props.BoolProperty(
+        name="按折痕",
+        description="在右键菜单一级显示\"按折痕\"",
+        default=True
+    )
+    init_sharp_edges: bpy.props.BoolProperty(
+        name="按尖锐边",
+        description="在右键菜单一级显示\"按尖锐边\"",
+        default=True
     )
 
     def draw(self, context):
@@ -636,6 +670,39 @@ class MMY_Preferences(bpy.types.AddonPreferences):
         row = box.row()
         row.prop(self, "geometry_nodes_asset_path", text="资产库路径")
         box.label(text="一键切换所有修改器的视口显示状态")
+
+        layout.separator()
+
+        # === 初始化面组快捷选项 ===
+        layout.label(text="初始化面组快捷选项:", icon='GROUP_VERTEX')
+        box = layout.box()
+        row = box.row()
+        row.prop(self, "init_loose_parts")
+        row.prop(self, "init_materials")
+        row = box.row()
+        row.prop(self, "init_uv_seams")
+        row.prop(self, "init_creases")
+        row = box.row()
+        row.prop(self, "init_sharp_edges")
+        box.label(text="勾选的选项将显示在雕刻右键菜单一级界面")
+
+        layout.separator()
+
+        # === 雕刻HUD位置记忆 ===
+        layout.label(text="雕刻HUD位置记忆:", icon='VIEW3D')
+        box = layout.box()
+        row = box.row()
+        row.prop(self, "sculpt_hud_per_file_position")
+        if not self.sculpt_hud_per_file_position:
+            box.label(text="全局位置（所有文件共享）:")
+            row = box.row()
+            row.prop(self, "sculpt_hud_global_offset_x", text="水平")
+            row.prop(self, "sculpt_hud_global_offset_y", text="垂直")
+        else:
+            box.label(text="按文件记忆（每个文件独立位置，保存文件时生效）")
+        # 布局方向
+        row = box.row()
+        row.prop(self, "sculpt_hud_layout", text="布局")
 
         layout.separator()
 

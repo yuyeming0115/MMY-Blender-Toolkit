@@ -649,8 +649,9 @@ class VIEW3D_OT_mmy_sculpt_hud_modal(bpy.types.Operator):
     def _activate_button(self, context, space, button_id):
         """激活按钮功能"""
         obj = context.active_object
-        overlay = space.overlay if space else None
-        shading = space.shading if space else None
+        # 使用 getattr 安全获取属性（避免 SpaceTextEditor 等非 VIEW_3D 类型报错）
+        overlay = getattr(space, 'overlay', None) if space else None
+        shading = getattr(space, 'shading', None) if space else None
         tool_settings = context.tool_settings
         sculpt = tool_settings.sculpt if tool_settings else None
 

@@ -8,6 +8,23 @@ from .hud_modal import register as register_modal, unregister as unregister_moda
 
 # ============ 面组右键菜单 ============
 
+class MMY_MT_SculptFaceSetsInit(bpy.types.Menu):
+    """初始化面组子菜单"""
+    bl_idname = "MMY_MT_sculpt_face_sets_init"
+    bl_label = "初始化面组"
+
+    def draw(self, context):
+        layout = self.layout
+        layout.operator("sculpt.face_sets_init", text="按松散块").mode = 'LOOSE_PARTS'
+        layout.operator("sculpt.face_sets_init", text="按材质").mode = 'MATERIALS'
+        layout.operator("sculpt.face_sets_init", text="按法向").mode = 'NORMALS'
+        layout.operator("sculpt.face_sets_init", text="按UV边界").mode = 'UV_SEAMS'
+        layout.operator("sculpt.face_sets_init", text="按折痕").mode = 'CREASES'
+        layout.operator("sculpt.face_sets_init", text="按倒角权重").mode = 'BEVEL_WEIGHT'
+        layout.operator("sculpt.face_sets_init", text="按尖锐边").mode = 'SHARP_EDGES'
+        layout.operator("sculpt.face_sets_init", text="按面组边界").mode = 'FACE_SET_BOUNDARIES'
+
+
 class MMY_MT_SculptFaceSets(bpy.types.Menu):
     """面组菜单"""
     bl_idname = "MMY_MT_sculpt_face_sets"
@@ -15,6 +32,7 @@ class MMY_MT_SculptFaceSets(bpy.types.Menu):
 
     def draw(self, context):
         layout = self.layout
+        obj = context.active_object
 
         # 创建面组
         layout.label(text="创建")
@@ -27,14 +45,6 @@ class MMY_MT_SculptFaceSets(bpy.types.Menu):
         # 可见性控制
         layout.label(text="可见性")
         layout.operator("sculpt.face_set_change_visibility", text="切换显示")
-        layout.operator("sculpt.face_set_invert_visibility", text="反转可见性")
-
-        layout.separator()
-
-        # 全局控制
-        layout.label(text="全局")
-        layout.operator("sculpt.face_set_hide_all", text="隐藏全部")
-        layout.operator("sculpt.face_set_show_all", text="显示全部")
 
         layout.separator()
 
@@ -44,7 +54,7 @@ class MMY_MT_SculptFaceSets(bpy.types.Menu):
         layout.operator("sculpt.face_set_edit", text="收缩面组").mode = 'SHRINK'
 
 
-_classes = (MMY_MT_SculptFaceSets,)
+_classes = (MMY_MT_SculptFaceSetsInit, MMY_MT_SculptFaceSets)
 
 
 def _draw_sculpt_context_menu(self, context):
@@ -56,7 +66,33 @@ def _draw_sculpt_context_menu(self, context):
     layout = self.layout
     layout.separator()
 
-    # 添加面组菜单
+    # 获取偏好设置
+    addon = context.preferences.addons.get("mmy_toolkit")
+    prefs = addon.preferences if addon else None
+
+    # 初始化面组快捷选项（一行排列，方形按钮）
+    if prefs:
+        init_options = [
+            (prefs.init_loose_parts, "松散", 'LOOSE_PARTS'),
+            (prefs.init_materials, "材质", 'MATERIALS'),
+            (prefs.init_uv_seams, "UV", 'UV_SEAMS'),
+            (prefs.init_creases, "折痕", 'CREASES'),
+            (prefs.init_sharp_edges, "尖锐", 'SHARP_EDGES'),
+        ]
+
+        # 收集已启用的选项
+        enabled_options = [(label, mode) for enabled, label, mode in init_options if enabled]
+
+        if enabled_options:
+            row = layout.row(align=True)
+            row.label(text="初始化:")
+            for label, mode in enabled_options:
+                row.operator("sculpt.face_sets_init", text=label).mode = mode
+
+    # 初始化面组完整子菜单（包含所有选项）
+    layout.menu("MMY_MT_sculpt_face_sets_init", text="初始化面组 (全部)", icon='GROUP_VERTEX')
+
+    # 面组菜单
     layout.menu("MMY_MT_sculpt_face_sets", text="面组", icon='GROUP_VERTEX')
 
 
@@ -142,6 +178,10 @@ def _stop_hud_timer():
 
 def register():
     """注册模块"""
+    # 注册 Scene 属性（按文件记忆）
+    from .hud_state import register_scene_properties
+    register_scene_properties()
+
     # 启用 HUD
     _HUD_STATE["enabled"] = True
     reset_hud_runtime_state()
@@ -215,6 +255,10 @@ def _on_file_loaded(dummy):
 
 def unregister():
     """注销模块"""
+    # 注销 Scene 属性
+    from .hud_state import unregister_scene_properties
+    unregister_scene_properties()
+
     # 禁用 HUD
     _HUD_STATE["enabled"] = False
     reset_hud_runtime_state()
