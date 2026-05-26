@@ -175,10 +175,11 @@ def _check_button_active(space, obj, button_id):
             return getattr(sculpt, 'use_symmetry_x', False)
         return False
     elif button_id == "dynamic_topology":
-        # 动态拓扑（检查是否有 detail_size 属性，存在则开启）
+        # 动态拓扑（检查 detail_type 属性是否存在且有效）
         if sculpt:
-            # 动态拓扑开启时会有 detail_size 属性
-            return hasattr(sculpt, 'detail_size') or hasattr(sculpt, 'detail_type')
+            # 动态拓扑开启时，detail_type 会是 'RELATIVE' 或 'CONSTANT'
+            detail_type = getattr(sculpt, 'detail_type', None)
+            return detail_type is not None and detail_type in ('RELATIVE', 'CONSTANT', 'MANUAL')
         return False
     elif button_id == "add":
         return False
