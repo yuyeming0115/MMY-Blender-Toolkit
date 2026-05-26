@@ -12,6 +12,11 @@ HUD_CORNER_RADIUS = 6
 HUD_MARGIN = 10
 HUD_HANDLE_WIDTH = 20  # 拖拽把手宽度
 
+# 边缘吸附相关常量
+HUD_EDGE_SNAP_THRESHOLD = 50  # 吸附触发阈值（像素）
+HUD_TOP_SAFE_MARGIN = 80  # 顶部安全距离（Header + 透明层）
+HUD_BOTTOM_SAFE_MARGIN = 20  # 底部安全距离
+
 # 颜色
 HUD_BG_COLOR = (0.15, 0.15, 0.15, 0.85)
 HUD_BORDER_COLOR = (0.3, 0.3, 0.3, 0.9)
@@ -67,90 +72,161 @@ def _draw_sculpt_hud_inner():
     button_count = len(buttons)
 
     handle_width = HUD_HANDLE_WIDTH
-    if layout_mode == "horizontal":
-        total_width = handle_width + button_count * HUD_BUTTON_WIDTH + (button_count - 1) * HUD_BUTTON_GAP + HUD_MARGIN * 2
-        total_height = HUD_BUTTON_HEIGHT + HUD_MARGIN * 2
-        start_x = region.width * 0.5 + offset_x * region.width - total_width * 0.5
-        start_y = region.height * 0.5 + offset_y * region.height - total_height * 0.5
-    else:
-        total_width = HUD_BUTTON_WIDTH + HUD_MARGIN * 2
-        total_height = handle_width + button_count * HUD_BUTTON_HEIGHT + (button_count - 1) * HUD_BUTTON_GAP + HUD_MARGIN * 2
-        start_x = region.width * 0.5 + offset_x * region.width - total_width * 0.5
-        start_y = region.height * 0.5 + offset_y * region.height - total_height * 0.5
 
-    # 绘制背景
+    # 导入绘制工具
     from .draw_utils import draw_rounded_rect, draw_rounded_rect_outline, draw_text
-    draw_rounded_rect(start_x, start_y, total_width, total_height, HUD_BG_COLOR, HUD_CORNER_RADIUS)
-    draw_rounded_rect_outline(start_x, start_y, total_width, total_height, HUD_BORDER_COLOR, HUD_CORNER_RADIUS)
 
-    # 绘制拖拽把手
+    # ============ 新的位置计算逻辑（借鉴 FocusMode） ============
+
+    # 计算把手位置（作为锚点）
+    if layout_mode == "horizontal":
+        # 水平布局：把手高度 = HUD 高度
+        hud_height = HUD_BUTTON_HEIGHT + HUD_MARGIN * 2
+        handle_button_height = hud_height
+
+        # 计算把手 Y 位置（带偏移）
+        base_y = region.height * 0.5 - hud_height * 0.5
+        handle_y = base_y + offset_y * region.height
+
+        # 边缘吸附：限制把手在安全区域内
+        # 顶部安全距离
+        max_y = region.height - HUD_TOP_SAFE_MARGIN - hud_height
+        # 底部安全距离
+        min_y = HUD_BOTTOM_SAFE_MARGIN
+        handle_y = max(min_y, min(max_y, handle_y))
+
+        # 计算把手 X 位置（带偏移）
+        total_width = handle_width + button_count * HUD_BUTTON_WIDTH + (button_count - 1) * HUD_BUTTON_GAP + HUD_MARGIN * 2
+        base_x = region.width * 0.5 - total_width * 0.5
+        handle_x = base_x + offset_x * region.width
+
+        # 限制 X 范围
+        handle_x = max(0, min(region.width - total_width, handle_x))
+
+        handle_w = handle_width
+        handle_h = hud_height
+    else:
+        # 垂直布局：使用动态展开方向
+        hud_total_height = handle_width + button_count * HUD_BUTTON_HEIGHT + (button_count - 1) * HUD_BUTTON_GAP + HUD_MARGIN * 2
+
+        # 计算把手 Y 位置（带偏移）- 把手作为锚点
+        base_y = region.height * 0.5
+        handle_center_y = base_y + offset_y * region.height
+
+        # 边缘吸附：检查是否靠近顶部或底部
+        expand_downward = True  # 默认向下展开
+        force_expand_direction = None
+
+        # 顶部吸附检测
+        if handle_center_y >= region.height - HUD_EDGE_SNAP_THRESHOLD:
+            # 靠近顶部：强制向下展开，把手固定在安全位置
+            force_expand_direction = "down"
+            # 把手顶部位置 = region 顶部 - 安全距离
+            handle_y = region.height - HUD_TOP_SAFE_MARGIN - handle_width
+            expand_downward = True
+
+        # 底部吸附检测
+        elif handle_center_y <= HUD_EDGE_SNAP_THRESHOLD:
+            # 靠近底部：强制向上展开
+            force_expand_direction = "up"
+            handle_y = HUD_BOTTOM_SAFE_MARGIN
+            expand_downward = False
+        else:
+            # 正常位置：根据把手位置决定展开方向
+            # 如果把手在上半部分，向下展开；反之向上展开
+            expand_downward = handle_center_y < region.height * 0.5
+
+            if expand_downward:
+                # 向下展开：把手在顶部，按钮在下方
+                handle_y = handle_center_y - handle_width * 0.5
+                # 确保把手不会超出顶部安全区域
+                handle_y = max(HUD_BOTTOM_SAFE_MARGIN, min(region.height - HUD_TOP_SAFE_MARGIN - handle_width, handle_y))
+            else:
+                # 向上展开：把手在底部，按钮在上方
+                handle_y = handle_center_y - handle_width * 0.5
+                # 确保把手不会超出底部安全区域
+                handle_y = max(HUD_BOTTOM_SAFE_MARGIN, handle_y)
+
+        # 计算把手 X 位置
+        total_width = HUD_BUTTON_WIDTH + HUD_MARGIN * 2
+        handle_x = region.width * 0.5 + offset_x * region.width - total_width * 0.5
+        handle_x = max(0, min(region.width - total_width, handle_x))
+
+        handle_w = total_width
+        handle_h = handle_width
+
+    # 绘制把手
     hovered = _HUD_STATE.get("hover")
     region_key = (window.as_pointer(), area.as_pointer(), region.as_pointer())
     is_handle_hovered = hovered == (region_key, "handle")
 
-    if layout_mode == "horizontal":
-        # 水平布局：把手在左边
-        handle_x = start_x
-        handle_y = start_y
-        handle_w = handle_width
-        handle_h = total_height
-    else:
-        # 垂直布局：把手在底部
-        handle_x = start_x
-        handle_y = start_y + total_height - handle_width
-        handle_w = total_width
-        handle_h = handle_width
-
     handle_color = HUD_HOVER_COLOR if is_handle_hovered else HUD_HANDLE_COLOR
     draw_rounded_rect(handle_x, handle_y, handle_w, handle_h, handle_color, HUD_CORNER_RADIUS)
-    # 绘制把手图标（两条竖线或横线）
+
+    # 绘制把手图标
     if layout_mode == "horizontal":
-        # 竖线把手
         line_x = handle_x + handle_w * 0.5
         draw_text("│", line_x - 4, handle_y + handle_h * 0.5 - 6, HUD_TEXT_COLOR, HUD_TEXT_SIZE)
     else:
-        # 横线把手（在底部）
         line_y = handle_y + handle_h * 0.5
         draw_text("─", handle_x + handle_w * 0.5 - 4, line_y - 6, HUD_TEXT_COLOR, HUD_TEXT_SIZE)
 
-    # 绘制按钮（垂直布局时反转顺序）
+    # ============ 绘制按钮 ============
+
     if layout_mode == "horizontal":
-        button_order = buttons
+        # 水平布局：按钮在把手右侧
+        btn_start_x = handle_x + handle_width + HUD_MARGIN
+        btn_y = handle_y + HUD_MARGIN
+
+        for i, button_id in enumerate(buttons):
+            btn_x = btn_start_x + i * (HUD_BUTTON_WIDTH + HUD_BUTTON_GAP)
+            _draw_button(btn_x, btn_y, button_id, space, obj, hovered, region_key, draw_rounded_rect, draw_rounded_rect_outline, draw_text)
+
     else:
-        button_order = list(reversed(buttons))  # 反转顺序
+        # 垂直布局：根据展开方向决定按钮位置
+        btn_x = handle_x + HUD_MARGIN
 
-    for i, button_id in enumerate(button_order):
-        if layout_mode == "horizontal":
-            btn_x = start_x + handle_width + HUD_MARGIN + i * (HUD_BUTTON_WIDTH + HUD_BUTTON_GAP)
-            btn_y = start_y + HUD_MARGIN
+        if expand_downward:
+            # 向下展开：按钮在把手下方
+            btn_start_y = handle_y + handle_width + HUD_BUTTON_GAP
+            button_order = list(reversed(buttons))  # 从下往上排列
         else:
-            # 垂直布局：按钮从上往下，把手在底部
-            btn_x = start_x + HUD_MARGIN
-            btn_y = start_y + HUD_MARGIN + i * (HUD_BUTTON_HEIGHT + HUD_BUTTON_GAP)
+            # 向上展开：按钮在把手上方
+            btn_start_y = handle_y - HUD_BUTTON_HEIGHT - HUD_BUTTON_GAP
+            button_order = buttons  # 从上往下排列
 
-        # 检查状态
-        is_active = _check_button_active(space, obj, button_id)
-        is_hovered = hovered == (region_key, button_id)
+        for i, button_id in enumerate(button_order):
+            if expand_downward:
+                btn_y = btn_start_y + i * (HUD_BUTTON_HEIGHT + HUD_BUTTON_GAP)
+            else:
+                btn_y = btn_start_y - i * (HUD_BUTTON_HEIGHT + HUD_BUTTON_GAP)
+            _draw_button(btn_x, btn_y, button_id, space, obj, hovered, region_key, draw_rounded_rect, draw_rounded_rect_outline, draw_text)
 
-        # 确定颜色
-        if is_active and is_hovered:
-            fill_color = (HUD_ACTIVE_COLOR[0] + 0.1, HUD_ACTIVE_COLOR[1] + 0.1, HUD_ACTIVE_COLOR[2] + 0.1, HUD_ACTIVE_COLOR[3])
-        elif is_active:
-            fill_color = HUD_ACTIVE_COLOR
-        elif is_hovered:
-            fill_color = HUD_HOVER_COLOR
-        else:
-            fill_color = (HUD_BG_COLOR[0] + 0.05, HUD_BG_COLOR[1] + 0.05, HUD_BG_COLOR[2] + 0.05, HUD_BG_COLOR[3])
 
-        # 绘制按钮
-        draw_rounded_rect(btn_x, btn_y, HUD_BUTTON_WIDTH, HUD_BUTTON_HEIGHT, fill_color, HUD_CORNER_RADIUS - 2)
-        draw_rounded_rect_outline(btn_x, btn_y, HUD_BUTTON_WIDTH, HUD_BUTTON_HEIGHT, HUD_BORDER_COLOR, HUD_CORNER_RADIUS - 2)
+def _draw_button(btn_x, btn_y, button_id, space, obj, hovered, region_key, draw_rounded_rect, draw_rounded_rect_outline, draw_text):
+    """绘制单个按钮"""
+    # 检查状态
+    is_active = _check_button_active(space, obj, button_id)
+    is_hovered = hovered == (region_key, button_id)
 
-        # 绘制符号+文字
-        label = _get_button_label(button_id, is_active)
-        # 计算文字位置（居中）
-        text_offset = len(label) * 3.5  # 粗略估算字符宽度
-        draw_text(label, btn_x + HUD_BUTTON_WIDTH * 0.5 - text_offset, btn_y + HUD_BUTTON_HEIGHT * 0.5 - 6, HUD_TEXT_COLOR, HUD_TEXT_SIZE)
+    # 确定颜色
+    if is_active and is_hovered:
+        fill_color = (HUD_ACTIVE_COLOR[0] + 0.1, HUD_ACTIVE_COLOR[1] + 0.1, HUD_ACTIVE_COLOR[2] + 0.1, HUD_ACTIVE_COLOR[3])
+    elif is_active:
+        fill_color = HUD_ACTIVE_COLOR
+    elif is_hovered:
+        fill_color = HUD_HOVER_COLOR
+    else:
+        fill_color = (HUD_BG_COLOR[0] + 0.05, HUD_BG_COLOR[1] + 0.05, HUD_BG_COLOR[2] + 0.05, HUD_BG_COLOR[3])
+
+    # 绘制按钮
+    draw_rounded_rect(btn_x, btn_y, HUD_BUTTON_WIDTH, HUD_BUTTON_HEIGHT, fill_color, HUD_CORNER_RADIUS - 2)
+    draw_rounded_rect_outline(btn_x, btn_y, HUD_BUTTON_WIDTH, HUD_BUTTON_HEIGHT, HUD_BORDER_COLOR, HUD_CORNER_RADIUS - 2)
+
+    # 绘制符号+文字
+    label = _get_button_label(button_id, is_active)
+    text_offset = len(label) * 3.5
+    draw_text(label, btn_x + HUD_BUTTON_WIDTH * 0.5 - text_offset, btn_y + HUD_BUTTON_HEIGHT * 0.5 - 6, HUD_TEXT_COLOR, HUD_TEXT_SIZE)
 
 
 def _check_button_active(space, obj, button_id):

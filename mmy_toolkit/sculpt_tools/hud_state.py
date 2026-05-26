@@ -64,27 +64,15 @@ def get_global_offset():
 
 
 def set_global_offset(offset_x, offset_y):
-    """设置全局 HUD 偏移值（动态计算边界确保 HUD 不超出屏幕）"""
+    """设置全局 HUD 偏移值
+
+    边界限制放宽，实际的边缘吸附和安全距离在绘制时处理。
+    """
     # 水平方向限制
-    _HUD_STATE["global_offset_x"] = max(-0.35, min(0.35, offset_x))
+    _HUD_STATE["global_offset_x"] = max(-0.5, min(0.5, offset_x))
 
-    # 动态计算垂直方向限制（根据按钮数量）
-    button_count = len(_HUD_STATE["user_buttons"]) + 1  # +1 for add button
-
-    # 计算 HUD 高度（垂直布局）
-    total_height = _HUD_HANDLE_WIDTH + button_count * _HUD_BUTTON_HEIGHT + (button_count - 1) * _HUD_BUTTON_GAP + 2 * _HUD_MARGIN
-
-    # 使用更保守的估算（假设 region 高度较小）
-    estimated_region_height = 600
-
-    # 计算最小 offset_y（确保 HUD 顶部有足够安全距离）
-    # 公式：确保 HUD 不会进入顶部安全区域
-    min_offset_y = (_TOP_SAFE_MARGIN + total_height * 0.5 - estimated_region_height * 0.5) / estimated_region_height
-
-    # 确保限制值合理（向上移动限制最多 -0.35）
-    min_offset_y = max(-0.35, min_offset_y)
-
-    _HUD_STATE["global_offset_y"] = max(min_offset_y, min(0.30, offset_y))
+    # 垂直方向放宽限制（边缘吸附在绘制时处理）
+    _HUD_STATE["global_offset_y"] = max(-1.0, min(1.0, offset_y))
 
 
 def reset_global_offset():

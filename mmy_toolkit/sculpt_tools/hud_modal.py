@@ -222,6 +222,12 @@ class MMY_OT_HUDLayoutReset(bpy.types.Operator):
 
 # ============ 位置检测 ============
 
+# 边缘吸附常量（与 hud_draw.py 保持一致）
+HUD_EDGE_SNAP_THRESHOLD = 50
+HUD_TOP_SAFE_MARGIN = 80
+HUD_BOTTOM_SAFE_MARGIN = 20
+
+
 def get_region_key(window, area, region):
     """获取 region 唯一标识"""
     return (window.as_pointer(), area.as_pointer(), region.as_pointer())
@@ -271,47 +277,98 @@ def find_button_at_point(window, mouse_x, mouse_y, area_id=None, region_id=None)
     buttons = user_buttons + ["add"]
     button_count = len(buttons)
 
-    if layout_mode == "horizontal":
-        total_width = HUD_HANDLE_WIDTH + button_count * HUD_BUTTON_WIDTH + (button_count - 1) * HUD_BUTTON_GAP + HUD_MARGIN * 2
-        total_height = HUD_BUTTON_HEIGHT + HUD_MARGIN * 2
-        start_x = region.width * 0.5 + offset_x * region.width - total_width * 0.5
-        start_y = region.height * 0.5 + offset_y * region.height - total_height * 0.5
-    else:
-        total_width = HUD_BUTTON_WIDTH + HUD_MARGIN * 2
-        total_height = HUD_HANDLE_WIDTH + button_count * HUD_BUTTON_HEIGHT + (button_count - 1) * HUD_BUTTON_GAP + HUD_MARGIN * 2
-        start_x = region.width * 0.5 + offset_x * region.width - total_width * 0.5
-        start_y = region.height * 0.5 + offset_y * region.height - total_height * 0.5
-
     region_mouse_x = mouse_x - region.x
     region_mouse_y = mouse_y - region.y
 
-    if not (start_x <= region_mouse_x <= start_x + total_width and start_y <= region_mouse_y <= start_y + total_height):
-        return None, None, None, None
+    # ============ 新的位置计算逻辑（与 hud_draw.py 保持一致） ============
 
-    # 检查把手
     if layout_mode == "horizontal":
-        handle_x, handle_y = start_x, start_y
-        handle_w, handle_h = HUD_HANDLE_WIDTH, total_height
+        # 水平布局
+        hud_height = HUD_BUTTON_HEIGHT + HUD_MARGIN * 2
+        total_width = HUD_HANDLE_WIDTH + button_count * HUD_BUTTON_WIDTH + (button_count - 1) * HUD_BUTTON_GAP + HUD_MARGIN * 2
+
+        # 计算把手位置（带安全限制）
+        base_y = region.height * 0.5 - hud_height * 0.5
+        handle_y = base_y + offset_y * region.height
+        max_y = region.height - HUD_TOP_SAFE_MARGIN - hud_height
+        min_y = HUD_BOTTOM_SAFE_MARGIN
+        handle_y = max(min_y, min(max_y, handle_y))
+
+        base_x = region.width * 0.5 - total_width * 0.5
+        handle_x = base_x + offset_x * region.width
+        handle_x = max(0, min(region.width - total_width, handle_x))
+
+        handle_w = HUD_HANDLE_WIDTH
+        handle_h = hud_height
+
+        # 检查把手
+        if (handle_x <= region_mouse_x <= handle_x + handle_w and handle_y <= region_mouse_y <= handle_y + handle_h):
+            return area, region, space, "handle"
+
+        # 检查按钮
+        btn_start_x = handle_x + HUD_HANDLE_WIDTH + HUD_MARGIN
+        btn_y = handle_y + HUD_MARGIN
+
+        for i, button_id in enumerate(buttons):
+            btn_x = btn_start_x + i * (HUD_BUTTON_WIDTH + HUD_BUTTON_GAP)
+            if (btn_x <= region_mouse_x <= btn_x + HUD_BUTTON_WIDTH and btn_y <= region_mouse_y <= btn_y + HUD_BUTTON_HEIGHT):
+                return area, region, space, button_id
+
     else:
-        handle_x = start_x
-        handle_y = start_y + total_height - HUD_HANDLE_WIDTH
-        handle_w, handle_h = total_width, HUD_HANDLE_WIDTH
+        # 垂直布局：动态展开方向
+        total_width = HUD_BUTTON_WIDTH + HUD_MARGIN * 2
 
-    if (handle_x <= region_mouse_x <= handle_x + handle_w and handle_y <= region_mouse_y <= handle_y + handle_h):
-        return area, region, space, "handle"
+        # 计算把手中心 Y 位置
+        handle_center_y = region.height * 0.5 + offset_y * region.height
 
-    # 检查按钮
-    button_order = buttons if layout_mode == "horizontal" else list(reversed(buttons))
-    for i, button_id in enumerate(button_order):
-        if layout_mode == "horizontal":
-            btn_x = start_x + HUD_HANDLE_WIDTH + HUD_MARGIN + i * (HUD_BUTTON_WIDTH + HUD_BUTTON_GAP)
-            btn_y = start_y + HUD_MARGIN
+        # 确定展开方向（与绘制逻辑一致）
+        expand_downward = True
+        if handle_center_y >= region.height - HUD_EDGE_SNAP_THRESHOLD:
+            # 靠近顶部：向下展开
+            handle_y = region.height - HUD_TOP_SAFE_MARGIN - HUD_HANDLE_WIDTH
+            expand_downward = True
+        elif handle_center_y <= HUD_EDGE_SNAP_THRESHOLD:
+            # 靠近底部：向上展开
+            handle_y = HUD_BOTTOM_SAFE_MARGIN
+            expand_downward = False
         else:
-            btn_x = start_x + HUD_MARGIN
-            btn_y = start_y + HUD_MARGIN + i * (HUD_BUTTON_HEIGHT + HUD_BUTTON_GAP)
+            expand_downward = handle_center_y < region.height * 0.5
+            if expand_downward:
+                handle_y = handle_center_y - HUD_HANDLE_WIDTH * 0.5
+                handle_y = max(HUD_BOTTOM_SAFE_MARGIN, min(region.height - HUD_TOP_SAFE_MARGIN - HUD_HANDLE_WIDTH, handle_y))
+            else:
+                handle_y = handle_center_y - HUD_HANDLE_WIDTH * 0.5
+                handle_y = max(HUD_BOTTOM_SAFE_MARGIN, handle_y)
 
-        if (btn_x <= region_mouse_x <= btn_x + HUD_BUTTON_WIDTH and btn_y <= region_mouse_y <= btn_y + HUD_BUTTON_HEIGHT):
-            return area, region, space, button_id
+        # 计算把手 X 位置
+        handle_x = region.width * 0.5 + offset_x * region.width - total_width * 0.5
+        handle_x = max(0, min(region.width - total_width, handle_x))
+
+        handle_w = total_width
+        handle_h = HUD_HANDLE_WIDTH
+
+        # 检查把手
+        if (handle_x <= region_mouse_x <= handle_x + handle_w and handle_y <= region_mouse_y <= handle_y + handle_h):
+            return area, region, space, "handle"
+
+        # 检查按钮（根据展开方向）
+        btn_x = handle_x + HUD_MARGIN
+
+        if expand_downward:
+            btn_start_y = handle_y + HUD_HANDLE_WIDTH + HUD_BUTTON_GAP
+            button_order = list(reversed(buttons))
+        else:
+            btn_start_y = handle_y - HUD_BUTTON_HEIGHT - HUD_BUTTON_GAP
+            button_order = buttons
+
+        for i, button_id in enumerate(button_order):
+            if expand_downward:
+                btn_y = btn_start_y + i * (HUD_BUTTON_HEIGHT + HUD_BUTTON_GAP)
+            else:
+                btn_y = btn_start_y - i * (HUD_BUTTON_HEIGHT + HUD_BUTTON_GAP)
+
+            if (btn_x <= region_mouse_x <= btn_x + HUD_BUTTON_WIDTH and btn_y <= region_mouse_y <= btn_y + HUD_BUTTON_HEIGHT):
+                return area, region, space, button_id
 
     return area, region, space, "HUD_AREA"
 
