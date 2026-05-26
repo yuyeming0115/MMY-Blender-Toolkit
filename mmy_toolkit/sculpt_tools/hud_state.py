@@ -55,9 +55,12 @@ def get_global_offset():
 
 
 def set_global_offset(offset_x, offset_y):
-    """设置全局 HUD 偏移值"""
-    _HUD_STATE["global_offset_x"] = offset_x
-    _HUD_STATE["global_offset_y"] = offset_y
+    """设置全局 HUD 偏移值（限制范围确保 HUD 不超出屏幕）"""
+    # 限制 offset 范围：-0.4 到 0.4（确保 HUD 基本在屏幕内）
+    # HUD 中心默认在屏幕中央，offset 是相对于中心的偏移比例
+    max_offset = 0.35  # 允许的最大偏移比例
+    _HUD_STATE["global_offset_x"] = max(-max_offset, min(max_offset, offset_x))
+    _HUD_STATE["global_offset_y"] = max(-max_offset, min(max_offset, offset_y))
 
 
 def reset_global_offset():

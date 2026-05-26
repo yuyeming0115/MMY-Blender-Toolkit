@@ -6,7 +6,7 @@ from .hud_state import _HUD_STATE, _AVAILABLE_BUTTONS, get_user_buttons
 # 常量
 HUD_TEXT_SIZE = 12
 HUD_BUTTON_HEIGHT = 24
-HUD_BUTTON_WIDTH = 80  # 加宽以容纳符号+文字
+HUD_BUTTON_WIDTH = 60  # 缩小宽度以适应符号+文字
 HUD_BUTTON_GAP = 4
 HUD_CORNER_RADIUS = 6
 HUD_MARGIN = 10
