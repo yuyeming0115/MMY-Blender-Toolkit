@@ -61,30 +61,23 @@ def get_top_toolbar_height(area, space):
 
 
 def get_bottom_toolbar_height(area, space):
-    """获取底部工具栏高度（Footer 或雕刻工具 Shelf）"""
+    """获取底部工具栏高度（包括 ASSET_SHELF）"""
     height = 0
     for region in area.regions:
-        # 检查 FOOTER region
-        if region.type == "FOOTER" and region.height > 0:
+        # 检查 ASSET_SHELF（雕刻模式底部工具架）
+        if region.type == "ASSET_SHELF" and region.height > 0:
             height = max(height, region.height)
-        # 检查工具 shelf（某些模式下会有底部工具栏）
-        if region.type == "TOOLS" and region.y == 0 and region.height > 0:
-            # TOOLS region 在底部时，可能是底部工具栏
+        # 检查 ASSET_SHELF_HEADER
+        if region.type == "ASSET_SHELF_HEADER" and region.height > 0:
+            height = max(height, height + region.height)
+        # 检查 FOOTER
+        if region.type == "FOOTER" and region.height > 0:
             height = max(height, region.height)
     return height
 
 
 def get_effective_viewport_bounds(area, space, region):
-    """获取有效视口边界（扣除各区域后的可用空间）
-
-    注意：Header/Footer 是独立的 region，不在 WINDOW region 内。
-    WINDOW region 的 Y 坐标范围是 0 到 region.height。
-    """
-    # 调试：打印所有 region 信息
-    print(f"[MMY Sculpt] region.height={region.height}")
-    for r in area.regions:
-        print(f"[MMY Sculpt] region: type={r.type}, y={r.y}, height={r.height}, width={r.width}")
-
+    """获取有效视口边界（扣除各区域后的可用空间）"""
     left = get_left_toolbar_width(area, space)
     right = region.width - get_sidebar_width(area, space)
 
@@ -92,14 +85,13 @@ def get_effective_viewport_bounds(area, space, region):
     top_toolbar = get_top_toolbar_height(area, space)
     bottom_toolbar = get_bottom_toolbar_height(area, space)
 
-    print(f"[MMY Sculpt] top_toolbar={top_toolbar}, bottom_toolbar={bottom_toolbar}")
+    # 顶部边界：WINDOW region 顶部减去顶部工具栏高度 + 透明层安全距离
+    # Header + ToolHeader = 52，加上透明层约 30px
+    top = region.height - top_toolbar - 30
 
-    # 顶部：确保有足够空间（Header + 透明层 + 额外安全距离）
-    top = region.height - max(HUD_TOP_SAFE_MARGIN, top_toolbar + 50)
-    # 底部：动态检测底部工具栏高度 + 安全距离
-    bottom = max(HUD_BOTTOM_SAFE_MARGIN, bottom_toolbar + 20)
-
-    print(f"[MMY Sculpt] bounds: top={top}, bottom={bottom}, height={top-bottom}")
+    # 底部边界：ASSET_SHELF 高度 + 安全距离
+    # ASSET_SHELF 在 WINDOW region 下方，但覆盖了 WINDOW region 的底部
+    bottom = bottom_toolbar + 10
 
     return {
         "left": left + HUD_SIDE_SAFE_MARGIN,
