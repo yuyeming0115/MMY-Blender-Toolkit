@@ -88,6 +88,10 @@ class MMY_PT_SmartNamingPanel(bpy.types.Panel):
         # 快速生成器入口
         box.operator("mmy.quick_generate_collections", text="快速生成器", icon='MODIFIER')
 
+        # 提取当前架构入口
+        row = box.row(align=True)
+        row.operator("mmy.save_current_architecture", text="提取架构", icon='FILE_NEW')
+
         # === 快捷归组 ===
         layout.separator()
         box = layout.box()
@@ -174,6 +178,27 @@ def _append_to_outliner_object_menu(self, context):
         layout.operator("mmy.group_selected_objects", text="归组到新集合", icon='GROUP')
 
 
+class MMY_MT_CollectionTemplates(bpy.types.Menu):
+    """集合架构模板选择菜单"""
+    bl_idname = "MMY_MT_collection_templates"
+    bl_label = "选择模板"
+
+    def draw(self, context):
+        layout = self.layout
+        names = get_all_template_names()
+
+        for name in names:
+            op = layout.operator("mmy.generate_collection_template", text=name, icon='OUTLINER')
+            op.template_name = name
+
+
+def _append_init_architecture_menu(self, context):
+    """在大纲空白处右键菜单添加初始化架构入口"""
+    layout = self.layout
+    layout.separator()
+    layout.menu("MMY_MT_collection_templates", text="初始化集合架构", icon='OUTLINER')
+
+
 def _append_to_outliner_context_menu(self, context):
     """在大纲上下文菜单添加选项（集合/空白区域）"""
     layout = self.layout
@@ -232,6 +257,7 @@ class MMY_OT_ApplySuffix(bpy.types.Operator):
 _classes = (
     MMY_PT_CollectionTemplateProps,
     MMY_PT_SmartNamingPanel,
+    MMY_MT_CollectionTemplates,
     MMY_OT_ApplyPrefix,
     MMY_OT_ApplySuffix,
 )
@@ -267,6 +293,12 @@ def register():
     except:
         pass
 
+    # 初始化架构菜单（只挂载到空白处右键菜单）
+    try:
+        bpy.types.OUTLINER_MT_context_menu.append(_append_init_architecture_menu)
+    except:
+        pass
+
 
 def unregister():
     # 移除大纲右键菜单
@@ -285,6 +317,12 @@ def unregister():
     # 移除对象右键菜单
     try:
         bpy.types.OUTLINER_MT_object.remove(_append_to_outliner_object_menu)
+    except:
+        pass
+
+    # 移除初始化架构菜单
+    try:
+        bpy.types.OUTLINER_MT_context_menu.remove(_append_init_architecture_menu)
     except:
         pass
 

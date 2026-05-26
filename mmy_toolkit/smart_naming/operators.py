@@ -636,6 +636,123 @@ class MMY_OT_QuickGenerateCollections(bpy.types.Operator):
         return True
 
 
+class MMY_OT_SaveCurrentArchitecture(bpy.types.Operator):
+    """从当前场景提取集合架构保存为模板"""
+    bl_idname = "mmy.save_current_architecture"
+    bl_label = "提取当前架构"
+    bl_description = "分析场景集合层级，保存为可复用模板"
+    bl_options = {'REGISTER'}
+
+    template_name: StringProperty(name="模板名称", default="我的模板")
+    root_coll_name: StringProperty(name="根集合", description="选择要提取的根集合")
+
+    def invoke(self, context, event):
+        # 获取场景中的集合列表供选择
+        self._root_collections = []
+        for coll in context.scene.collection.children:
+            self._root_collections.append(coll.name)
+
+        if self._root_collections:
+            self.root_coll_name = self._root_collections[0]
+
+        return context.window_manager.invoke_props_dialog(self, width=300)
+
+    def draw(self, context):
+        layout = self.layout
+        layout.prop(self, "template_name")
+
+        # 根集合选择
+        row = layout.row()
+        row.label(text="根集合:")
+        col = row.column()
+        col.prop_search(self, "root_coll_name", bpy.data, "collections", text="")
+
+    def execute(self, context):
+        from .collection_templates import add_custom_template, BUILTIN_TEMPLATES
+
+        # 检查模板名称
+        if not self.template_name:
+            self.report({'WARNING'}, "请输入模板名称")
+            return {'CANCELLED'}
+
+        if self.template_name in BUILTIN_TEMPLATES:
+            self.report({'WARNING'}, "不能覆盖内置模板")
+            return {'CANCELLED'}
+
+        # 获取根集合
+        root_coll = bpy.data.collections.get(self.root_coll_name)
+        if not root_coll:
+            self.report({'WARNING'}, "请选择根集合")
+            return {'CANCELLED'}
+
+        # 提取架构
+        children = []
+        auto_lod = False
+        lod_suffixes = ["_high", "_low"]
+
+        for child in root_coll.children:
+            child_name = child.name
+            # 检查是否是 LOD 子集合（去掉后缀）
+            for suffix in lod_suffixes:
+                if child_name.endswith(suffix):
+                    auto_lod = True
+                    base_name = child_name[:-len(suffix)]
+                    if base_name not in children:
+                        children.append(base_name)
+                    break
+            else:
+                children.append(child_name)
+
+        # 构建模板配置
+        config = {
+            "root_name": root_coll.name,
+            "children": children,
+            "auto_lod": auto_lod,
+            "lod_suffixes": lod_suffixes if auto_lod else [],
+        }
+
+        # 保存模板
+        if add_custom_template(self.template_name, config):
+            self.report({'INFO'}, f"已保存模板: {self.template_name}")
+        else:
+            self.report({'WARNING'}, f"模板名称已存在: {self.template_name}")
+            return {'CANCELLED'}
+
+        return {'FINISHED'}
+
+    @classmethod
+    def poll(cls, context):
+        # 至少有一个场景根集合的子集合
+        return len(context.scene.collection.children) > 0
+
+
+class MMY_OT_DeleteTemplate(bpy.types.Operator):
+    """删除自定义模板"""
+    bl_idname = "mmy.delete_template"
+    bl_label = "删除模板"
+    bl_options = {'REGISTER'}
+
+    template_name: StringProperty(name="模板名称")
+
+    def execute(self, context):
+        from .collection_templates import remove_custom_template, BUILTIN_TEMPLATES
+
+        if self.template_name in BUILTIN_TEMPLATES:
+            self.report({'WARNING'}, "不能删除内置模板")
+            return {'CANCELLED'}
+
+        if remove_custom_template(self.template_name):
+            self.report({'INFO'}, f"已删除模板: {self.template_name}")
+        else:
+            self.report({'WARNING'}, f"模板不存在: {self.template_name}")
+
+        return {'FINISHED'}
+
+    @classmethod
+    def poll(cls, context):
+        return True
+
+
 _classes = (
     MMY_OT_SmartDuplicateCollection,
     MMY_OT_SmartDuplicateObject,
@@ -649,6 +766,8 @@ _classes = (
     MMY_OT_GroupSelectedObjects,
     MMY_OT_GenerateCollectionTemplate,
     MMY_OT_QuickGenerateCollections,
+    MMY_OT_SaveCurrentArchitecture,
+    MMY_OT_DeleteTemplate,
 )
 
 
