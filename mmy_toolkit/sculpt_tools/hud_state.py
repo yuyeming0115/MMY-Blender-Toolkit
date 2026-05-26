@@ -19,8 +19,8 @@ _HUD_HANDLE_WIDTH = 20
 _HUD_MARGIN = 10
 _HUD_BUTTON_GAP = 4
 
-# 预留的顶部安全区域（Header 高度约 30-40px，加上透明层约 50px）
-_TOP_SAFE_MARGIN = 50
+# 预留的顶部安全区域（Header 高度约 30-40px，加上透明层约 100px）
+_TOP_SAFE_MARGIN = 100
 
 # HUD 运行时状态
 _HUD_STATE = {
@@ -74,15 +74,15 @@ def set_global_offset(offset_x, offset_y):
     # 计算 HUD 高度（垂直布局）
     total_height = _HUD_HANDLE_WIDTH + button_count * _HUD_BUTTON_HEIGHT + (button_count - 1) * _HUD_BUTTON_GAP + 2 * _HUD_MARGIN
 
-    # 估算 region 高度（假设典型值 800px）
-    estimated_region_height = 800
+    # 使用更保守的估算（假设 region 高度较小）
+    estimated_region_height = 600
 
-    # 计算最小 offset_y（确保 HUD 顶部 >= _TOP_SAFE_MARGIN）
-    # 公式：region.height * 0.5 + offset_y * region.height - total_height * 0.5 >= _TOP_SAFE_MARGIN
+    # 计算最小 offset_y（确保 HUD 顶部有足够安全距离）
+    # 公式：确保 HUD 不会进入顶部安全区域
     min_offset_y = (_TOP_SAFE_MARGIN + total_height * 0.5 - estimated_region_height * 0.5) / estimated_region_height
 
-    # 确保限制值合理（不能太大，否则 HUD 无法移动）
-    min_offset_y = max(-0.35, min(0, min_offset_y))
+    # 确保限制值合理（向上移动限制最多 -0.35）
+    min_offset_y = max(-0.35, min_offset_y)
 
     _HUD_STATE["global_offset_y"] = max(min_offset_y, min(0.30, offset_y))
 
