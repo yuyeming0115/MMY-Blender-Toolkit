@@ -753,6 +753,105 @@ class MMY_OT_DeleteTemplate(bpy.types.Operator):
         return True
 
 
+class MMY_OT_CreateHighLowCopy(bpy.types.Operator):
+    """生成高低模副本"""
+    bl_idname = "mmy.create_high_low_copy"
+    bl_label = "生成高低模副本"
+    bl_description = "复制对象并替换 _low/_high 后缀"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        selected_objs = context.selected_objects
+
+        if not selected_objs:
+            self.report({'WARNING'}, "请先选中对象")
+            return {'CANCELLED'}
+
+        created_count = 0
+        created_objs = []  # 收集新创建的对象
+
+        for obj in selected_objs:
+            name = obj.name
+
+            # 检测后缀（大小写不敏感）
+            target_suffix = None
+            current_suffix = None
+
+            name_lower = name.lower()
+
+            if name_lower.endswith('_low'):
+                # 找出实际的后缀（保持原始大小写）
+                current_suffix = name[-4:]  # 最后4个字符
+                target_suffix = '_high' if current_suffix == '_low' else '_High'
+            elif name_lower.endswith('_high'):
+                current_suffix = name[-5:]  # 最后5个字符
+                target_suffix = '_low' if current_suffix == '_high' else '_Low'
+            else:
+                # 检查是否包含其他位置的 low/high
+                if '_low' in name_lower:
+                    # 找出实际的后缀位置
+                    idx = name_lower.find('_low')
+                    current_suffix = name[idx:idx+4]
+                    target_suffix = '_high'
+                elif '_high' in name_lower:
+                    idx = name_lower.find('_high')
+                    current_suffix = name[idx:idx+5]
+                    target_suffix = '_low'
+
+            if not target_suffix:
+                continue  # 不包含 low/high 后缀，跳过
+
+            # 计算新名称
+            new_name = name.replace(current_suffix, target_suffix)
+
+            # 检查名称是否已存在
+            existing_names = get_all_object_names()
+            if new_name in existing_names:
+                # 名称冲突，添加后缀
+                separator = get_separator()
+                digits = get_digits()
+                new_name = find_next_available_name(new_name, existing_names, separator, digits)
+
+            # 复制对象
+            new_obj = obj.copy()
+            new_obj.name = new_name
+
+            # 复制数据（网格）
+            if obj.data:
+                new_obj.data = obj.data.copy()
+
+            # 链接到同一集合
+            for coll in bpy.data.collections:
+                if coll.objects.get(obj.name):
+                    coll.objects.link(new_obj)
+                    break
+
+            # 如果原对象在场景根集合
+            if context.scene.collection.objects.get(obj.name):
+                context.scene.collection.objects.link(new_obj)
+
+            # 取消原对象选中，选中新对象
+            obj.select_set(False)
+            new_obj.select_set(True)
+            created_objs.append(new_obj)
+            created_count += 1
+
+        # 设置最后一个新对象为活动对象
+        if created_objs:
+            context.view_layer.objects.active = created_objs[-1]
+
+        if created_count > 0:
+            self.report({'INFO'}, f"已创建并选中 {created_count} 个高低模副本")
+        else:
+            self.report({'WARNING'}, "选中对象不含 _low/_high 后缀")
+
+        return {'FINISHED'}
+
+    @classmethod
+    def poll(cls, context):
+        return context.selected_objects
+
+
 _classes = (
     MMY_OT_SmartDuplicateCollection,
     MMY_OT_SmartDuplicateObject,
@@ -768,6 +867,7 @@ _classes = (
     MMY_OT_QuickGenerateCollections,
     MMY_OT_SaveCurrentArchitecture,
     MMY_OT_DeleteTemplate,
+    MMY_OT_CreateHighLowCopy,
 )
 
 

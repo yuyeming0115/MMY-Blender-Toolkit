@@ -31,6 +31,38 @@ class MMY_PT_CollectionTemplateProps(bpy.types.PropertyGroup):
 
 
 # ===================================================================
+# 后缀预设菜单（大纲右键子菜单）
+# ===================================================================
+
+class MMY_MT_SuffixPresets(bpy.types.Menu):
+    """后缀预设选择菜单"""
+    bl_idname = "MMY_MT_suffix_presets"
+    bl_label = "选择后缀"
+
+    def draw(self, context):
+        layout = self.layout
+        suffixes = get_suffix_presets()
+
+        for suffix in suffixes:
+            op = layout.operator("mmy.apply_suffix", text=suffix, icon='TEXT')
+            op.suffix = suffix
+
+
+class MMY_MT_PrefixPresets(bpy.types.Menu):
+    """前缀预设选择菜单"""
+    bl_idname = "MMY_MT_prefix_presets"
+    bl_label = "选择前缀"
+
+    def draw(self, context):
+        layout = self.layout
+        prefixes = get_prefix_presets()
+
+        for prefix in prefixes:
+            op = layout.operator("mmy.apply_prefix", text=prefix, icon='TEXT')
+            op.prefix = prefix
+
+
+# ===================================================================
 # N面板
 # ===================================================================
 
@@ -171,11 +203,29 @@ def _append_to_outliner_object_menu(self, context):
     """在大纲对象右键菜单添加选项"""
     layout = self.layout
 
-    # 归组功能：只有选中对象时才显示
+    # 只有选中对象时才显示
     if context.selected_objects:
         layout.separator()
+
+        # 归组功能
         layout.operator_context = 'INVOKE_DEFAULT'
         layout.operator("mmy.group_selected_objects", text="归组到新集合", icon='GROUP')
+
+        # 快速添加后缀/前缀子菜单
+        layout.menu("MMY_MT_suffix_presets", text="添加后缀", icon='TEXT')
+        layout.menu("MMY_MT_prefix_presets", text="添加前缀", icon='TEXT')
+
+        # 高低模副本：检测是否有 _low/_high 后缀的对象（大小写不敏感）
+        has_lod_suffix = False
+        for obj in context.selected_objects:
+            name_lower = obj.name.lower()
+            if '_low' in name_lower or '_high' in name_lower:
+                has_lod_suffix = True
+                break
+
+        if has_lod_suffix:
+            layout.separator()
+            layout.operator("mmy.create_high_low_copy", text="生成高低模副本", icon='MODIFIER')
 
 
 class MMY_MT_CollectionTemplates(bpy.types.Menu):
@@ -258,6 +308,8 @@ _classes = (
     MMY_PT_CollectionTemplateProps,
     MMY_PT_SmartNamingPanel,
     MMY_MT_CollectionTemplates,
+    MMY_MT_SuffixPresets,
+    MMY_MT_PrefixPresets,
     MMY_OT_ApplyPrefix,
     MMY_OT_ApplySuffix,
 )
@@ -287,11 +339,18 @@ def register():
         except:
             pass
 
-    # 对象右键菜单
-    try:
-        bpy.types.OUTLINER_MT_object.append(_append_to_outliner_object_menu)
-    except:
-        pass
+    # 对象右键菜单（尝试多个可能的菜单名）
+    object_menus = [
+        'OUTLINER_MT_object',
+        'OUTLINER_MT_object_context_menu',
+        'OUTLINER_MT_context_menu',  # 也尝试添加到空白处菜单（选中对象时也能触发）
+    ]
+    for menu_name in object_menus:
+        try:
+            menu = getattr(bpy.types, menu_name)
+            menu.append(_append_to_outliner_object_menu)
+        except:
+            pass
 
     # 初始化架构菜单（只挂载到空白处右键菜单）
     try:
@@ -315,10 +374,17 @@ def unregister():
             pass
 
     # 移除对象右键菜单
-    try:
-        bpy.types.OUTLINER_MT_object.remove(_append_to_outliner_object_menu)
-    except:
-        pass
+    object_menus = [
+        'OUTLINER_MT_object',
+        'OUTLINER_MT_object_context_menu',
+        'OUTLINER_MT_context_menu',
+    ]
+    for menu_name in object_menus:
+        try:
+            menu = getattr(bpy.types, menu_name)
+            menu.remove(_append_to_outliner_object_menu)
+        except:
+            pass
 
     # 移除初始化架构菜单
     try:

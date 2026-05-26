@@ -108,9 +108,15 @@ def get_suffix_presets():
 
 
 def add_suffix_preset(suffix):
-    """添加后缀预设"""
+    """添加后缀预设（自动补全下划线）"""
     data = load_naming_presets()
     presets = data.get("suffix_presets", [])
+
+    # 自动补全下划线
+    separator = data.get("separator", "_")
+    if suffix and not suffix.startswith(separator):
+        suffix = separator + suffix
+
     if suffix not in presets:
         presets.append(suffix)
         data["suffix_presets"] = presets
@@ -126,6 +132,22 @@ def remove_suffix_preset(suffix):
     if suffix in presets:
         presets.remove(suffix)
         data["suffix_presets"] = presets
+        save_naming_presets(data)
+        return True
+    return False
+
+
+def add_prefix_preset(prefix):
+    """添加前缀预设（可选自动补全下划线）"""
+    data = load_naming_presets()
+    presets = data.get("prefix_presets", [])
+
+    # 前缀默认不自动补全，但可以手动添加
+    # 如果用户想要自动补全，可以修改这里
+
+    if prefix not in presets:
+        presets.append(prefix)
+        data["prefix_presets"] = presets
         save_naming_presets(data)
         return True
     return False
