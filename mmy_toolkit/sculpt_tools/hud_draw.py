@@ -170,8 +170,10 @@ def _check_button_active(space, obj, button_id):
     elif button_id == "backface_culling":
         return shading.show_backface_culling if shading else False
     elif button_id == "symmetry":
-        # 雕刻对称（使用 tool_settings.sculpt）
-        return sculpt.use_symmetry if sculpt else False
+        # 雕刻对称（检查任意轴向是否启用）
+        if sculpt:
+            return sculpt.use_symmetry_x or sculpt.use_symmetry_y or sculpt.use_symmetry_z
+        return False
     elif button_id == "dynamic_topology":
         # 动态拓扑（使用 tool_settings.sculpt）
         return getattr(sculpt, 'use_dyntopo', False) if sculpt else False

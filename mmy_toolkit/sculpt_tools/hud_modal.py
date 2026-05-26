@@ -435,9 +435,9 @@ class VIEW3D_OT_mmy_sculpt_hud_modal(bpy.types.Operator):
                 shading.show_backface_culling = not shading.show_backface_culling
             return True
         elif button_id == "symmetry":
-            # 雕刻对称（使用 tool_settings.sculpt）
+            # 雕刻对称（切换 X 轴对称，最常用）
             if sculpt:
-                sculpt.use_symmetry = not sculpt.use_symmetry
+                sculpt.use_symmetry_x = not sculpt.use_symmetry_x
             return True
         elif button_id == "dynamic_topology":
             # 动态拓扑（使用 operator）
