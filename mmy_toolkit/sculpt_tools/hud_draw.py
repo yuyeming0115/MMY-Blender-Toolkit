@@ -80,6 +80,11 @@ def get_effective_viewport_bounds(area, space, region):
     注意：Header/Footer 是独立的 region，不在 WINDOW region 内。
     WINDOW region 的 Y 坐标范围是 0 到 region.height。
     """
+    # 调试：打印所有 region 信息
+    print(f"[MMY Sculpt] region.height={region.height}")
+    for r in area.regions:
+        print(f"[MMY Sculpt] region: type={r.type}, y={r.y}, height={r.height}, width={r.width}")
+
     left = get_left_toolbar_width(area, space)
     right = region.width - get_sidebar_width(area, space)
 
@@ -87,10 +92,14 @@ def get_effective_viewport_bounds(area, space, region):
     top_toolbar = get_top_toolbar_height(area, space)
     bottom_toolbar = get_bottom_toolbar_height(area, space)
 
+    print(f"[MMY Sculpt] top_toolbar={top_toolbar}, bottom_toolbar={bottom_toolbar}")
+
     # 顶部：确保有足够空间（Header + 透明层 + 额外安全距离）
     top = region.height - max(HUD_TOP_SAFE_MARGIN, top_toolbar + 50)
     # 底部：动态检测底部工具栏高度 + 安全距离
     bottom = max(HUD_BOTTOM_SAFE_MARGIN, bottom_toolbar + 20)
+
+    print(f"[MMY Sculpt] bounds: top={top}, bottom={bottom}, height={top-bottom}")
 
     return {
         "left": left + HUD_SIDE_SAFE_MARGIN,
