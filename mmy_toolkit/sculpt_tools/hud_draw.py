@@ -14,8 +14,8 @@ HUD_HANDLE_WIDTH = 20  # 拖拽把手宽度
 
 # 边缘吸附相关常量
 HUD_EDGE_SNAP_THRESHOLD = 50  # 吸附触发阈值（像素）
-HUD_TOP_SAFE_MARGIN = 80  # 顶部安全距离（Header + 透明层）
-HUD_BOTTOM_SAFE_MARGIN = 20  # 底部安全距离
+HUD_TOP_SAFE_MARGIN = 120  # 顶部安全距离（Header + 透明层，增加）
+HUD_BOTTOM_SAFE_MARGIN = 40  # 底部安全距离（增加）
 HUD_SIDE_SAFE_MARGIN = 10  # 侧边安全距离
 
 # 颜色
