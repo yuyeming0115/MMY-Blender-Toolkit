@@ -269,19 +269,26 @@ def get_bottom_toolbar_height(area, space):
 
 
 def get_effective_viewport_bounds(area, space, region):
-    """获取有效视口边界（扣除各区域后的可用空间）"""
+    """获取有效视口边界（扣除各区域后的可用空间）
+
+    注意：Header/Footer 是独立的 region，不在 WINDOW region 内。
+    WINDOW region 的 Y 坐标范围是 0 到 region.height。
+    """
     left = get_left_toolbar_width(area, space)
     right = region.width - get_sidebar_width(area, space)
-    top = region.height - max(HUD_TOP_SAFE_MARGIN, get_top_toolbar_height(area, space) + 40)
-    bottom = max(HUD_BOTTOM_SAFE_MARGIN, get_bottom_toolbar_height(area, space))
+
+    # 顶部：region.height - 安全距离（Header 在 WINDOW region 上方）
+    top = region.height - HUD_TOP_SAFE_MARGIN
+    # 底部：安全距离（Footer 在 WINDOW region 下方）
+    bottom = HUD_BOTTOM_SAFE_MARGIN
 
     return {
         "left": left + HUD_SIDE_SAFE_MARGIN,
         "right": right - HUD_SIDE_SAFE_MARGIN,
         "top": top,
-        "bottom": bottom + HUD_SIDE_SAFE_MARGIN,
+        "bottom": bottom,
         "width": right - left - 2 * HUD_SIDE_SAFE_MARGIN,
-        "height": top - bottom - HUD_SIDE_SAFE_MARGIN,
+        "height": top - bottom,
     }
 
 
