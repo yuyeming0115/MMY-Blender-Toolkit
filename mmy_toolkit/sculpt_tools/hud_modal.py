@@ -415,6 +415,8 @@ class VIEW3D_OT_mmy_sculpt_hud_modal(bpy.types.Operator):
         obj = context.active_object
         overlay = space.overlay if space else None
         shading = space.shading if space else None
+        tool_settings = context.tool_settings
+        sculpt = tool_settings.sculpt if tool_settings else None
 
         if button_id == "face_sets":
             if overlay:
@@ -429,22 +431,21 @@ class VIEW3D_OT_mmy_sculpt_hud_modal(bpy.types.Operator):
                 overlay.show_wireframes = not overlay.show_wireframes
             return True
         elif button_id == "backface_culling":
-            # 背面遮罩（正确属性名）
             if shading:
                 shading.show_backface_culling = not shading.show_backface_culling
             return True
         elif button_id == "symmetry":
-            # 雕刻对称
-            if obj and obj.type == 'MESH' and obj.data:
-                obj.data.use_sculpt_symmetry = not obj.data.use_sculpt_symmetry
+            # 雕刻对称（使用 tool_settings.sculpt）
+            if sculpt:
+                sculpt.use_symmetry = not sculpt.use_symmetry
             return True
         elif button_id == "dynamic_topology":
-            # 动态拓扑
-            if obj and obj.type == 'MESH':
-                if obj.data.use_dynamic_topology_sculpting:
+            # 动态拓扑（使用 operator）
+            if sculpt:
+                try:
                     bpy.ops.sculpt.dynamic_topology_toggle()
-                else:
-                    bpy.ops.sculpt.dynamic_topology_toggle()
+                except:
+                    pass
             return True
 
         return False

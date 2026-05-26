@@ -155,8 +155,11 @@ def _draw_sculpt_hud_inner():
 
 def _check_button_active(space, obj, button_id):
     """检查按钮激活状态"""
+    context = bpy.context
     overlay = space.overlay if space else None
     shading = space.shading if space else None
+    tool_settings = context.tool_settings if context else None
+    sculpt = tool_settings.sculpt if tool_settings else None
 
     if button_id == "face_sets":
         return overlay.show_sculpt_face_sets if overlay else False
@@ -165,14 +168,13 @@ def _check_button_active(space, obj, button_id):
     elif button_id == "wireframe":
         return overlay.show_wireframes if overlay else False
     elif button_id == "backface_culling":
-        # 背面遮罩（正确属性名）
         return shading.show_backface_culling if shading else False
     elif button_id == "symmetry":
-        # 雕刻对称
-        return obj.data.use_sculpt_symmetry if obj and obj.type == 'MESH' else False
+        # 雕刻对称（使用 tool_settings.sculpt）
+        return sculpt.use_symmetry if sculpt else False
     elif button_id == "dynamic_topology":
-        # 动态拓扑
-        return obj.data.use_dynamic_topology_sculpting if obj and obj.type == 'MESH' else False
+        # 动态拓扑（使用 tool_settings.sculpt）
+        return getattr(sculpt, 'use_dyntopo', False) if sculpt else False
     elif button_id == "add":
         return False
 
