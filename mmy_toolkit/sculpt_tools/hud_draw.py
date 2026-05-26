@@ -275,6 +275,8 @@ def _draw_sculpt_hud_inner():
 
 def _draw_button(btn_x, btn_y, button_id, space, obj, hovered, region_key, draw_rounded_rect, draw_rounded_rect_outline, draw_text):
     """绘制单个按钮"""
+    from .draw_utils import get_text_dimensions
+
     # 检查状态
     is_active = _check_button_active(space, obj, button_id)
     is_hovered = hovered == (region_key, button_id)
@@ -293,10 +295,12 @@ def _draw_button(btn_x, btn_y, button_id, space, obj, hovered, region_key, draw_
     draw_rounded_rect(btn_x, btn_y, HUD_BUTTON_WIDTH, HUD_BUTTON_HEIGHT, fill_color, HUD_CORNER_RADIUS - 2)
     draw_rounded_rect_outline(btn_x, btn_y, HUD_BUTTON_WIDTH, HUD_BUTTON_HEIGHT, HUD_BORDER_COLOR, HUD_CORNER_RADIUS - 2)
 
-    # 绘制符号+文字
+    # 绘制符号+文字（使用准确宽度居中）
     label = _get_button_label(button_id, is_active)
-    text_offset = len(label) * 3.5
-    draw_text(label, btn_x + HUD_BUTTON_WIDTH * 0.5 - text_offset, btn_y + HUD_BUTTON_HEIGHT * 0.5 - 6, HUD_TEXT_COLOR, HUD_TEXT_SIZE)
+    text_width, text_height = get_text_dimensions(label, HUD_TEXT_SIZE)
+    text_x = btn_x + (HUD_BUTTON_WIDTH - text_width) * 0.5
+    text_y = btn_y + (HUD_BUTTON_HEIGHT - text_height) * 0.5
+    draw_text(label, text_x, text_y, HUD_TEXT_COLOR, HUD_TEXT_SIZE)
 
 
 def _check_button_active(space, obj, button_id):
