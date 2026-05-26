@@ -173,18 +173,30 @@ def _check_button_active(space, obj, button_id):
         # 雕刻对称（检查 use_symmetry_x）
         try:
             if sculpt:
-                return bool(getattr(sculpt, 'use_symmetry_x', False))
-        except:
-            pass
+                val = getattr(sculpt, 'use_symmetry_x', False)
+                print(f"[MMY Sculpt] 检查对称状态: X={val}")
+                return bool(val)
+        except Exception as e:
+            print(f"[MMY Sculpt] 检查对称失败: {e}")
         return False
     elif button_id == "dynamic_topology":
-        # 动态拓扑（检查 constant_detail_resolution 属性）
+        # 动态拓扑（检查属性）
         try:
             if sculpt:
-                # 动态拓扑开启时会有 constant_detail_resolution 属性
-                return hasattr(sculpt, 'constant_detail_resolution')
-        except:
-            pass
+                # 打印所有可用属性
+                attrs = [a for a in dir(sculpt) if 'detail' in a.lower() or 'dyn' in a.lower()]
+                print(f"[MMY Sculpt] 动态拓扑相关属性: {attrs}")
+                # 尝试多种检查方式
+                if hasattr(sculpt, 'constant_detail_resolution'):
+                    return True
+                if hasattr(sculpt, 'detail_size'):
+                    return True
+                # 检查 detail_type
+                detail_type = getattr(sculpt, 'detail_type', None)
+                if detail_type and detail_type != 'NONE':
+                    return True
+        except Exception as e:
+            print(f"[MMY Sculpt] 检查动态拓扑失败: {e}")
         return False
     elif button_id == "add":
         return False
