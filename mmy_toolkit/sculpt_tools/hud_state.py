@@ -10,8 +10,8 @@ _AVAILABLE_BUTTONS = {
     "dynamic_topology": {"symbol": "⚡", "label": "动态", "action": "toggle_dyntopo"},
 }
 
-# 默认用户按钮列表
-_DEFAULT_USER_BUTTONS = ["face_sets", "mask", "wireframe"]
+# 默认用户按钮列表（包含所有常用按钮）
+_DEFAULT_USER_BUTTONS = ["face_sets", "mask", "wireframe", "backface_culling", "symmetry", "dynamic_topology"]
 
 # HUD 常量（用于计算高度）
 _HUD_BUTTON_HEIGHT = 24
@@ -39,7 +39,7 @@ _HUD_STATE = {
     "global_offset_x": 0.0,
     "global_offset_y": 0.0,
     # 用户按钮配置（存储用户选择的按钮列表）
-    "user_buttons": ["face_sets", "mask", "wireframe"],
+    "user_buttons": ["face_sets", "mask", "wireframe", "backface_culling", "symmetry", "dynamic_topology"],
     # 手动跟踪状态（Blender API 不直接暴露）
     "dyntopo_active": False,  # 动态拓扑状态
     "symmetry_x": False,      # 对称 X 轴状态
