@@ -13,7 +13,7 @@ HUD_MARGIN = 10
 HUD_HANDLE_WIDTH = 20  # 拖拽把手宽度
 
 # 边缘吸附相关常量
-HUD_EDGE_SNAP_THRESHOLD = 50  # 吸附触发阈值（像素）
+HUD_EDGE_SNAP_THRESHOLD = 20  # 吸附触发阈值（像素）- 减小以更容易解除吸附
 HUD_TOP_SAFE_MARGIN = 120  # 顶部安全距离（Header + 透明层，增加）
 HUD_BOTTOM_SAFE_MARGIN = 40  # 底部安全距离（增加）
 HUD_SIDE_SAFE_MARGIN = 10  # 侧边安全距离
@@ -85,13 +85,13 @@ def get_effective_viewport_bounds(area, space, region):
     top_toolbar = get_top_toolbar_height(area, space)
     bottom_toolbar = get_bottom_toolbar_height(area, space)
 
-    # 顶部边界：WINDOW region 顶部减去顶部工具栏高度 + 透明层安全距离
-    # Header + ToolHeader = 52，加上透明层约 30px
-    top = region.height - top_toolbar - 30
+    # 顶部边界：WINDOW region 顶部减去顶部工具栏高度 + 透明层 + 手柄高度
+    # 确保手柄完全露出，不被遮挡
+    top = region.height - top_toolbar - 30 - HUD_HANDLE_WIDTH
 
-    # 底部边界：ASSET_SHELF 高度 + 安全距离
-    # ASSET_SHELF 在 WINDOW region 下方，但覆盖了 WINDOW region 的底部
-    bottom = bottom_toolbar + 10
+    # 底部边界：ASSET_SHELF 高度 + 手柄高度 + 安全距离
+    # 确保手柄完全露出
+    bottom = bottom_toolbar + 10 + HUD_HANDLE_WIDTH
 
     return {
         "left": left + HUD_SIDE_SAFE_MARGIN,

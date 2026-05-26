@@ -223,10 +223,11 @@ class MMY_OT_HUDLayoutReset(bpy.types.Operator):
 # ============ 位置检测 ============
 
 # 边缘吸附常量（与 hud_draw.py 保持一致）
-HUD_EDGE_SNAP_THRESHOLD = 50
+HUD_EDGE_SNAP_THRESHOLD = 20
 HUD_TOP_SAFE_MARGIN = 120
 HUD_BOTTOM_SAFE_MARGIN = 40
 HUD_SIDE_SAFE_MARGIN = 10
+HUD_HANDLE_WIDTH = 20
 
 
 def get_sidebar_width(area, space):
@@ -285,13 +286,13 @@ def get_effective_viewport_bounds(area, space, region):
     top_toolbar = get_top_toolbar_height(area, space)
     bottom_toolbar = get_bottom_toolbar_height(area, space)
 
-    # 顶部边界：WINDOW region 顶部减去顶部工具栏高度 + 透明层安全距离
-    # Header + ToolHeader = 52，加上透明层约 30px
-    top = region.height - top_toolbar - 30
+    # 顶部边界：WINDOW region 顶部减去顶部工具栏高度 + 透明层 + 手柄高度
+    # 确保手柄完全露出，不被遮挡
+    top = region.height - top_toolbar - 30 - HUD_HANDLE_WIDTH
 
-    # 底部边界：ASSET_SHELF 高度 + 安全距离
-    # ASSET_SHELF 在 WINDOW region 下方，但覆盖了 WINDOW region 的底部
-    bottom = bottom_toolbar + 10
+    # 底部边界：ASSET_SHELF 高度 + 手柄高度 + 安全距离
+    # 确保手柄完全露出
+    bottom = bottom_toolbar + 10 + HUD_HANDLE_WIDTH
 
     return {
         "left": left + HUD_SIDE_SAFE_MARGIN,
