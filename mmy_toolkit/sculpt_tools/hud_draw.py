@@ -175,12 +175,11 @@ def _check_button_active(space, obj, button_id):
             return bool(getattr(sculpt, 'use_symmetry_x', False))
         return False
     elif button_id == "dynamic_topology":
-        # 动态拓扑（检查属性值，而不是存在性）
-        # 动态拓扑属性始终存在，需要检查是否处于活跃状态
-        # 使用 dyntopo 开启时 detail_size 会有实际值
+        # 动态拓扑状态检查
         try:
             if sculpt:
                 detail_size = getattr(sculpt, 'detail_size', 0)
+                print(f"[MMY Sculpt] 动态拓扑 detail_size={detail_size}")
                 # 动态拓扑开启时 detail_size 会有非零值
                 return detail_size > 0
         except:

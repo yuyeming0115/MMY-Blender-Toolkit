@@ -16,32 +16,23 @@ class MMY_MT_SymmetryAxisMenu(bpy.types.Menu):
         layout = self.layout
         sculpt = context.tool_settings.sculpt if context.tool_settings else None
 
-        # X 轴
-        row = layout.row()
-        op = row.operator("mmy.set_symmetry_axis", text="X 轴")
-        op.axis = 'X'
-        if sculpt and sculpt.use_symmetry_x:
-            row.active = True
+        # X 轴（显示当前状态）
+        x_state = sculpt.use_symmetry_x if sculpt else False
+        layout.operator("mmy.set_symmetry_axis", text=f"X 轴 {'✓' if x_state else ''}").axis = 'X'
 
         # Y 轴
-        row = layout.row()
-        op = row.operator("mmy.set_symmetry_axis", text="Y 轴")
-        op.axis = 'Y'
-        if sculpt and sculpt.use_symmetry_y:
-            row.active = True
+        y_state = sculpt.use_symmetry_y if sculpt else False
+        layout.operator("mmy.set_symmetry_axis", text=f"Y 轴 {'✓' if y_state else ''}").axis = 'Y'
 
         # Z 轴
-        row = layout.row()
-        op = row.operator("mmy.set_symmetry_axis", text="Z 轴")
-        op.axis = 'Z'
-        if sculpt and sculpt.use_symmetry_z:
-            row.active = True
+        z_state = sculpt.use_symmetry_z if sculpt else False
+        layout.operator("mmy.set_symmetry_axis", text=f"Z 轴 {'✓' if z_state else ''}").axis = 'Z'
 
 
 class MMY_OT_SetSymmetryAxis(bpy.types.Operator):
-    """设置对称轴向"""
+    """切换对称轴向"""
     bl_idname = "mmy.set_symmetry_axis"
-    bl_label = "设置对称轴向"
+    bl_label = "切换对称轴向"
     bl_options = {'INTERNAL'}
 
     axis: bpy.props.StringProperty(default='X')
@@ -49,12 +40,16 @@ class MMY_OT_SetSymmetryAxis(bpy.types.Operator):
     def execute(self, context):
         sculpt = context.tool_settings.sculpt if context.tool_settings else None
         if sculpt:
+            # 切换对应轴向的状态
             if self.axis == 'X':
                 sculpt.use_symmetry_x = not sculpt.use_symmetry_x
+                print(f"[MMY Sculpt] 轴向切换: X={sculpt.use_symmetry_x}")
             elif self.axis == 'Y':
                 sculpt.use_symmetry_y = not sculpt.use_symmetry_y
+                print(f"[MMY Sculpt] 轴向切换: Y={sculpt.use_symmetry_y}")
             elif self.axis == 'Z':
                 sculpt.use_symmetry_z = not sculpt.use_symmetry_z
+                print(f"[MMY Sculpt] 轴向切换: Z={sculpt.use_symmetry_z}")
             # 刷新视图
             for window in context.window_manager.windows:
                 for area in window.screen.areas:
