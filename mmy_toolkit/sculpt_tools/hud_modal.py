@@ -500,11 +500,19 @@ class VIEW3D_OT_mmy_sculpt_hud_modal(bpy.types.Operator):
             # 雕刻对称（切换 X 轴对称）
             if sculpt:
                 try:
+                    # 打印所有对称相关属性
+                    sym_attrs = [a for a in dir(sculpt) if 'sym' in a.lower()]
+                    print(f"[MMY Sculpt] 对称相关属性: {sym_attrs}")
+                    for attr in sym_attrs[:10]:
+                        val = getattr(sculpt, attr, None)
+                        if val is not None and not callable(val):
+                            print(f"[MMY Sculpt] sculpt.{attr}={val}")
+
                     current = getattr(sculpt, 'use_symmetry_x', False)
                     sculpt.use_symmetry_x = not current
                     # 更新手动跟踪状态
                     _HUD_STATE["symmetry_x"] = sculpt.use_symmetry_x
-                    print(f"[MMY Sculpt] 对称切换: X={sculpt.use_symmetry_x}")
+                    print(f"[MMY Sculpt] 对称切换后: X={sculpt.use_symmetry_x}")
                 except Exception as e:
                     print(f"[MMY Sculpt] 对称切换失败: {e}")
                 # 刷新视图确保生效
