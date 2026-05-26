@@ -61,11 +61,17 @@ def get_top_toolbar_height(area, space):
 
 
 def get_bottom_toolbar_height(area, space):
-    """获取底部工具栏高度（Footer）"""
+    """获取底部工具栏高度（Footer 或雕刻工具 Shelf）"""
+    height = 0
     for region in area.regions:
+        # 检查 FOOTER region
         if region.type == "FOOTER" and region.height > 0:
-            return region.height
-    return 0
+            height = max(height, region.height)
+        # 检查工具 shelf（某些模式下会有底部工具栏）
+        if region.type == "TOOLS" and region.y == 0 and region.height > 0:
+            # TOOLS region 在底部时，可能是底部工具栏
+            height = max(height, region.height)
+    return height
 
 
 def get_effective_viewport_bounds(area, space, region):
@@ -77,10 +83,14 @@ def get_effective_viewport_bounds(area, space, region):
     left = get_left_toolbar_width(area, space)
     right = region.width - get_sidebar_width(area, space)
 
-    # 顶部：region.height - 安全距离（Header 在 WINDOW region 上方）
-    top = region.height - HUD_TOP_SAFE_MARGIN
-    # 底部：安全距离（Footer 在 WINDOW region 下方）
-    bottom = HUD_BOTTOM_SAFE_MARGIN
+    # 动态检测顶部和底部工具栏高度
+    top_toolbar = get_top_toolbar_height(area, space)
+    bottom_toolbar = get_bottom_toolbar_height(area, space)
+
+    # 顶部：确保有足够空间（Header + 透明层 + 额外安全距离）
+    top = region.height - max(HUD_TOP_SAFE_MARGIN, top_toolbar + 50)
+    # 底部：动态检测底部工具栏高度 + 安全距离
+    bottom = max(HUD_BOTTOM_SAFE_MARGIN, bottom_toolbar + 20)
 
     return {
         "left": left + HUD_SIDE_SAFE_MARGIN,
