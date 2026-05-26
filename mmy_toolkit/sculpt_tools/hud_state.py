@@ -57,10 +57,11 @@ def get_global_offset():
 def set_global_offset(offset_x, offset_y):
     """设置全局 HUD 偏移值（限制范围确保 HUD 不超出屏幕）"""
     # 限制 offset 范围，确保 HUD 基本在屏幕内
-    # 水平方向允许较大范围，垂直方向更严格（防止被 Header/Timeline 遮挡）
+    # 水平方向允许较大范围
     _HUD_STATE["global_offset_x"] = max(-0.35, min(0.35, offset_x))
-    # 向上（负值）限制更严格，防止被顶部 UI 遮挡
-    _HUD_STATE["global_offset_y"] = max(-0.25, min(0.35, offset_y))
+    # 向上（负值）限制非常严格，防止被多层 Header 遮挡
+    # Blender Header 有透明层，需要预留更多空间
+    _HUD_STATE["global_offset_y"] = max(-0.15, min(0.30, offset_y))
 
 
 def reset_global_offset():
