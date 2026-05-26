@@ -5,6 +5,64 @@ from .hud_state import _HUD_STATE, _AVAILABLE_BUTTONS, get_user_buttons, get_glo
 from .hud_draw import HUD_BUTTON_WIDTH, HUD_BUTTON_HEIGHT, HUD_BUTTON_GAP, HUD_MARGIN, HUD_HANDLE_WIDTH
 
 
+# ============ 对称轴向菜单 ============
+
+class MMY_MT_SymmetryAxisMenu(bpy.types.Menu):
+    """对称轴向选择菜单"""
+    bl_idname = "MMY_MT_symmetry_axis_menu"
+    bl_label = "对称轴向"
+
+    def draw(self, context):
+        layout = self.layout
+        sculpt = context.tool_settings.sculpt if context.tool_settings else None
+
+        # X 轴
+        row = layout.row()
+        op = row.operator("mmy.set_symmetry_axis", text="X 轴")
+        op.axis = 'X'
+        if sculpt and sculpt.use_symmetry_x:
+            row.active = True
+
+        # Y 轴
+        row = layout.row()
+        op = row.operator("mmy.set_symmetry_axis", text="Y 轴")
+        op.axis = 'Y'
+        if sculpt and sculpt.use_symmetry_y:
+            row.active = True
+
+        # Z 轴
+        row = layout.row()
+        op = row.operator("mmy.set_symmetry_axis", text="Z 轴")
+        op.axis = 'Z'
+        if sculpt and sculpt.use_symmetry_z:
+            row.active = True
+
+
+class MMY_OT_SetSymmetryAxis(bpy.types.Operator):
+    """设置对称轴向"""
+    bl_idname = "mmy.set_symmetry_axis"
+    bl_label = "设置对称轴向"
+    bl_options = {'INTERNAL'}
+
+    axis: bpy.props.StringProperty(default='X')
+
+    def execute(self, context):
+        sculpt = context.tool_settings.sculpt if context.tool_settings else None
+        if sculpt:
+            if self.axis == 'X':
+                sculpt.use_symmetry_x = not sculpt.use_symmetry_x
+            elif self.axis == 'Y':
+                sculpt.use_symmetry_y = not sculpt.use_symmetry_y
+            elif self.axis == 'Z':
+                sculpt.use_symmetry_z = not sculpt.use_symmetry_z
+            # 刷新视图
+            for window in context.window_manager.windows:
+                for area in window.screen.areas:
+                    if area.type == "VIEW_3D":
+                        area.tag_redraw()
+        return {'FINISHED'}
+
+
 # ============ 添加按钮菜单 ============
 
 class MMY_MT_HUDAddButtonMenu(bpy.types.Menu):
@@ -352,6 +410,11 @@ class VIEW3D_OT_mmy_sculpt_hud_modal(bpy.types.Operator):
                 bpy.ops.wm.call_menu("INVOKE_DEFAULT", name="MMY_MT_hud_manage_buttons_menu")
                 return {'RUNNING_MODAL'}
 
+            if button_id == "symmetry":
+                # 右键点击对称按钮：弹出轴向选择菜单
+                bpy.ops.wm.call_menu("INVOKE_DEFAULT", name="MMY_MT_symmetry_axis_menu")
+                return {'RUNNING_MODAL'}
+
             return {'PASS_THROUGH'}
 
         return {'PASS_THROUGH'}
@@ -435,9 +498,14 @@ class VIEW3D_OT_mmy_sculpt_hud_modal(bpy.types.Operator):
                 shading.show_backface_culling = not shading.show_backface_culling
             return True
         elif button_id == "symmetry":
-            # 雕刻对称（切换 X 轴对称，最常用）
+            # 雕刻对称（切换 X 轴对称）
             if sculpt:
                 sculpt.use_symmetry_x = not sculpt.use_symmetry_x
+                # 刷新视图确保生效
+                for window in context.window_manager.windows:
+                    for area in window.screen.areas:
+                        if area.type == "VIEW_3D":
+                            area.tag_redraw()
             return True
         elif button_id == "dynamic_topology":
             # 动态拓扑（使用 operator）
@@ -446,6 +514,11 @@ class VIEW3D_OT_mmy_sculpt_hud_modal(bpy.types.Operator):
                     bpy.ops.sculpt.dynamic_topology_toggle()
                 except:
                     pass
+                # 刷新视图
+                for window in context.window_manager.windows:
+                    for area in window.screen.areas:
+                        if area.type == "VIEW_3D":
+                            area.tag_redraw()
             return True
 
         return False
@@ -460,6 +533,8 @@ class VIEW3D_OT_mmy_sculpt_hud_modal(bpy.types.Operator):
 
 
 _classes = (
+    MMY_MT_SymmetryAxisMenu,
+    MMY_OT_SetSymmetryAxis,
     MMY_MT_HUDAddButtonMenu,
     MMY_OT_HUDAddButton,
     MMY_MT_HUDManageButtonsMenu,
