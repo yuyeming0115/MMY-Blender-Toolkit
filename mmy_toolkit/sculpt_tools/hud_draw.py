@@ -171,32 +171,20 @@ def _check_button_active(space, obj, button_id):
         return shading.show_backface_culling if shading else False
     elif button_id == "symmetry":
         # 雕刻对称（检查 use_symmetry_x）
-        try:
-            if sculpt:
-                val = getattr(sculpt, 'use_symmetry_x', False)
-                print(f"[MMY Sculpt] 检查对称状态: X={val}")
-                return bool(val)
-        except Exception as e:
-            print(f"[MMY Sculpt] 检查对称失败: {e}")
+        if sculpt:
+            return bool(getattr(sculpt, 'use_symmetry_x', False))
         return False
     elif button_id == "dynamic_topology":
-        # 动态拓扑（检查属性）
+        # 动态拓扑（检查属性值，而不是存在性）
+        # 动态拓扑属性始终存在，需要检查是否处于活跃状态
+        # 使用 dyntopo 开启时 detail_size 会有实际值
         try:
             if sculpt:
-                # 打印所有可用属性
-                attrs = [a for a in dir(sculpt) if 'detail' in a.lower() or 'dyn' in a.lower()]
-                print(f"[MMY Sculpt] 动态拓扑相关属性: {attrs}")
-                # 尝试多种检查方式
-                if hasattr(sculpt, 'constant_detail_resolution'):
-                    return True
-                if hasattr(sculpt, 'detail_size'):
-                    return True
-                # 检查 detail_type
-                detail_type = getattr(sculpt, 'detail_type', None)
-                if detail_type and detail_type != 'NONE':
-                    return True
-        except Exception as e:
-            print(f"[MMY Sculpt] 检查动态拓扑失败: {e}")
+                detail_size = getattr(sculpt, 'detail_size', 0)
+                # 动态拓扑开启时 detail_size 会有非零值
+                return detail_size > 0
+        except:
+            pass
         return False
     elif button_id == "add":
         return False
