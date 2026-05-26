@@ -178,10 +178,12 @@ def _check_button_active(space, obj, button_id):
         # 动态拓扑状态检查
         try:
             if sculpt:
-                detail_size = getattr(sculpt, 'detail_size', 0)
-                print(f"[MMY Sculpt] 动态拓扑 detail_size={detail_size}")
-                # 动态拓扑开启时 detail_size 会有非零值
-                return detail_size > 0
+                # 检查多种可能的属性
+                detail_type_method = getattr(sculpt, 'detail_type_method', None)
+                print(f"[MMY Sculpt] 动态拓扑 detail_type_method={detail_type_method}")
+                # 动态拓扑开启时可能有特定的值
+                # 如果方法存在且不是 NONE，则认为开启
+                return detail_type_method is not None
         except:
             pass
         return False
