@@ -170,39 +170,15 @@ def _check_button_active(space, obj, button_id):
     elif button_id == "backface_culling":
         return shading.show_backface_culling if shading else False
     elif button_id == "symmetry":
-        # 雕刻对称（检查 use_symmetry_x）
+        # 对称：检查手动跟踪状态或 sculpt 属性
+        if _HUD_STATE.get("symmetry_x"):
+            return True
         if sculpt:
             return bool(getattr(sculpt, 'use_symmetry_x', False))
         return False
     elif button_id == "dynamic_topology":
-        # 动态拓扑状态检查
-        try:
-            # 方法1：检查 mesh 对象是否有 dyntopo 属性
-            mesh = obj.data if obj and obj.type == 'MESH' else None
-            if mesh:
-                mesh_attrs = [a for a in dir(mesh) if 'dyn' in a.lower() or 'topo' in a.lower() or 'sculpt' in a.lower()]
-                for attr in mesh_attrs:
-                    val = getattr(mesh, attr, None)
-                    if val is not None and not callable(val):
-                        print(f"[MMY Sculpt] mesh.{attr}={val}")
-
-                # Blender 4.x+: mesh.use_dynamic_topology_sculpting
-                dyntopo_mesh = getattr(mesh, 'use_dynamic_topology_sculpting', None)
-                print(f"[MMY Sculpt] mesh.use_dynamic_topology_sculpting={dyntopo_mesh}")
-
-            # 方法2：检查 sculpt.use_dyntopo
-            if sculpt:
-                dyntopo_sculpt = getattr(sculpt, 'use_dyntopo', None)
-                print(f"[MMY Sculpt] sculpt.use_dyntopo={dyntopo_sculpt}")
-
-                # 方法3：检查 sculpt.detail_type_method（开/关可能不同）
-                detail_type = getattr(sculpt, 'detail_type_method', None)
-                print(f"[MMY Sculpt] sculpt.detail_type_method={detail_type}")
-
-            return False  # 暂时返回 False，等确定正确属性
-        except Exception as e:
-            print(f"[MMY Sculpt] 动态拓扑检查失败: {e}")
-        return False
+        # 动态拓扑：使用手动跟踪状态（Blender API 不直接暴露）
+        return _HUD_STATE.get("dyntopo_active", False)
     elif button_id == "add":
         return False
 

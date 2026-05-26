@@ -40,15 +40,19 @@ class MMY_OT_SetSymmetryAxis(bpy.types.Operator):
     def execute(self, context):
         sculpt = context.tool_settings.sculpt if context.tool_settings else None
         if sculpt:
+            from .hud_state import _HUD_STATE
             # 切换对应轴向的状态
             if self.axis == 'X':
                 sculpt.use_symmetry_x = not sculpt.use_symmetry_x
+                _HUD_STATE["symmetry_x"] = sculpt.use_symmetry_x
                 print(f"[MMY Sculpt] 轴向切换: X={sculpt.use_symmetry_x}")
             elif self.axis == 'Y':
                 sculpt.use_symmetry_y = not sculpt.use_symmetry_y
+                _HUD_STATE["symmetry_y"] = sculpt.use_symmetry_y
                 print(f"[MMY Sculpt] 轴向切换: Y={sculpt.use_symmetry_y}")
             elif self.axis == 'Z':
                 sculpt.use_symmetry_z = not sculpt.use_symmetry_z
+                _HUD_STATE["symmetry_z"] = sculpt.use_symmetry_z
                 print(f"[MMY Sculpt] 轴向切换: Z={sculpt.use_symmetry_z}")
             # 刷新视图
             for window in context.window_manager.windows:
@@ -498,6 +502,8 @@ class VIEW3D_OT_mmy_sculpt_hud_modal(bpy.types.Operator):
                 try:
                     current = getattr(sculpt, 'use_symmetry_x', False)
                     sculpt.use_symmetry_x = not current
+                    # 更新手动跟踪状态
+                    _HUD_STATE["symmetry_x"] = sculpt.use_symmetry_x
                     print(f"[MMY Sculpt] 对称切换: X={sculpt.use_symmetry_x}")
                 except Exception as e:
                     print(f"[MMY Sculpt] 对称切换失败: {e}")
@@ -509,16 +515,18 @@ class VIEW3D_OT_mmy_sculpt_hud_modal(bpy.types.Operator):
             return True
         elif button_id == "dynamic_topology":
             # 动态拓扑（使用 operator）
-            if sculpt:
-                try:
-                    bpy.ops.sculpt.dynamic_topology_toggle()
-                except:
-                    pass
-                # 刷新视图
-                for window in context.window_manager.windows:
-                    for area in window.screen.areas:
-                        if area.type == "VIEW_3D":
-                            area.tag_redraw()
+            try:
+                bpy.ops.sculpt.dynamic_topology_toggle()
+                # 更新手动跟踪状态
+                _HUD_STATE["dyntopo_active"] = not _HUD_STATE.get("dyntopo_active", False)
+                print(f"[MMY Sculpt] 动态拓扑切换: {_HUD_STATE['dyntopo_active']}")
+            except Exception as e:
+                print(f"[MMY Sculpt] 动态拓扑切换失败: {e}")
+            # 刷新视图
+            for window in context.window_manager.windows:
+                for area in window.screen.areas:
+                    if area.type == "VIEW_3D":
+                        area.tag_redraw()
             return True
 
         return False

@@ -31,6 +31,11 @@ _HUD_STATE = {
     "global_offset_y": 0.0,
     # 用户按钮配置（存储用户选择的按钮列表）
     "user_buttons": ["face_sets", "mask", "wireframe"],
+    # 手动跟踪状态（Blender API 不直接暴露）
+    "dyntopo_active": False,  # 动态拓扑状态
+    "symmetry_x": False,      # 对称 X 轴状态
+    "symmetry_y": False,      # 对称 Y 轴状态
+    "symmetry_z": False,      # 对称 Z 轴状态
 }
 
 
