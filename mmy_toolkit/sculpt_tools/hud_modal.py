@@ -429,9 +429,9 @@ class VIEW3D_OT_mmy_sculpt_hud_modal(bpy.types.Operator):
                 overlay.show_wireframes = not overlay.show_wireframes
             return True
         elif button_id == "backface_culling":
-            # 背面遮罩
+            # 背面遮罩（正确属性名）
             if shading:
-                shading.backface_culling = not shading.backface_culling
+                shading.show_backface_culling = not shading.show_backface_culling
             return True
         elif button_id == "symmetry":
             # 雕刻对称

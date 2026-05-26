@@ -26,8 +26,9 @@ def draw_sculpt_hud_callback():
     try:
         _draw_sculpt_hud_inner()
     except Exception as e:
-        # 静默处理绘制错误
-        pass
+        print(f"[MMY Sculpt] 绘制错误: {e}")
+        import traceback
+        traceback.print_exc()
 
 
 def _draw_sculpt_hud_inner():
@@ -164,8 +165,8 @@ def _check_button_active(space, obj, button_id):
     elif button_id == "wireframe":
         return overlay.show_wireframes if overlay else False
     elif button_id == "backface_culling":
-        # 背面遮罩（在 shading.type == 'SOLID' 时生效）
-        return shading.backface_culling if shading else False
+        # 背面遮罩（正确属性名）
+        return shading.show_backface_culling if shading else False
     elif button_id == "symmetry":
         # 雕刻对称
         return obj.data.use_sculpt_symmetry if obj and obj.type == 'MESH' else False
