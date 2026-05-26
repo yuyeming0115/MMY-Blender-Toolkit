@@ -226,6 +226,63 @@ class MMY_OT_HUDLayoutReset(bpy.types.Operator):
 HUD_EDGE_SNAP_THRESHOLD = 50
 HUD_TOP_SAFE_MARGIN = 80
 HUD_BOTTOM_SAFE_MARGIN = 20
+HUD_SIDE_SAFE_MARGIN = 10
+
+
+def get_sidebar_width(area, space):
+    """获取右侧侧边栏宽度（N 面板）"""
+    if not hasattr(space, "show_region_ui") or not space.show_region_ui:
+        return 0
+    for region in area.regions:
+        if region.type == "UI":
+            return region.width
+    return 0
+
+
+def get_left_toolbar_width(area, space):
+    """获取左侧工具栏宽度（T 面板）"""
+    if not hasattr(space, "show_region_toolbar") or not space.show_region_toolbar:
+        return 0
+    for region in area.regions:
+        if region.type == "TOOLS":
+            return region.width
+    return 0
+
+
+def get_top_toolbar_height(area, space):
+    """获取顶部工具栏高度"""
+    if not hasattr(space, "show_region_header") or not space.show_region_header:
+        return 0
+    total_height = 0
+    for region in area.regions:
+        if region.type in ("HEADER", "TOOL_HEADER"):
+            total_height += region.height
+    return total_height
+
+
+def get_bottom_toolbar_height(area, space):
+    """获取底部工具栏高度"""
+    for region in area.regions:
+        if region.type == "FOOTER" and region.height > 0:
+            return region.height
+    return 0
+
+
+def get_effective_viewport_bounds(area, space, region):
+    """获取有效视口边界（扣除各区域后的可用空间）"""
+    left = get_left_toolbar_width(area, space)
+    right = region.width - get_sidebar_width(area, space)
+    top = region.height - max(HUD_TOP_SAFE_MARGIN, get_top_toolbar_height(area, space) + 40)
+    bottom = max(HUD_BOTTOM_SAFE_MARGIN, get_bottom_toolbar_height(area, space))
+
+    return {
+        "left": left + HUD_SIDE_SAFE_MARGIN,
+        "right": right - HUD_SIDE_SAFE_MARGIN,
+        "top": top,
+        "bottom": bottom + HUD_SIDE_SAFE_MARGIN,
+        "width": right - left - 2 * HUD_SIDE_SAFE_MARGIN,
+        "height": top - bottom - HUD_SIDE_SAFE_MARGIN,
+    }
 
 
 def get_region_key(window, area, region):
@@ -280,7 +337,10 @@ def find_button_at_point(window, mouse_x, mouse_y, area_id=None, region_id=None)
     region_mouse_x = mouse_x - region.x
     region_mouse_y = mouse_y - region.y
 
-    # ============ 新的位置计算逻辑（与 hud_draw.py 保持一致） ============
+    # ============ 获取有效视口边界 ============
+    bounds = get_effective_viewport_bounds(area, space, region)
+
+    # ============ 位置计算（与 hud_draw.py 保持一致） ============
 
     if layout_mode == "horizontal":
         # 水平布局
@@ -288,15 +348,17 @@ def find_button_at_point(window, mouse_x, mouse_y, area_id=None, region_id=None)
         total_width = HUD_HANDLE_WIDTH + button_count * HUD_BUTTON_WIDTH + (button_count - 1) * HUD_BUTTON_GAP + HUD_MARGIN * 2
 
         # 计算把手位置（带安全限制）
-        base_y = region.height * 0.5 - hud_height * 0.5
-        handle_y = base_y + offset_y * region.height
-        max_y = region.height - HUD_TOP_SAFE_MARGIN - hud_height
-        min_y = HUD_BOTTOM_SAFE_MARGIN
+        center_y = (bounds["top"] + bounds["bottom"]) * 0.5
+        base_y = center_y - hud_height * 0.5
+        handle_y = base_y + offset_y * bounds["height"]
+        max_y = bounds["top"] - hud_height
+        min_y = bounds["bottom"]
         handle_y = max(min_y, min(max_y, handle_y))
 
-        base_x = region.width * 0.5 - total_width * 0.5
-        handle_x = base_x + offset_x * region.width
-        handle_x = max(0, min(region.width - total_width, handle_x))
+        center_x = (bounds["left"] + bounds["right"]) * 0.5
+        base_x = center_x - total_width * 0.5
+        handle_x = base_x + offset_x * bounds["width"]
+        handle_x = max(bounds["left"], min(bounds["right"] - total_width, handle_x))
 
         handle_w = HUD_HANDLE_WIDTH
         handle_h = hud_height
@@ -319,30 +381,30 @@ def find_button_at_point(window, mouse_x, mouse_y, area_id=None, region_id=None)
         total_width = HUD_BUTTON_WIDTH + HUD_MARGIN * 2
 
         # 计算把手中心 Y 位置
-        handle_center_y = region.height * 0.5 + offset_y * region.height
+        center_y = (bounds["top"] + bounds["bottom"]) * 0.5
+        handle_center_y = center_y + offset_y * bounds["height"]
 
-        # 确定展开方向（与绘制逻辑一致）
+        # 确定展开方向
         expand_downward = True
-        if handle_center_y >= region.height - HUD_EDGE_SNAP_THRESHOLD:
-            # 靠近顶部：向下展开
-            handle_y = region.height - HUD_TOP_SAFE_MARGIN - HUD_HANDLE_WIDTH
+        if handle_center_y >= bounds["top"] - HUD_EDGE_SNAP_THRESHOLD:
+            handle_y = bounds["top"] - HUD_HANDLE_WIDTH
             expand_downward = True
-        elif handle_center_y <= HUD_EDGE_SNAP_THRESHOLD:
-            # 靠近底部：向上展开
-            handle_y = HUD_BOTTOM_SAFE_MARGIN
+        elif handle_center_y <= bounds["bottom"] + HUD_EDGE_SNAP_THRESHOLD:
+            handle_y = bounds["bottom"]
             expand_downward = False
         else:
-            expand_downward = handle_center_y < region.height * 0.5
+            expand_downward = handle_center_y < center_y
             if expand_downward:
                 handle_y = handle_center_y - HUD_HANDLE_WIDTH * 0.5
-                handle_y = max(HUD_BOTTOM_SAFE_MARGIN, min(region.height - HUD_TOP_SAFE_MARGIN - HUD_HANDLE_WIDTH, handle_y))
+                handle_y = max(bounds["bottom"], min(bounds["top"] - HUD_HANDLE_WIDTH, handle_y))
             else:
                 handle_y = handle_center_y - HUD_HANDLE_WIDTH * 0.5
-                handle_y = max(HUD_BOTTOM_SAFE_MARGIN, handle_y)
+                handle_y = max(bounds["bottom"], handle_y)
 
         # 计算把手 X 位置
-        handle_x = region.width * 0.5 + offset_x * region.width - total_width * 0.5
-        handle_x = max(0, min(region.width - total_width, handle_x))
+        center_x = (bounds["left"] + bounds["right"]) * 0.5
+        handle_x = center_x + offset_x * bounds["width"] - total_width * 0.5
+        handle_x = max(bounds["left"], min(bounds["right"] - total_width, handle_x))
 
         handle_w = total_width
         handle_h = HUD_HANDLE_WIDTH

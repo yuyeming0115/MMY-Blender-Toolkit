@@ -16,6 +16,7 @@ HUD_HANDLE_WIDTH = 20  # 拖拽把手宽度
 HUD_EDGE_SNAP_THRESHOLD = 50  # 吸附触发阈值（像素）
 HUD_TOP_SAFE_MARGIN = 80  # 顶部安全距离（Header + 透明层）
 HUD_BOTTOM_SAFE_MARGIN = 20  # 底部安全距离
+HUD_SIDE_SAFE_MARGIN = 10  # 侧边安全距离
 
 # 颜色
 HUD_BG_COLOR = (0.15, 0.15, 0.15, 0.85)
@@ -24,6 +25,64 @@ HUD_TEXT_COLOR = (1.0, 1.0, 1.0, 1.0)
 HUD_ACTIVE_COLOR = (0.2, 0.5, 0.8, 0.9)
 HUD_HOVER_COLOR = (0.25, 0.25, 0.25, 0.9)
 HUD_HANDLE_COLOR = (0.18, 0.18, 0.18, 0.9)
+
+
+# ============ 区域宽度检测函数（借鉴 FocusMode） ============
+
+def get_sidebar_width(area, space):
+    """获取右侧侧边栏宽度（N 面板）"""
+    if not hasattr(space, "show_region_ui") or not space.show_region_ui:
+        return 0
+    for region in area.regions:
+        if region.type == "UI":
+            return region.width
+    return 0
+
+
+def get_left_toolbar_width(area, space):
+    """获取左侧工具栏宽度（T 面板）"""
+    if not hasattr(space, "show_region_toolbar") or not space.show_region_toolbar:
+        return 0
+    for region in area.regions:
+        if region.type == "TOOLS":
+            return region.width
+    return 0
+
+
+def get_top_toolbar_height(area, space):
+    """获取顶部工具栏高度（Header）"""
+    if not hasattr(space, "show_region_header") or not space.show_region_header:
+        return 0
+    total_height = 0
+    for region in area.regions:
+        if region.type in ("HEADER", "TOOL_HEADER"):
+            total_height += region.height
+    return total_height
+
+
+def get_bottom_toolbar_height(area, space):
+    """获取底部工具栏高度（Footer）"""
+    for region in area.regions:
+        if region.type == "FOOTER" and region.height > 0:
+            return region.height
+    return 0
+
+
+def get_effective_viewport_bounds(area, space, region):
+    """获取有效视口边界（扣除各区域后的可用空间）"""
+    left = get_left_toolbar_width(area, space)
+    right = region.width - get_sidebar_width(area, space)
+    top = region.height - max(HUD_TOP_SAFE_MARGIN, get_top_toolbar_height(area, space) + 40)
+    bottom = max(HUD_BOTTOM_SAFE_MARGIN, get_bottom_toolbar_height(area, space))
+
+    return {
+        "left": left + HUD_SIDE_SAFE_MARGIN,
+        "right": right - HUD_SIDE_SAFE_MARGIN,
+        "top": top,
+        "bottom": bottom + HUD_SIDE_SAFE_MARGIN,
+        "width": right - left - 2 * HUD_SIDE_SAFE_MARGIN,
+        "height": top - bottom - HUD_SIDE_SAFE_MARGIN,
+    }
 
 
 def draw_sculpt_hud_callback():
@@ -76,32 +135,34 @@ def _draw_sculpt_hud_inner():
     # 导入绘制工具
     from .draw_utils import draw_rounded_rect, draw_rounded_rect_outline, draw_text
 
-    # ============ 新的位置计算逻辑（借鉴 FocusMode） ============
+    # ============ 获取有效视口边界（智能 padding） ============
+    bounds = get_effective_viewport_bounds(area, space, region)
 
-    # 计算把手位置（作为锚点）
+    # ============ 新的位置计算逻辑 ============
+
     if layout_mode == "horizontal":
         # 水平布局：把手高度 = HUD 高度
         hud_height = HUD_BUTTON_HEIGHT + HUD_MARGIN * 2
         handle_button_height = hud_height
 
-        # 计算把手 Y 位置（带偏移）
-        base_y = region.height * 0.5 - hud_height * 0.5
-        handle_y = base_y + offset_y * region.height
+        # 计算把手 Y 位置（带偏移），限制在有效边界内
+        center_y = (bounds["top"] + bounds["bottom"]) * 0.5
+        base_y = center_y - hud_height * 0.5
+        handle_y = base_y + offset_y * bounds["height"]
 
-        # 边缘吸附：限制把手在安全区域内
-        # 顶部安全距离
-        max_y = region.height - HUD_TOP_SAFE_MARGIN - hud_height
-        # 底部安全距离
-        min_y = HUD_BOTTOM_SAFE_MARGIN
+        # 限制把手在有效边界内
+        max_y = bounds["top"] - hud_height
+        min_y = bounds["bottom"]
         handle_y = max(min_y, min(max_y, handle_y))
 
-        # 计算把手 X 位置（带偏移）
+        # 计算把手 X 位置（带偏移），限制在有效边界内
         total_width = handle_width + button_count * HUD_BUTTON_WIDTH + (button_count - 1) * HUD_BUTTON_GAP + HUD_MARGIN * 2
-        base_x = region.width * 0.5 - total_width * 0.5
-        handle_x = base_x + offset_x * region.width
+        center_x = (bounds["left"] + bounds["right"]) * 0.5
+        base_x = center_x - total_width * 0.5
+        handle_x = base_x + offset_x * bounds["width"]
 
-        # 限制 X 范围
-        handle_x = max(0, min(region.width - total_width, handle_x))
+        # 限制 X 在有效边界内
+        handle_x = max(bounds["left"], min(bounds["right"] - total_width, handle_x))
 
         handle_w = handle_width
         handle_h = hud_height
@@ -109,48 +170,41 @@ def _draw_sculpt_hud_inner():
         # 垂直布局：使用动态展开方向
         hud_total_height = handle_width + button_count * HUD_BUTTON_HEIGHT + (button_count - 1) * HUD_BUTTON_GAP + HUD_MARGIN * 2
 
-        # 计算把手 Y 位置（带偏移）- 把手作为锚点
-        base_y = region.height * 0.5
-        handle_center_y = base_y + offset_y * region.height
+        # 计算把手中心 Y 位置（带偏移）
+        center_y = (bounds["top"] + bounds["bottom"]) * 0.5
+        handle_center_y = center_y + offset_y * bounds["height"]
 
-        # 边缘吸附：检查是否靠近顶部或底部
-        expand_downward = True  # 默认向下展开
+        # 边缘吸附检测（使用有效边界）
+        expand_downward = True
         force_expand_direction = None
 
         # 顶部吸附检测
-        if handle_center_y >= region.height - HUD_EDGE_SNAP_THRESHOLD:
-            # 靠近顶部：强制向下展开，把手固定在安全位置
+        if handle_center_y >= bounds["top"] - HUD_EDGE_SNAP_THRESHOLD:
             force_expand_direction = "down"
-            # 把手顶部位置 = region 顶部 - 安全距离
-            handle_y = region.height - HUD_TOP_SAFE_MARGIN - handle_width
+            handle_y = bounds["top"] - handle_width
             expand_downward = True
 
         # 底部吸附检测
-        elif handle_center_y <= HUD_EDGE_SNAP_THRESHOLD:
-            # 靠近底部：强制向上展开
+        elif handle_center_y <= bounds["bottom"] + HUD_EDGE_SNAP_THRESHOLD:
             force_expand_direction = "up"
-            handle_y = HUD_BOTTOM_SAFE_MARGIN
+            handle_y = bounds["bottom"]
             expand_downward = False
         else:
             # 正常位置：根据把手位置决定展开方向
-            # 如果把手在上半部分，向下展开；反之向上展开
-            expand_downward = handle_center_y < region.height * 0.5
+            expand_downward = handle_center_y < center_y
 
             if expand_downward:
-                # 向下展开：把手在顶部，按钮在下方
                 handle_y = handle_center_y - handle_width * 0.5
-                # 确保把手不会超出顶部安全区域
-                handle_y = max(HUD_BOTTOM_SAFE_MARGIN, min(region.height - HUD_TOP_SAFE_MARGIN - handle_width, handle_y))
+                handle_y = max(bounds["bottom"], min(bounds["top"] - handle_width, handle_y))
             else:
-                # 向上展开：把手在底部，按钮在上方
                 handle_y = handle_center_y - handle_width * 0.5
-                # 确保把手不会超出底部安全区域
-                handle_y = max(HUD_BOTTOM_SAFE_MARGIN, handle_y)
+                handle_y = max(bounds["bottom"], handle_y)
 
-        # 计算把手 X 位置
+        # 计算把手 X 位置（使用有效边界）
         total_width = HUD_BUTTON_WIDTH + HUD_MARGIN * 2
-        handle_x = region.width * 0.5 + offset_x * region.width - total_width * 0.5
-        handle_x = max(0, min(region.width - total_width, handle_x))
+        center_x = (bounds["left"] + bounds["right"]) * 0.5
+        handle_x = center_x + offset_x * bounds["width"] - total_width * 0.5
+        handle_x = max(bounds["left"], min(bounds["right"] - total_width, handle_x))
 
         handle_w = total_width
         handle_h = handle_width
@@ -187,11 +241,9 @@ def _draw_sculpt_hud_inner():
         btn_x = handle_x + HUD_MARGIN
 
         if expand_downward:
-            # 向下展开：按钮在把手下方
             btn_start_y = handle_y + handle_width + HUD_BUTTON_GAP
             button_order = list(reversed(buttons))  # 从下往上排列
         else:
-            # 向上展开：按钮在把手上方
             btn_start_y = handle_y - HUD_BUTTON_HEIGHT - HUD_BUTTON_GAP
             button_order = buttons  # 从上往下排列
 
