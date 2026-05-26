@@ -170,11 +170,10 @@ def _check_button_active(space, obj, button_id):
     elif button_id == "backface_culling":
         return shading.show_backface_culling if shading else False
     elif button_id == "symmetry":
-        # 对称：检查手动跟踪状态或 sculpt 属性
-        if _HUD_STATE.get("symmetry_x"):
-            return True
-        if sculpt:
-            return bool(getattr(sculpt, 'use_symmetry_x', False))
+        # 对称：检查网格镜像属性（mesh.use_mirror_x）
+        mesh = obj.data if obj and obj.type == 'MESH' else None
+        if mesh:
+            return bool(getattr(mesh, 'use_mirror_x', False))
         return False
     elif button_id == "dynamic_topology":
         # 动态拓扑：使用手动跟踪状态（Blender API 不直接暴露）

@@ -38,22 +38,23 @@ class MMY_OT_SetSymmetryAxis(bpy.types.Operator):
     axis: bpy.props.StringProperty(default='X')
 
     def execute(self, context):
-        sculpt = context.tool_settings.sculpt if context.tool_settings else None
-        if sculpt:
+        obj = context.active_object
+        mesh = obj.data if obj and obj.type == 'MESH' else None
+        if mesh:
             from .hud_state import _HUD_STATE
-            # 切换对应轴向的状态
+            # 切换对应轴向的状态（网格镜像）
             if self.axis == 'X':
-                sculpt.use_symmetry_x = not sculpt.use_symmetry_x
-                _HUD_STATE["symmetry_x"] = sculpt.use_symmetry_x
-                print(f"[MMY Sculpt] 轴向切换: X={sculpt.use_symmetry_x}")
+                mesh.use_mirror_x = not mesh.use_mirror_x
+                _HUD_STATE["symmetry_x"] = mesh.use_mirror_x
+                print(f"[MMY Sculpt] 网格镜像切换: X={mesh.use_mirror_x}")
             elif self.axis == 'Y':
-                sculpt.use_symmetry_y = not sculpt.use_symmetry_y
-                _HUD_STATE["symmetry_y"] = sculpt.use_symmetry_y
-                print(f"[MMY Sculpt] 轴向切换: Y={sculpt.use_symmetry_y}")
+                mesh.use_mirror_y = not mesh.use_mirror_y
+                _HUD_STATE["symmetry_y"] = mesh.use_mirror_y
+                print(f"[MMY Sculpt] 网格镜像切换: Y={mesh.use_mirror_y}")
             elif self.axis == 'Z':
-                sculpt.use_symmetry_z = not sculpt.use_symmetry_z
-                _HUD_STATE["symmetry_z"] = sculpt.use_symmetry_z
-                print(f"[MMY Sculpt] 轴向切换: Z={sculpt.use_symmetry_z}")
+                mesh.use_mirror_z = not mesh.use_mirror_z
+                _HUD_STATE["symmetry_z"] = mesh.use_mirror_z
+                print(f"[MMY Sculpt] 网格镜像切换: Z={mesh.use_mirror_z}")
             # 刷新视图
             for window in context.window_manager.windows:
                 for area in window.screen.areas:
@@ -497,24 +498,18 @@ class VIEW3D_OT_mmy_sculpt_hud_modal(bpy.types.Operator):
                 shading.show_backface_culling = not shading.show_backface_culling
             return True
         elif button_id == "symmetry":
-            # 雕刻对称（切换 X 轴对称）
-            if sculpt:
+            # 雕刻对称（使用 mesh.use_mirror_x - 网格镜像）
+            mesh = obj.data if obj and obj.type == 'MESH' else None
+            if mesh:
                 try:
-                    # 打印所有对称相关属性
-                    sym_attrs = [a for a in dir(sculpt) if 'sym' in a.lower()]
-                    print(f"[MMY Sculpt] 对称相关属性: {sym_attrs}")
-                    for attr in sym_attrs[:10]:
-                        val = getattr(sculpt, attr, None)
-                        if val is not None and not callable(val):
-                            print(f"[MMY Sculpt] sculpt.{attr}={val}")
-
-                    current = getattr(sculpt, 'use_symmetry_x', False)
-                    sculpt.use_symmetry_x = not current
+                    # 网格镜像属性
+                    current = getattr(mesh, 'use_mirror_x', False)
+                    mesh.use_mirror_x = not current
                     # 更新手动跟踪状态
-                    _HUD_STATE["symmetry_x"] = sculpt.use_symmetry_x
-                    print(f"[MMY Sculpt] 对称切换后: X={sculpt.use_symmetry_x}")
+                    _HUD_STATE["symmetry_x"] = mesh.use_mirror_x
+                    print(f"[MMY Sculpt] 网格镜像切换: X={mesh.use_mirror_x}")
                 except Exception as e:
-                    print(f"[MMY Sculpt] 对称切换失败: {e}")
+                    print(f"[MMY Sculpt] 网格镜像切换失败: {e}")
                 # 刷新视图确保生效
                 for window in context.window_manager.windows:
                     for area in window.screen.areas:
