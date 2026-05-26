@@ -500,7 +500,12 @@ class VIEW3D_OT_mmy_sculpt_hud_modal(bpy.types.Operator):
         elif button_id == "symmetry":
             # 雕刻对称（切换 X 轴对称）
             if sculpt:
-                sculpt.use_symmetry_x = not sculpt.use_symmetry_x
+                try:
+                    current = getattr(sculpt, 'use_symmetry_x', False)
+                    sculpt.use_symmetry_x = not current
+                    print(f"[MMY Sculpt] 对称切换: X={sculpt.use_symmetry_x}")
+                except Exception as e:
+                    print(f"[MMY Sculpt] 对称切换失败: {e}")
                 # 刷新视图确保生效
                 for window in context.window_manager.windows:
                     for area in window.screen.areas:

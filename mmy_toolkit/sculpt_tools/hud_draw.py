@@ -170,16 +170,21 @@ def _check_button_active(space, obj, button_id):
     elif button_id == "backface_culling":
         return shading.show_backface_culling if shading else False
     elif button_id == "symmetry":
-        # 雕刻对称（检查 X 轴是否启用）
-        if sculpt:
-            return getattr(sculpt, 'use_symmetry_x', False)
+        # 雕刻对称（检查 use_symmetry_x）
+        try:
+            if sculpt:
+                return bool(getattr(sculpt, 'use_symmetry_x', False))
+        except:
+            pass
         return False
     elif button_id == "dynamic_topology":
-        # 动态拓扑（检查 detail_type 属性是否存在且有效）
-        if sculpt:
-            # 动态拓扑开启时，detail_type 会是 'RELATIVE' 或 'CONSTANT'
-            detail_type = getattr(sculpt, 'detail_type', None)
-            return detail_type is not None and detail_type in ('RELATIVE', 'CONSTANT', 'MANUAL')
+        # 动态拓扑（检查 constant_detail_resolution 属性）
+        try:
+            if sculpt:
+                # 动态拓扑开启时会有 constant_detail_resolution 属性
+                return hasattr(sculpt, 'constant_detail_resolution')
+        except:
+            pass
         return False
     elif button_id == "add":
         return False
