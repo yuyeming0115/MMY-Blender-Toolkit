@@ -14,18 +14,17 @@ class MMY_MT_SymmetryAxisMenu(bpy.types.Menu):
 
     def draw(self, context):
         layout = self.layout
-        sculpt = context.tool_settings.sculpt if context.tool_settings else None
+        obj = context.active_object
+        mesh = obj.data if obj and obj.type == 'MESH' else None
 
-        # X 轴（显示当前状态）
-        x_state = sculpt.use_symmetry_x if sculpt else False
+        # 使用 mesh.use_mirror_x/y/z（网格镜像属性）检查状态
+        x_state = mesh.use_mirror_x if mesh else False
         layout.operator("mmy.set_symmetry_axis", text=f"X 轴 {'✓' if x_state else ''}").axis = 'X'
 
-        # Y 轴
-        y_state = sculpt.use_symmetry_y if sculpt else False
+        y_state = mesh.use_mirror_y if mesh else False
         layout.operator("mmy.set_symmetry_axis", text=f"Y 轴 {'✓' if y_state else ''}").axis = 'Y'
 
-        # Z 轴
-        z_state = sculpt.use_symmetry_z if sculpt else False
+        z_state = mesh.use_mirror_z if mesh else False
         layout.operator("mmy.set_symmetry_axis", text=f"Z 轴 {'✓' if z_state else ''}").axis = 'Z'
 
 
