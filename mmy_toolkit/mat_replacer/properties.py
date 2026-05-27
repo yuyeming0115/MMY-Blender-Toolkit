@@ -110,6 +110,16 @@ class MMY_LinkedMaterialItem(bpy.types.PropertyGroup):
     name: StringProperty(name="材质名", default="")
 
 
+class MMY_SourceObjectItem(bpy.types.PropertyGroup):
+    """源对象项"""
+    name: StringProperty(name="对象名", default="")
+
+
+class MMY_SourceMaterialItem(bpy.types.PropertyGroup):
+    """源材质项"""
+    name: StringProperty(name="材质名", default="")
+
+
 class MMY_MatReplacerProps(bpy.types.PropertyGroup):
     """材质替换器属性组"""
     external_file: StringProperty(subtype="FILE_PATH", default="")
@@ -154,11 +164,20 @@ class MMY_MatReplacerProps(bpy.types.PropertyGroup):
         update=_update_constraint_enabled
     )
 
+    # === 材质分配同步属性 ===
+    mat_source_file: StringProperty(subtype="FILE_PATH", default="", name="材质源文件")
+    source_objects: CollectionProperty(type=MMY_SourceObjectItem)
+    source_materials: CollectionProperty(type=MMY_SourceMaterialItem)
+    source_object_index: IntProperty(default=0, name="源对象索引")
+    manual_source_name: StringProperty(default="", name="手动源对象名")
+
 
 _classes = (
     MMY_MaterialMappingItem,
     MMY_ExternalMaterialItem,
     MMY_LinkedMaterialItem,
+    MMY_SourceObjectItem,
+    MMY_SourceMaterialItem,
     MMY_MatReplacerProps,
 )
 

@@ -65,9 +65,10 @@ def decode_target_mat_id(safe_id):
 
 
 class MMY_OT_SelectExternalFile(bpy.types.Operator, ImportHelper):
-    """选择外部 .blend 文件"""
+    """选择外部 .blend 文件（材质替换 + 材质分配同步共用）"""
     bl_idname = "mmy.select_external_file"
-    bl_label = "选择外部文件"
+    bl_label = "选择Mat文件"
+    bl_description = "选择材质源文件，用于材质Link和材质分配同步"
     bl_options = {'REGISTER'}
 
     filename_ext = ".blend"
@@ -81,16 +82,35 @@ class MMY_OT_SelectExternalFile(bpy.types.Operator, ImportHelper):
             self.report({'ERROR'}, f"文件不存在: {filepath}")
             return {'CANCELLED'}
 
+        # 设置文件路径（材质替换和材质分配同步共用）
         props.external_file = filepath
+        props.mat_source_file = filepath  # 同时设置材质分配同步的源文件
+
+        # 清空旧数据
         props.external_materials.clear()
+        props.source_objects.clear()
+        props.source_materials.clear()
 
         try:
             with bpy.data.libraries.load(filepath) as (data_from, data_to):
+                # 加载材质列表
                 for mat_name in data_from.materials:
                     item = props.external_materials.add()
                     item.name = mat_name
                     item.is_selected = True
-            self.report({'INFO'}, f"已加载 {len(props.external_materials)} 个材质")
+
+                # 加载对象列表
+                for obj_name in data_from.objects:
+                    item = props.source_objects.add()
+                    item.name = obj_name
+
+                # 加载源材质列表
+                for mat_name in data_from.materials:
+                    item = props.source_materials.add()
+                    item.name = mat_name
+
+            self.report({'INFO'}, f"已加载: {len(props.external_materials)} 个材质, {len(props.source_objects)} 个对象")
+
         except Exception as e:
             self.report({'ERROR'}, f"读取失败: {str(e)}")
             return {'CANCELLED'}
@@ -468,6 +488,308 @@ class MMY_OT_CreateScaleConstraint(bpy.types.Operator):
         return {'FINISHED'}
 
 
+# === 材质分配同步操作符 ===
+
+class MMY_OT_SelectMatSourceFile(bpy.types.Operator, ImportHelper):
+    """选择材质源文件（Mat.blend）"""
+    bl_idname = "mmy.select_mat_source_file"
+    bl_label = "选择材质源文件"
+    bl_description = "选择包含材质分配信息的源 .blend 文件"
+    bl_options = {'REGISTER'}
+
+    filename_ext = ".blend"
+    filter_glob: bpy.props.StringProperty(default="*.blend", options={'HIDDEN'})
+
+    def execute(self, context):
+        props = context.scene.mmy_mat_replacer
+        filepath = self.filepath
+
+        if not os.path.exists(filepath):
+            self.report({'ERROR'}, f"文件不存在: {filepath}")
+            return {'CANCELLED'}
+
+        props.mat_source_file = filepath
+
+        # 读取源文件中的对象列表
+        try:
+            with bpy.data.libraries.load(filepath) as (data_from, data_to):
+                # 保存源对象列表到属性
+                props.source_objects.clear()
+                for obj_name in data_from.objects:
+                    item = props.source_objects.add()
+                    item.name = obj_name
+
+                # 保存材质列表
+                props.source_materials.clear()
+                for mat_name in data_from.materials:
+                    item = props.source_materials.add()
+                    item.name = mat_name
+
+                self.report({'INFO'}, f"已加载: {len(props.source_objects)} 个对象, {len(props.source_materials)} 个材质")
+
+        except Exception as e:
+            self.report({'ERROR'}, f"读取失败: {str(e)}")
+            return {'CANCELLED'}
+
+        return {'FINISHED'}
+
+
+class MMY_OT_SyncMaterialAssignment(bpy.types.Operator):
+    """同步材质分配信息"""
+    bl_idname = "mmy.sync_material_assignment"
+    bl_label = "同步材质分配"
+    bl_description = "从源文件同步材质槽和面分配到当前对象"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    # 允许手动指定源对象名称
+    source_object_name: bpy.props.StringProperty(
+        name="源对象名",
+        default="",
+        description="手动指定源对象名称，为空则使用同名匹配"
+    )
+
+    @classmethod
+    def poll(cls, context):
+        props = context.scene.mmy_mat_replacer
+        return props.mat_source_file and context.active_object and context.active_object.type == 'MESH'
+
+    def execute(self, context):
+        props = context.scene.mmy_mat_replacer
+        filepath = props.mat_source_file
+
+        target_obj = context.active_object
+        if not target_obj or target_obj.type != 'MESH':
+            self.report({'ERROR'}, "请选中网格对象")
+            return {'CANCELLED'}
+
+        # 确定源对象名称：手动指定 或 同名匹配 或 使用手动源名属性
+        if self.source_object_name:
+            source_obj_name = self.source_object_name
+        elif props.manual_source_name:
+            source_obj_name = props.manual_source_name
+        else:
+            source_obj_name = target_obj.name
+
+        # 检查源对象是否存在
+        source_obj_found = False
+        for item in props.source_objects:
+            if item.name == source_obj_name:
+                source_obj_found = True
+                break
+
+        if not source_obj_found:
+            # 尝试在源对象列表中找可能的匹配
+            self.report({'WARNING'}, f"源文件未找到对象: {source_obj_name}")
+            self.report({'INFO'}, f"可用对象: {', '.join([item.name for item in props.source_objects[:10]])}")
+            return {'CANCELLED'}
+
+        try:
+            # 使用更直接的方式：临时 append 源对象，读取数据，然后删除
+            self._sync_via_temp_append(context, filepath, source_obj_name, target_obj)
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            self.report({'ERROR'}, f"同步失败: {str(e)}")
+            return {'CANCELLED'}
+
+        return {'FINISHED'}
+
+    def _sync_via_temp_append(self, context, filepath, source_name, target_obj):
+        """通过临时 append 源对象来同步材质分配"""
+        import tempfile
+        import shutil
+
+        # 保存目标对象的指针（重要！防止误删）
+        target_obj_ptr = target_obj
+        target_obj_name = target_obj.name
+
+        # 临时保存当前场景状态
+        original_selected = [obj.name for obj in context.selected_objects]
+        original_active = context.active_object.name if context.active_object else None
+
+        # 记录当前对象列表（用于识别新 append 的对象）
+        existing_objects = set(obj.name for obj in bpy.data.objects)
+
+        # 在临时集合中 append 源对象
+        temp_coll_name = "_MMY_TEMP_SYNC_"
+        temp_coll = bpy.data.collections.new(temp_coll_name)
+        context.scene.collection.children.link(temp_coll)
+
+        try:
+            # Append 源对象
+            with bpy.data.libraries.load(filepath, link=False) as (data_from, data_to):
+                # 找到源对象
+                if source_name in data_from.objects:
+                    data_to.objects = [source_name]
+
+            # 查找新 append 的对象（通过对比对象列表）
+            source_obj = None
+            for obj in bpy.data.objects:
+                if obj.name not in existing_objects:
+                    source_obj = obj
+                    break
+
+            # 如果没找到新对象，可能是源对象名被重命名了
+            if not source_obj:
+                # 查找可能的 append 对象（名称包含源名）
+                for obj in bpy.data.objects:
+                    if source_name in obj.name and obj != target_obj_ptr:
+                        source_obj = obj
+                        break
+
+            if not source_obj:
+                self.report({'ERROR'}, f"未能加载源对象: {source_name}")
+                return
+
+            # 链接到临时集合（如果还没链接）
+            if source_obj.name not in temp_coll.objects:
+                temp_coll.objects.link(source_obj)
+
+            # 检查拓扑是否匹配
+            source_mesh = source_obj.data
+            target_mesh = target_obj_ptr.data
+
+            if len(source_mesh.polygons) != len(target_mesh.polygons):
+                self.report({'WARNING'}, f"拓扑不匹配: 源{len(source_mesh.polygons)}面 vs 目标{len(target_mesh.polygons)}面")
+                self.report({'INFO'}, "尝试部分同步...")
+
+            # 同步材质槽
+            self._sync_material_slots(context, source_obj, target_obj_ptr)
+
+            # 同步材质分配索引
+            synced_count = 0
+            min_faces = min(len(source_mesh.polygons), len(target_mesh.polygons))
+
+            for i in range(min_faces):
+                target_mesh.polygons[i].material_index = source_mesh.polygons[i].material_index
+                synced_count += 1
+
+            # 更新材质槽显示
+            for area in context.screen.areas:
+                if area.type == 'PROPERTIES':
+                    for space in area.spaces:
+                        if space.type == 'PROPERTIES':
+                            space.context = 'MATERIAL'
+                            break
+
+            self.report({'INFO'}, f"已同步 {synced_count} 个面的材质分配")
+
+        finally:
+            # 安全清理临时对象和集合（保护目标对象！）
+            # 只清理新添加的对象，不清理目标对象
+            objs_to_remove = []
+            meshes_to_remove = []
+
+            for obj in bpy.data.objects:
+                # 只清理新 append 的对象（不在原有列表中）且不是目标对象
+                if obj.name not in existing_objects and obj != target_obj_ptr:
+                    objs_to_remove.append(obj)
+                    if obj.data:
+                        meshes_to_remove.append(obj.data)
+
+            # 取消链接并移除
+            for obj in objs_to_remove:
+                try:
+                    if obj.name in temp_coll.objects:
+                        temp_coll.objects.unlink(obj)
+                    bpy.data.objects.remove(obj, do_unlink=True)
+                except:
+                    pass
+
+            # 移除临时 mesh 数据
+            for mesh in meshes_to_remove:
+                if mesh and mesh.users == 0:
+                    try:
+                        bpy.data.meshes.remove(mesh)
+                    except:
+                        pass
+
+            # 移除临时集合
+            try:
+                context.scene.collection.children.unlink(temp_coll)
+            except:
+                pass
+            try:
+                bpy.data.collections.remove(temp_coll)
+            except:
+                pass
+
+            # 恢复选中状态（确保目标对象存在）
+            bpy.ops.object.select_all(action='DESELECT')
+
+            # 确保目标对象仍然存在
+            if target_obj_ptr and target_obj_ptr.name in bpy.data.objects:
+                target_obj_ptr.select_set(True)
+                context.view_layer.objects.active = target_obj_ptr
+
+            # 恢复其他选中对象
+            for name in original_selected:
+                if name != target_obj_name:  # 避免重复选中
+                    obj = bpy.data.objects.get(name)
+                    if obj:
+                        obj.select_set(True)
+
+    def _sync_material_slots(self, context, source_obj, target_obj):
+        """同步材质槽（使用 Link 方式关联材质）"""
+        # 先 Link 源文件的所有材质
+        props = context.scene.mmy_mat_replacer
+        filepath = props.mat_source_file
+
+        # 获取源对象的材质列表
+        source_materials = []
+        for slot in source_obj.material_slots:
+            if slot.material:
+                source_materials.append(slot.material.name)
+
+        # Link 这些材质到当前文件
+        linked_materials = {}
+        if filepath and source_materials:
+            try:
+                with bpy.data.libraries.load(filepath, link=True) as (data_from, data_to):
+                    data_to.materials = source_materials
+
+                # 查找 Link 的材质
+                for mat_name in source_materials:
+                    for mat in bpy.data.materials:
+                        if mat.name == mat_name and mat.library is not None:
+                            linked_materials[mat_name] = mat
+                            break
+                        # Blender 可能会给 Link 材质添加后缀
+                        if mat.library is not None and mat_name in mat.name:
+                            linked_materials[mat_name] = mat
+                            break
+            except Exception as e:
+                print(f"[MMY] Link材质失败: {e}")
+                # 如果 Link 失败，使用原材质（复制方式）
+                for mat_name in source_materials:
+                    for slot in source_obj.material_slots:
+                        if slot.material and slot.material.name == mat_name:
+                            linked_materials[mat_name] = slot.material
+                            break
+
+        # 清除目标对象的多余材质槽
+        while len(target_obj.material_slots) > len(source_obj.material_slots):
+            target_obj.active_material_index = len(target_obj.material_slots) - 1
+            bpy.ops.object.material_slot_remove()
+
+        # 确保材质槽数量匹配，使用 Link 的材质
+        for i in range(len(source_obj.material_slots)):
+            source_slot = source_obj.material_slots[i]
+            source_mat = source_slot.material
+
+            if source_mat:
+                # 获取 Link 的材质
+                linked_mat = linked_materials.get(source_mat.name, source_mat)
+
+                # 如果目标材质槽不够，添加新槽
+                if i >= len(target_obj.material_slots):
+                    target_obj.data.materials.append(linked_mat)
+                else:
+                    # 替换材质为 Link 版本
+                    target_obj.material_slots[i].material = linked_mat
+
+
 _classes = (
     MMY_OT_SelectExternalFile,
     MMY_OT_LinkMaterials,
@@ -476,6 +798,8 @@ _classes = (
     MMY_OT_SelectAnimFile,
     MMY_OT_LinkAnimation,
     MMY_OT_CreateScaleConstraint,
+    MMY_OT_SelectMatSourceFile,
+    MMY_OT_SyncMaterialAssignment,
 )
 
 

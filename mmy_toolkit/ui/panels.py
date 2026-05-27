@@ -307,47 +307,69 @@ class VIEW3D_PT_MMYMeshTools(bpy.types.Panel):
 
         layout.separator()
         box = layout.box()
-        box.label(text="材质替换", icon='MATERIAL')
+        box.label(text="材质管理", icon='MATERIAL')
 
-        # Step 1: 选择外部文件
+        # === 统一的文件选择入口 ===
         row = box.row(align=True)
-        row.operator("mmy.select_external_file", text="选择外部文件", icon='FILE_FOLDER')
+        row.operator("mmy.select_external_file", text="选择Mat文件", icon='FILE_FOLDER')
+
         if props.external_file:
             import os
             filename = os.path.basename(props.external_file)
             row.label(text=filename)
 
-        # Step 2: Link按钮 + 替换按钮（同一行）
-        if len(props.external_materials) > 0:
-            row = box.row(align=True)
-            row.operator("mmy.link_materials", text="Link并生成映射", icon='LINK_BLEND')
-            if len(props.mappings) > 0:
-                row.operator("mmy.execute_replace", text="替换", icon='PLAY')
-            row.operator("mmy.clear_all", text="清除", icon='X')
+            # === 材质 Link + 替换 ===
+            if len(props.external_materials) > 0:
+                col = box.column()
 
-        # 双列布局：外部材质勾选 + 映射列表
-        if len(props.external_materials) > 0:
-            split = box.split(factor=0.35)
+                # Link材质按钮
+                row = col.row(align=True)
+                row.operator("mmy.link_materials", text="Link材质", icon='LINK_BLEND')
 
-            # 左列：外部材质勾选
-            left = split.column()
-            left.label(text="外部材质:", icon='LINKED')
-            for item in props.external_materials:
-                row = left.row(align=True)
-                row.prop(item, "is_selected", text="")
-                short = item.name[:18] + ".." if len(item.name) > 18 else item.name
-                row.label(text=short)
+                # 替换按钮（如果映射已生成）
+                if len(props.mappings) > 0:
+                    row.operator("mmy.execute_replace", text="替换材质", icon='PLAY')
 
-            # 右列：映射列表
-            right = split.column()
-            right.label(text="映射:", icon='MATERIAL')
+                row.operator("mmy.clear_all", text="清除", icon='X')
 
-            if len(props.mappings) > 0:
-                for mapping in props.mappings:
-                    row = right.row(align=True)
-                    src_short = mapping.source_mat_name[:12] + ".." if len(mapping.source_mat_name) > 12 else mapping.source_mat_name
-                    row.label(text=src_short)
-                    row.prop(mapping, "target_mat_id", text="")
+                # 映射列表（折叠显示）
+                if len(props.mappings) > 0:
+                    exp = box.box()
+                    exp.label(text=f"映射: {len(props.mappings)} 项", icon='MATERIAL')
+                    for mapping in props.mappings[:5]:  # 只显示前5项
+                        row = exp.row(align=True)
+                        src_short = mapping.source_mat_name[:12] + ".." if len(mapping.source_mat_name) > 12 else mapping.source_mat_name
+                        row.label(text=src_short)
+                        row.prop(mapping, "target_mat_id", text="")
+                    if len(props.mappings) > 5:
+                        exp.label(text=f"... 还有 {len(props.mappings)-5} 项")
+
+        # === 材质分配同步 ===
+        if props.external_file and len(props.source_objects) > 0:
+            box.separator()
+            sub = box.box()
+            sub.label(text="材质分配同步", icon='MATERIAL_DATA')
+            sub.label(text=f"源对象: {len(props.source_objects)} 个")
+
+            obj = context.active_object
+            if obj and obj.type == 'MESH':
+                row = sub.row(align=True)
+                row.label(text="源对象:")
+                row.prop_search(props, "manual_source_name", props, "source_objects", text="")
+
+                source_name = props.manual_source_name if props.manual_source_name else obj.name
+                source_valid = any(item.name == source_name for item in props.source_objects)
+
+                row = sub.row()
+                row.scale_y = 1.2
+                if source_valid:
+                    op = row.operator("mmy.sync_material_assignment", text="同步材质分配", icon='PLAY')
+                    op.source_object_name = source_name
+                    row.label(text=f"→ {obj.name}")
+                else:
+                    row.label(text="请选择有效的源对象", icon='ERROR')
+            else:
+                sub.label(text="请选中网格对象", icon='ERROR')
 
 
 _classes = (
