@@ -72,22 +72,48 @@ def _draw_sculpt_context_menu(self, context):
 
     # 初始化面组快捷选项（一行排列，方形按钮）
     if prefs:
+        # face_sets_init 的选项
         init_options = [
-            (prefs.init_loose_parts, "松散", 'LOOSE_PARTS'),
-            (prefs.init_materials, "材质", 'MATERIALS'),
-            (prefs.init_uv_seams, "UV", 'UV_SEAMS'),
-            (prefs.init_creases, "折痕", 'CREASES'),
-            (prefs.init_sharp_edges, "尖锐", 'SHARP_EDGES'),
+            (prefs.init_loose_parts, "松散", 'LOOSE_PARTS', "sculpt.face_sets_init"),
+            (prefs.init_materials, "材质", 'MATERIALS', "sculpt.face_sets_init"),
+            (prefs.init_uv_seams, "UV", 'UV_SEAMS', "sculpt.face_sets_init"),
+            (prefs.init_creases, "折痕", 'CREASES', "sculpt.face_sets_init"),
+            (prefs.init_sharp_edges, "尖锐", 'SHARP_EDGES', "sculpt.face_sets_init"),
+            # face_sets_create 的选项（从选中项创建）
+            (prefs.init_selection, "选中", 'SELECTION', "sculpt.face_sets_create"),
         ]
 
         # 收集已启用的选项
-        enabled_options = [(label, mode) for enabled, label, mode in init_options if enabled]
+        enabled_options = [(label, mode, op) for enabled, label, mode, op in init_options if enabled]
 
         if enabled_options:
             row = layout.row(align=True)
             row.label(text="初始化:")
-            for label, mode in enabled_options:
-                row.operator("sculpt.face_sets_init", text=label).mode = mode
+            for label, mode, op in enabled_options:
+                row.operator(op, text=label).mode = mode
+
+    # 遮罩快捷选项（一行排列）
+    if prefs:
+        mask_options = [
+            (prefs.mask_boundary, "边界", "sculpt.mask_from_boundary"),
+            (prefs.mask_face_set_boundary, "面组边界", "sculpt.mask_from_boundary_face_set"),  # 尝试不同的 operator
+            (prefs.mask_cavity, "Cavity", "sculpt.mask_from_cavity"),
+            (prefs.mask_slice, "切片", "sculpt.paint_mask_slice"),
+            (prefs.mask_extract, "提取", "sculpt.paint_mask_extract"),
+        ]
+
+        # 收集已启用的选项
+        enabled_mask_options = [(label, op) for enabled, label, op in mask_options if enabled]
+
+        if enabled_mask_options:
+            row = layout.row(align=True)
+            row.label(text="遮罩:")
+            for label, op in enabled_mask_options:
+                # 检查 operator 是否存在
+                try:
+                    row.operator(op, text=label)
+                except:
+                    pass  # 跳过不存在的 operator
 
     # 初始化面组完整子菜单（包含所有选项）
     layout.menu("MMY_MT_sculpt_face_sets_init", text="初始化面组 (全部)", icon='GROUP_VERTEX')

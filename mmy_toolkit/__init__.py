@@ -505,6 +505,38 @@ class MMY_Preferences(bpy.types.AddonPreferences):
         description="在右键菜单一级显示\"按尖锐边\"",
         default=True
     )
+    init_selection: bpy.props.BoolProperty(
+        name="从选中项",
+        description="在右键菜单一级显示\"从选中项\"（需先在编辑模式下选中面）",
+        default=True
+    )
+
+    # === 遮罩快捷选项 ===
+    mask_boundary: bpy.props.BoolProperty(
+        name="网格边界",
+        description="在右键菜单一级显示\"网格边界遮罩\"",
+        default=True
+    )
+    mask_face_set_boundary: bpy.props.BoolProperty(
+        name="面组边界",
+        description="在右键菜单一级显示\"面组边界遮罩\"",
+        default=True
+    )
+    mask_cavity: bpy.props.BoolProperty(
+        name="Cavity",
+        description="在右键菜单一级显示\"Cavity遮罩\"",
+        default=True
+    )
+    mask_slice: bpy.props.BoolProperty(
+        name="切片",
+        description="在右键菜单一级显示\"遮罩切片到新物体\"",
+        default=True
+    )
+    mask_extract: bpy.props.BoolProperty(
+        name="提取",
+        description="在右键菜单一级显示\"遮罩提取\"",
+        default=True
+    )
 
     def draw(self, context):
         layout = self.layout
@@ -679,11 +711,25 @@ class MMY_Preferences(bpy.types.AddonPreferences):
         row = box.row()
         row.prop(self, "init_loose_parts")
         row.prop(self, "init_materials")
-        row = box.row()
         row.prop(self, "init_uv_seams")
-        row.prop(self, "init_creases")
         row = box.row()
+        row.prop(self, "init_creases")
         row.prop(self, "init_sharp_edges")
+        row.prop(self, "init_selection")
+        box.label(text="勾选的选项将显示在雕刻右键菜单一级界面（选中项需先在编辑模式下选中面）")
+
+        layout.separator()
+
+        # === 遮罩快捷选项 ===
+        layout.label(text="遮罩快捷选项:", icon='MOD_MASK')
+        box = layout.box()
+        row = box.row()
+        row.prop(self, "mask_boundary")
+        row.prop(self, "mask_face_set_boundary")
+        row.prop(self, "mask_cavity")
+        row = box.row()
+        row.prop(self, "mask_slice")
+        row.prop(self, "mask_extract")
         box.label(text="勾选的选项将显示在雕刻右键菜单一级界面")
 
         layout.separator()
