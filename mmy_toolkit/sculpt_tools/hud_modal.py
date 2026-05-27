@@ -330,6 +330,10 @@ def find_button_at_point(window, mouse_x, mouse_y, area_id=None, region_id=None)
     if region is None:
         region = getattr(context, "region", None)
 
+    # 只接受 WINDOW region 的点击，忽略 ASSET_SHELF、HEADER 等其他 region
+    if region and region.type != "WINDOW":
+        return None, None, None, None
+
     space = getattr(area, "spaces", None)
     if space:
         space = space.active if hasattr(space, 'active') else space[0] if len(space) > 0 else None

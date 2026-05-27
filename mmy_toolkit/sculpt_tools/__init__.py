@@ -95,23 +95,25 @@ def _draw_sculpt_context_menu(self, context):
     # 遮罩快捷选项（一行排列）
     if prefs:
         mask_options = [
-            (prefs.mask_boundary, "边界", "sculpt.mask_from_boundary"),
-            (prefs.mask_face_set_boundary, "面组边界", "sculpt.mask_from_boundary_face_set"),  # 尝试不同的 operator
-            (prefs.mask_cavity, "Cavity", "sculpt.mask_from_cavity"),
-            (prefs.mask_slice, "切片", "sculpt.paint_mask_slice"),
-            (prefs.mask_extract, "提取", "sculpt.paint_mask_extract"),
+            (prefs.mask_boundary, "边界", "sculpt.mask_from_boundary", None),
+            (prefs.mask_face_set_boundary, "面组边界", "sculpt.mask_from_boundary", 'FACE_SETS'),
+            (prefs.mask_cavity, "Cavity", "sculpt.mask_from_cavity", None),
+            (prefs.mask_slice, "切片", "sculpt.paint_mask_slice", None),
+            (prefs.mask_extract, "提取", "sculpt.paint_mask_extract", None),
         ]
 
         # 收集已启用的选项
-        enabled_mask_options = [(label, op) for enabled, label, op in mask_options if enabled]
+        enabled_mask_options = [(label, op, mode) for enabled, label, op, mode in mask_options if enabled]
 
         if enabled_mask_options:
             row = layout.row(align=True)
             row.label(text="遮罩:")
-            for label, op in enabled_mask_options:
-                # 检查 operator 是否存在
+            for label, op, mode in enabled_mask_options:
+                # 检查 operator 是否存在并设置参数
                 try:
-                    row.operator(op, text=label)
+                    op_item = row.operator(op, text=label)
+                    if mode:
+                        op_item.boundary_mode = mode
                 except:
                     pass  # 跳过不存在的 operator
 
