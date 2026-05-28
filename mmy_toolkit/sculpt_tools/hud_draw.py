@@ -328,6 +328,13 @@ def _check_button_active(space, obj, button_id):
     elif button_id == "dynamic_topology":
         # 动态拓扑：使用手动跟踪状态（Blender API 不直接暴露）
         return _HUD_STATE.get("dyntopo_active", False)
+    elif button_id == "auto_mask":
+        # 自动遮罩：检查拓扑或面组边界是否开启
+        if sculpt:
+            topology = getattr(sculpt, 'use_automasking_topology', False)
+            face_sets = getattr(sculpt, 'use_automasking_face_sets', False)
+            return bool(topology or face_sets)
+        return False
     elif button_id == "add":
         return False
 
