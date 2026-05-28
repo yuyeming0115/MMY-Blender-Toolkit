@@ -332,17 +332,17 @@ class VIEW3D_PT_MMYMeshTools(bpy.types.Panel):
 
                 row.operator("mmy.clear_all", text="清除", icon='X')
 
-                # 映射列表（折叠显示）
+                # 映射列表（全部显示，不截断）
                 if len(props.mappings) > 0:
                     exp = box.box()
                     exp.label(text=f"映射: {len(props.mappings)} 项", icon='MATERIAL')
-                    for mapping in props.mappings[:5]:  # 只显示前5项
+
+                    # 显示所有映射项（使用更紧凑的布局）
+                    for mapping in props.mappings:
                         row = exp.row(align=True)
-                        src_short = mapping.source_mat_name[:12] + ".." if len(mapping.source_mat_name) > 12 else mapping.source_mat_name
-                        row.label(text=src_short)
+                        # 不截断材质名，完整显示
+                        row.label(text=mapping.source_mat_name)
                         row.prop(mapping, "target_mat_id", text="")
-                    if len(props.mappings) > 5:
-                        exp.label(text=f"... 还有 {len(props.mappings)-5} 项")
 
         # === 材质分配同步 ===
         if props.external_file and len(props.source_objects) > 0:
