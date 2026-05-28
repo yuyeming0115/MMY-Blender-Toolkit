@@ -111,16 +111,12 @@ class MMY_OT_SetAutoMaskType(bpy.types.Operator):
 
         if sculpt:
             if self.mask_type == 'topology':
-                # 切换拓扑自动遮罩（关闭面组边界）
+                # 独立切换拓扑自动遮罩
                 sculpt.use_automasking_topology = not sculpt.use_automasking_topology
-                if sculpt.use_automasking_topology:
-                    sculpt.use_automasking_face_sets = False
                 print(f"[MMY Sculpt] 拓扑自动遮罩: {sculpt.use_automasking_topology}")
             elif self.mask_type == 'face_sets':
-                # 切换面组边界自动遮罩（关闭拓扑）
+                # 独立切换面组边界自动遮罩
                 sculpt.use_automasking_face_sets = not sculpt.use_automasking_face_sets
-                if sculpt.use_automasking_face_sets:
-                    sculpt.use_automasking_topology = False
                 print(f"[MMY Sculpt] 面组边界自动遮罩: {sculpt.use_automasking_face_sets}")
             elif self.mask_type == 'none':
                 # 关闭所有
