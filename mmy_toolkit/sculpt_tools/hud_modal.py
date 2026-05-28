@@ -62,8 +62,277 @@ class MMY_OT_SetSymmetryAxis(bpy.types.Operator):
         return {'FINISHED'}
 
 
-# ============ 自动遮罩类型菜单 ============
+# ============ 自动遮罩类型菜单（带拖拽切换） ============
 
+# 菜单常量
+MENU_ITEM_HEIGHT = 24
+MENU_WIDTH = 140
+MENU_MARGIN = 8
+
+# 菜单状态
+_MENU_STATE = {
+    "active": False,
+    "position": (0, 0),
+    "hover_item": None,
+    "dragging": False,
+    "last_toggled": None,  # 防止重复切换
+}
+
+# 菜单选项
+_MENU_ITEMS = [
+    {"id": "topology", "label": "拓扑", "prop": "use_automasking_topology"},
+    {"id": "face_sets", "label": "面组边界", "prop": "use_automasking_face_sets"},
+    {"id": "none", "label": "关闭所有", "prop": None},
+]
+
+
+class MMY_OT_AutoMaskMenuModal(bpy.types.Operator):
+    """自动遮罩菜单（支持拖拽切换）"""
+    bl_idname = "mmy.auto_mask_menu_modal"
+    bl_label = "自动遮罩菜单"
+    bl_options = {'INTERNAL'}
+
+    _draw_handler = None
+
+    def invoke(self, context, event):
+        # 计算菜单位置（在auto_mask按钮旁边）
+        window = context.window
+        mouse_x, mouse_y = event.mouse_x, event.mouse_y
+
+        # 获取按钮位置
+        area, region, space, button_id = find_button_at_point(window, mouse_x, mouse_y)
+        if button_id != "auto_mask" or region is None:
+            return {'CANCELLED'}
+
+        # 计算菜单位置（在按钮右下方弹出）
+        bounds = get_effective_viewport_bounds(area, space, region)
+
+        # 找到auto_mask按钮的具体位置
+        prefs = context.preferences.addons.get("mmy_toolkit").preferences if context.preferences.addons.get("mmy_toolkit") else None
+        layout_mode = getattr(prefs, "sculpt_hud_layout", "horizontal") if prefs else "horizontal"
+        offset_x, offset_y = get_global_offset()
+        user_buttons = get_user_buttons()
+        buttons = user_buttons + ["add"]
+
+        if layout_mode == "horizontal":
+            hud_height = HUD_BUTTON_HEIGHT + HUD_MARGIN * 2
+            center_y = (bounds["top"] + bounds["bottom"]) * 0.5
+            base_y = center_y - hud_height * 0.5
+            handle_y = base_y + offset_y * bounds["height"]
+            handle_y = max(bounds["bottom"], min(bounds["top"] - hud_height, handle_y))
+
+            btn_y = handle_y + HUD_MARGIN
+            btn_index = buttons.index("auto_mask") if "auto_mask" in buttons else 0
+            btn_start_x = bounds["left"] + bounds["width"] * 0.5 - (HUD_HANDLE_WIDTH + len(buttons) * HUD_BUTTON_WIDTH + (len(buttons) - 1) * HUD_BUTTON_GAP + HUD_MARGIN * 2) * 0.5 + HUD_HANDLE_WIDTH + HUD_MARGIN + offset_x * bounds["width"]
+            btn_x = btn_start_x + btn_index * (HUD_BUTTON_WIDTH + HUD_BUTTON_GAP)
+
+            # 菜单在按钮下方弹出
+            menu_x = btn_x
+            menu_y = btn_y - len(_MENU_ITEMS) * MENU_ITEM_HEIGHT - MENU_MARGIN
+        else:
+            # 垂直布局
+            btn_x = bounds["left"] + bounds["width"] * 0.5 - (HUD_BUTTON_WIDTH + HUD_MARGIN * 2) * 0.5 + offset_x * bounds["width"]
+            menu_x = btn_x + HUD_BUTTON_WIDTH + MENU_MARGIN
+            menu_y = mouse_y - region.y
+
+        # 存储菜单位置（region相对坐标）
+        _MENU_STATE["active"] = True
+        _MENU_STATE["position"] = (menu_x, menu_y)
+        _MENU_STATE["hover_item"] = None
+        _MENU_STATE["dragging"] = False
+        _MENU_STATE["last_toggled"] = None
+
+        # 注册绘制回调
+        self._draw_handler = bpy.types.SpaceView3D.draw_handler_add(
+            self._draw_menu_callback,
+            (),
+            "WINDOW",
+            "POST_PIXEL"
+        )
+
+        context.window_manager.modal_handler_add(self)
+        return {'RUNNING_MODAL'}
+
+    def modal(self, context, event):
+        if not _MENU_STATE["active"]:
+            return self._finish(context)
+
+        mouse_x = event.mouse_x
+        mouse_y = event.mouse_y
+
+        # 获取region坐标
+        window = context.window
+        area, region = None, None
+        screen = getattr(window, "screen", None)
+        if screen:
+            for a in screen.areas:
+                if a.type == "VIEW_3D":
+                    area = a
+                    for r in a.regions:
+                        if r.type == "WINDOW":
+                            region = r
+                            break
+                    break
+
+        if region is None:
+            return {'PASS_THROUGH'}
+
+        region_mouse_x = mouse_x - region.x
+        region_mouse_y = mouse_y - region.y
+
+        # 计算菜单边界
+        menu_x, menu_y = _MENU_STATE["position"]
+        menu_height = len(_MENU_ITEMS) * MENU_ITEM_HEIGHT + MENU_MARGIN * 2
+
+        # 检测鼠标是否在菜单区域内
+        in_menu = (menu_x <= region_mouse_x <= menu_x + MENU_WIDTH and
+                   menu_y <= region_mouse_y <= menu_y + menu_height)
+
+        # 左键按下：开始拖拽
+        if event.type == 'LEFTMOUSE' and event.value == 'PRESS':
+            if in_menu:
+                _MENU_STATE["dragging"] = True
+                self._toggle_at_position(context, region_mouse_y)
+            return {'RUNNING_MODAL'}
+
+        # 鼠标移动：拖拽切换
+        if event.type == 'MOUSEMOVE' and _MENU_STATE["dragging"]:
+            if in_menu:
+                self._toggle_at_position(context, region_mouse_y)
+            return {'RUNNING_MODAL'}
+
+        # 左键释放：结束拖拽
+        if event.type == 'LEFTMOUSE' and event.value == 'RELEASE':
+            _MENU_STATE["dragging"] = False
+            # 如果不在菜单区域且没有拖拽，关闭菜单
+            if not in_menu and not _MENU_STATE["dragging"]:
+                return self._finish(context)
+            return {'RUNNING_MODAL'}
+
+        # 右键或ESC：关闭菜单
+        if event.type in ('RIGHTMOUSE', 'ESC') and event.value == 'PRESS':
+            return self._finish(context)
+
+        # 鼠标移出菜单区域（非拖拽状态）：关闭菜单
+        if event.type == 'MOUSEMOVE' and not _MENU_STATE["dragging"] and not in_menu:
+            return self._finish(context)
+
+        return {'PASS_THROUGH'}
+
+    def _toggle_at_position(self, context, region_mouse_y):
+        """根据鼠标Y位置切换对应选项"""
+        menu_x, menu_y = _MENU_STATE["position"]
+
+        # 计算鼠标悬停的选项索引
+        relative_y = region_mouse_y - menu_y - MENU_MARGIN
+        item_index = int(relative_y // MENU_ITEM_HEIGHT)
+
+        if 0 <= item_index < len(_MENU_ITEMS):
+            item = _MENU_ITEMS[item_index]
+            item_id = item["id"]
+
+            # 防止重复切换同一个选项
+            if _MENU_STATE["last_toggled"] == item_id:
+                return
+
+            _MENU_STATE["last_toggled"] = item_id
+            _MENU_STATE["hover_item"] = item_id
+
+            # 执行切换
+            tool_settings = context.tool_settings
+            sculpt = tool_settings.sculpt if tool_settings else None
+
+            if sculpt:
+                if item_id == "topology":
+                    sculpt.use_automasking_topology = not sculpt.use_automasking_topology
+                    print(f"[MMY Sculpt] 拓扑自动遮罩: {sculpt.use_automasking_topology}")
+                elif item_id == "face_sets":
+                    sculpt.use_automasking_face_sets = not sculpt.use_automasking_face_sets
+                    print(f"[MMY Sculpt] 面组边界自动遮罩: {sculpt.use_automasking_face_sets}")
+                elif item_id == "none":
+                    sculpt.use_automasking_topology = False
+                    sculpt.use_automasking_face_sets = False
+                    print(f"[MMY Sculpt] 关闭所有自动遮罩")
+
+                # 刷新视图
+                for window in context.window_manager.windows:
+                    for area in window.screen.areas:
+                        if area.type == "VIEW_3D":
+                            area.tag_redraw()
+
+    def _draw_menu_callback(self):
+        """绘制菜单"""
+        try:
+            self._draw_menu_inner()
+        except Exception as e:
+            print(f"[MMY Sculpt] 菜单绘制错误: {e}")
+
+    def _draw_menu_inner(self):
+        """实际绘制逻辑"""
+        if not _MENU_STATE["active"]:
+            return
+
+        context = bpy.context
+        tool_settings = context.tool_settings
+        sculpt = tool_settings.sculpt if tool_settings else None
+
+        from .draw_utils import draw_rounded_rect, draw_rounded_rect_outline, draw_text, get_text_dimensions
+
+        menu_x, menu_y = _MENU_STATE["position"]
+        menu_height = len(_MENU_ITEMS) * MENU_ITEM_HEIGHT + MENU_MARGIN * 2
+
+        # 绘制菜单背景
+        bg_color = (0.15, 0.15, 0.15, 0.9)
+        draw_rounded_rect(menu_x, menu_y, MENU_WIDTH, menu_height, bg_color, 6)
+        draw_rounded_rect_outline(menu_x, menu_y, MENU_WIDTH, menu_height, (0.3, 0.3, 0.3, 0.9), 6)
+
+        # 绘制选项
+        for i, item in enumerate(_MENU_ITEMS):
+            item_y = menu_y + MENU_MARGIN + i * MENU_ITEM_HEIGHT
+            item_id = item["id"]
+
+            # 获取状态
+            if sculpt and item["prop"]:
+                state = getattr(sculpt, item["prop"], False)
+            else:
+                state = False
+
+            # 悬停高亮
+            is_hovered = _MENU_STATE["hover_item"] == item_id
+            if is_hovered:
+                hover_color = (0.2, 0.4, 0.6, 0.9)
+                draw_rounded_rect(menu_x + 2, item_y + 2, MENU_WIDTH - 4, MENU_ITEM_HEIGHT - 4, hover_color, 4)
+
+            # 绘制文字（勾选标记 + 标签）
+            checkmark = "✓ " if state else "  "
+            label = f"{checkmark}{item['label']}"
+            text_width, text_height = get_text_dimensions(label, 12)
+            text_x = menu_x + MENU_MARGIN + 8
+            text_y = item_y + (MENU_ITEM_HEIGHT - text_height) * 0.5
+            draw_text(label, text_x, text_y, (1.0, 1.0, 1.0, 1.0), 12)
+
+    def _finish(self, context):
+        _MENU_STATE["active"] = False
+        _MENU_STATE["hover_item"] = None
+        _MENU_STATE["dragging"] = False
+
+        if self._draw_handler:
+            try:
+                bpy.types.SpaceView3D.draw_handler_remove(self._draw_handler, "WINDOW")
+            except:
+                pass
+            self._draw_handler = None
+
+        # 刷新视图
+        for window in context.window_manager.windows:
+            for area in window.screen.areas:
+                if area.type == "VIEW_3D":
+                    area.tag_redraw()
+
+        return {'CANCELLED'}
+
+
+# 保留原菜单（备用）
 class MMY_MT_AutoMaskTypeMenu(bpy.types.Menu):
     """自动遮罩类型选择菜单"""
     bl_idname = "MMY_MT_auto_mask_type_menu"
@@ -627,8 +896,8 @@ class VIEW3D_OT_mmy_sculpt_hud_modal(bpy.types.Operator):
                 return {'RUNNING_MODAL'}
 
             if button_id == "auto_mask":
-                # 右键点击自动遮罩按钮：弹出类型选择菜单
-                bpy.ops.wm.call_menu("INVOKE_DEFAULT", name="MMY_MT_auto_mask_type_menu")
+                # 右键点击自动遮罩按钮：弹出拖拽切换菜单
+                bpy.ops.mmy.auto_mask_menu_modal('INVOKE_DEFAULT')
                 return {'RUNNING_MODAL'}
 
             return {'PASS_THROUGH'}
@@ -822,7 +1091,8 @@ class VIEW3D_OT_mmy_sculpt_hud_modal(bpy.types.Operator):
 _classes = (
     MMY_MT_SymmetryAxisMenu,
     MMY_OT_SetSymmetryAxis,
-    MMY_MT_AutoMaskTypeMenu,
+    MMY_OT_AutoMaskMenuModal,  # 新增：拖拽切换菜单
+    MMY_MT_AutoMaskTypeMenu,   # 保留：备用标准菜单
     MMY_OT_SetAutoMaskType,
     MMY_MT_HUDAddButtonMenu,
     MMY_OT_HUDAddButton,
