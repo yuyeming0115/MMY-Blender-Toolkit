@@ -62,6 +62,80 @@ class MMY_OT_SetSymmetryAxis(bpy.types.Operator):
         return {'FINISHED'}
 
 
+# ============ 自动遮罩类型菜单 ============
+
+class MMY_MT_AutoMaskTypeMenu(bpy.types.Menu):
+    """自动遮罩类型选择菜单"""
+    bl_idname = "MMY_MT_auto_mask_type_menu"
+    bl_label = "自动遮罩类型"
+
+    def draw(self, context):
+        layout = self.layout
+        tool_settings = context.tool_settings
+        sculpt = tool_settings.sculpt if tool_settings else None
+
+        if not sculpt:
+            layout.label(text="无法获取雕刻设置")
+            return
+
+        # 获取当前状态
+        topology_state = getattr(sculpt, 'use_automasking_topology', False)
+        face_sets_state = getattr(sculpt, 'use_automasking_face_sets', False)
+
+        # 拓扑自动遮罩
+        op = layout.operator("mmy.set_auto_mask_type", text=f"拓扑 {'✓' if topology_state else ''}")
+        op.mask_type = 'topology'
+
+        # 面组边界自动遮罩
+        op = layout.operator("mmy.set_auto_mask_type", text=f"面组边界 {'✓' if face_sets_state else ''}")
+        op.mask_type = 'face_sets'
+
+        layout.separator()
+
+        # 关闭所有自动遮罩
+        op = layout.operator("mmy.set_auto_mask_type", text="关闭所有")
+        op.mask_type = 'none'
+
+
+class MMY_OT_SetAutoMaskType(bpy.types.Operator):
+    """切换自动遮罩类型"""
+    bl_idname = "mmy.set_auto_mask_type"
+    bl_label = "切换自动遮罩类型"
+    bl_options = {'INTERNAL'}
+
+    mask_type: bpy.props.StringProperty(default='topology')
+
+    def execute(self, context):
+        tool_settings = context.tool_settings
+        sculpt = tool_settings.sculpt if tool_settings else None
+
+        if sculpt:
+            if self.mask_type == 'topology':
+                # 切换拓扑自动遮罩（关闭面组边界）
+                sculpt.use_automasking_topology = not sculpt.use_automasking_topology
+                if sculpt.use_automasking_topology:
+                    sculpt.use_automasking_face_sets = False
+                print(f"[MMY Sculpt] 拓扑自动遮罩: {sculpt.use_automasking_topology}")
+            elif self.mask_type == 'face_sets':
+                # 切换面组边界自动遮罩（关闭拓扑）
+                sculpt.use_automasking_face_sets = not sculpt.use_automasking_face_sets
+                if sculpt.use_automasking_face_sets:
+                    sculpt.use_automasking_topology = False
+                print(f"[MMY Sculpt] 面组边界自动遮罩: {sculpt.use_automasking_face_sets}")
+            elif self.mask_type == 'none':
+                # 关闭所有
+                sculpt.use_automasking_topology = False
+                sculpt.use_automasking_face_sets = False
+                print(f"[MMY Sculpt] 关闭所有自动遮罩")
+
+            # 刷新视图
+            for window in context.window_manager.windows:
+                for area in window.screen.areas:
+                    if area.type == "VIEW_3D":
+                        area.tag_redraw()
+        return {'FINISHED'}
+
+
 # ============ 添加按钮菜单 ============
 
 class MMY_MT_HUDAddButtonMenu(bpy.types.Menu):
@@ -556,6 +630,11 @@ class VIEW3D_OT_mmy_sculpt_hud_modal(bpy.types.Operator):
                 bpy.ops.wm.call_menu("INVOKE_DEFAULT", name="MMY_MT_symmetry_axis_menu")
                 return {'RUNNING_MODAL'}
 
+            if button_id == "auto_mask":
+                # 右键点击自动遮罩按钮：弹出类型选择菜单
+                bpy.ops.wm.call_menu("INVOKE_DEFAULT", name="MMY_MT_auto_mask_type_menu")
+                return {'RUNNING_MODAL'}
+
             return {'PASS_THROUGH'}
 
         return {'PASS_THROUGH'}
@@ -708,6 +787,30 @@ class VIEW3D_OT_mmy_sculpt_hud_modal(bpy.types.Operator):
                     if area.type == "VIEW_3D":
                         area.tag_redraw()
             return True
+        elif button_id == "auto_mask":
+            # 自动遮罩：切换拓扑自动遮罩（默认行为）
+            if sculpt:
+                try:
+                    # 获取当前状态
+                    topology = getattr(sculpt, 'use_automasking_topology', False)
+                    face_sets = getattr(sculpt, 'use_automasking_face_sets', False)
+
+                    # 如果已开启任何自动遮罩，则关闭；否则开启拓扑
+                    if topology or face_sets:
+                        sculpt.use_automasking_topology = False
+                        sculpt.use_automasking_face_sets = False
+                        print(f"[MMY Sculpt] 关闭自动遮罩")
+                    else:
+                        sculpt.use_automasking_topology = True
+                        print(f"[MMY Sculpt] 开启拓扑自动遮罩")
+                except Exception as e:
+                    print(f"[MMY Sculpt] 自动遮罩切换失败: {e}")
+                # 刷新视图
+                for window in context.window_manager.windows:
+                    for area in window.screen.areas:
+                        if area.type == "VIEW_3D":
+                            area.tag_redraw()
+            return True
 
         return False
 
@@ -723,6 +826,8 @@ class VIEW3D_OT_mmy_sculpt_hud_modal(bpy.types.Operator):
 _classes = (
     MMY_MT_SymmetryAxisMenu,
     MMY_OT_SetSymmetryAxis,
+    MMY_MT_AutoMaskTypeMenu,
+    MMY_OT_SetAutoMaskType,
     MMY_MT_HUDAddButtonMenu,
     MMY_OT_HUDAddButton,
     MMY_MT_HUDManageButtonsMenu,
