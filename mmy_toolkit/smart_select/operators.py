@@ -143,8 +143,23 @@ class MMY_OT_SmartSelectHandler(bpy.types.Operator):
 
         # 只处理左键点击
         if event.type == 'LEFTMOUSE' and event.value == 'PRESS':
-            # 检查当前区域类型，只允许 3D 视图和 UV 编辑器
-            area = context.area
+            # context.area 在窗口级别 modal 中可能为 None
+            # 需要从鼠标位置找到实际区域
+            mouse_x = event.mouse_x
+            mouse_y = event.mouse_y
+
+            # 从窗口找到鼠标所在的区域
+            window = context.window
+            area = None
+            if window:
+                screen = window.screen
+                if screen:
+                    for a in screen.areas:
+                        if (a.x <= mouse_x <= a.x + a.width and
+                            a.y <= mouse_y <= a.y + a.height):
+                            area = a
+                            break
+
             if area is None:
                 return {'PASS_THROUGH'}
 
@@ -172,8 +187,6 @@ class MMY_OT_SmartSelectHandler(bpy.types.Operator):
             interval = getattr(addon.preferences, "smart_select_double_click_interval", DOUBLE_CLICK_INTERVAL)
 
             current_time = time.time()
-            mouse_x = event.mouse_x
-            mouse_y = event.mouse_y
 
             global _last_click_time, _last_click_x, _last_click_y
 
