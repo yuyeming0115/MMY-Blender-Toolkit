@@ -74,7 +74,7 @@ class MMY_OT_SmartSelectDialog(bpy.types.Operator):
     """智能选择 - 弹出确认面板"""
     bl_idname = "mmy.smart_select_dialog"
     bl_label = "智能选择"
-    bl_options = {'REGISTER', 'UNDO', 'PRESET'}
+    bl_options = {'REGISTER', 'UNDO'}
 
     select_type: EnumProperty(
         name="选择类型",
@@ -91,12 +91,6 @@ class MMY_OT_SmartSelectDialog(bpy.types.Operator):
     _mouse_y = 0
 
     def execute(self, context):
-        # 保存偏好设置（记住用户选择）
-        addon = context.preferences.addons.get("mmy_toolkit")
-        if addon and addon.preferences:
-            # 记住上次的选择类型
-            addon.preferences["smart_select_last_type"] = self.select_type
-
         # 执行选择
         if self.select_type == 'ISLAND':
             if select_uv_island(context, self._mouse_x, self._mouse_y):
@@ -121,15 +115,15 @@ class MMY_OT_SmartSelectDialog(bpy.types.Operator):
         self._mouse_x = event.mouse_region_x if hasattr(event, 'mouse_region_x') else event.mouse_x
         self._mouse_y = event.mouse_region_y if hasattr(event, 'mouse_region_y') else event.mouse_y
 
-        # 尝试读取上次的选择类型
-        addon = context.preferences.addons.get("mmy_toolkit")
-        if addon and addon.preferences:
-            try:
-                self.select_type = addon.preferences.get("smart_select_last_type", 'ISLAND')
-            except:
-                pass
+        # 尝试读取上次的选择类型（使用场景属性存储）
+        try:
+            last_type = context.scene.get("mmy_smart_select_last_type", 'ISLAND')
+            self.select_type = last_type
+        except:
+            pass
 
-        return context.window_manager.invoke_props_dialog(self, width=200)
+        # 使用 invoke_props_popup 在鼠标位置弹出（比 invoke_props_dialog 更轻量）
+        return context.window_manager.invoke_props_popup(self, event)
 
 
 # ============ 双击检测监听器 ============
@@ -151,6 +145,21 @@ class MMY_OT_SmartSelectHandler(bpy.types.Operator):
 
         # 只处理左键点击
         if event.type == 'LEFTMOUSE' and event.value == 'PRESS':
+            # 检查当前区域类型，只允许 3D 视图和 UV 编辑器
+            area = context.area
+            if area is None:
+                return {'PASS_THROUGH'}
+
+            # 只在 VIEW_3D 和 IMAGE_EDITOR（UV模式）中触发
+            if area.type not in ('VIEW_3D', 'IMAGE_EDITOR'):
+                return {'PASS_THROUGH'}
+
+            # IMAGE_EDITOR 需要检查是否是 UV 模式
+            if area.type == 'IMAGE_EDITOR':
+                space = area.spaces.active
+                if space and hasattr(space, 'mode') and space.mode != 'VIEW':
+                    return {'PASS_THROUGH'}
+
             interval = getattr(addon.preferences, "smart_select_double_click_interval", DOUBLE_CLICK_INTERVAL)
 
             current_time = time.time()
@@ -160,7 +169,7 @@ class MMY_OT_SmartSelectHandler(bpy.types.Operator):
             global _last_click_time, _last_click_x, _last_click_y
 
             # 调试：打印每次点击
-            print(f"[Smart Select] 点击检测: time_diff={current_time - _last_click_time:.2f}, pos_diff=({abs(mouse_x - _last_click_x)}, {abs(mouse_y - _last_click_y)})")
+            print(f"[Smart Select] 点击检测: area={area.type}, time_diff={current_time - _last_click_time:.2f}")
 
             if current_time - _last_click_time < interval:
                 dx = abs(mouse_x - _last_click_x)
