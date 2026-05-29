@@ -303,8 +303,8 @@ class MMY_MT_AddModifierMenu(bpy.types.Menu):
 
             for mod_type, mod_name in modifiers:
                 icon_name = MODIFIER_ICON_NAMES.get(mod_type, 'MODIFIER_DATA')
-                op = col.operator("object.modifier_add", text=mod_name, icon=icon_name)
-                op.type = mod_type
+                op = col.operator("mmy.add_modifier_to_selected", text=mod_name, icon=icon_name)
+                op.mod_type = mod_type
 
         # 绘制资产库列（如果有资产）
         if assets:
@@ -328,8 +328,8 @@ class MMY_MT_AddModifierMenu(bpy.types.Menu):
 
             for mod_type, mod_name in modifiers:
                 icon_name = MODIFIER_ICON_NAMES.get(mod_type, 'MODIFIER_DATA')
-                op = col.operator("object.modifier_add", text=mod_name, icon=icon_name)
-                op.type = mod_type
+                op = col.operator("mmy.add_modifier_to_selected", text=mod_name, icon=icon_name)
+                op.mod_type = mod_type
 
 
 # ============ 工具按钮行 ============

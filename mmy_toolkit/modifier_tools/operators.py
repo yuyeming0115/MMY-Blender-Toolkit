@@ -184,7 +184,7 @@ class MMY_OT_CollapseAllModifiers(bpy.types.Operator):
 
 
 class MMY_OT_AddGeometryNodesAsset(bpy.types.Operator):
-    """从资产库添加几何节点修改器"""
+    """从资产库添加几何节点修改器（支持多选）"""
     bl_idname = "mmy.add_geometry_nodes_asset"
     bl_label = "添加几何节点资产"
     bl_options = {'REGISTER', 'UNDO'}
@@ -193,8 +193,11 @@ class MMY_OT_AddGeometryNodesAsset(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        obj = context.active_object
-        return obj and obj.type == 'MESH'
+        # 至少有一个选中的网格对象
+        for obj in context.selected_objects:
+            if obj.type == 'MESH':
+                return True
+        return False
 
     def execute(self, context):
         # 从偏好设置获取资产库路径
@@ -225,12 +228,58 @@ class MMY_OT_AddGeometryNodesAsset(bpy.types.Operator):
             self.report({'ERROR'}, "节点组导入失败")
             return {'CANCELLED'}
 
-        # Add Geometry Nodes modifier
-        obj = context.active_object
-        mod = obj.modifiers.new(name=self.asset_name, type='NODES')
-        mod.node_group = node_group
+        # Add Geometry Nodes modifier to all selected mesh objects
+        objects = [obj for obj in context.selected_objects if obj.type == 'MESH']
+        if not objects:
+            self.report({'WARNING'}, "没有选中的网格对象")
+            return {'CANCELLED'}
 
-        self.report({'INFO'}, f"已添加几何节点修改器: {self.asset_name}")
+        count = 0
+        for obj in objects:
+            mod = obj.modifiers.new(name=self.asset_name, type='NODES')
+            mod.node_group = node_group
+            count += 1
+
+        self.report({'INFO'}, f"已为 {count} 个对象添加几何节点修改器: {self.asset_name}")
+        return {'FINISHED'}
+
+
+class MMY_OT_AddModifierToSelected(bpy.types.Operator):
+    """为所有选中对象添加修改器（支持多选）"""
+    bl_idname = "mmy.add_modifier_to_selected"
+    bl_label = "添加修改器"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    mod_type: bpy.props.StringProperty(name="修改器类型", default="")
+
+    @classmethod
+    def poll(cls, context):
+        # 至少有一个选中对象
+        return len(context.selected_objects) > 0
+
+    def execute(self, context):
+        if not self.mod_type:
+            self.report({'WARNING'}, "未指定修改器类型")
+            return {'CANCELLED'}
+
+        objects = context.selected_objects
+        count = 0
+
+        for obj in objects:
+            # 检查对象类型是否支持该修改器
+            # 网格对象支持大部分修改器，蜡笔对象支持特定修改器
+            try:
+                mod = obj.modifiers.new(name=self.mod_type, type=self.mod_type)
+                count += 1
+            except TypeError:
+                # 该修改器类型不适用于此对象
+                continue
+
+        if count == 0:
+            self.report({'WARNING'}, "没有对象可以添加该修改器")
+            return {'CANCELLED'}
+
+        self.report({'INFO'}, f"已为 {count} 个对象添加 {self.mod_type} 修改器")
         return {'FINISHED'}
 
 
@@ -241,4 +290,5 @@ _classes = (
     MMY_OT_ExpandAllModifiers,
     MMY_OT_CollapseAllModifiers,
     MMY_OT_AddGeometryNodesAsset,
+    MMY_OT_AddModifierToSelected,
 )
