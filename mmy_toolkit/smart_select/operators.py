@@ -137,7 +137,10 @@ class MMY_OT_SmartSelectHandler(bpy.types.Operator):
     _running = False
 
     def modal(self, context, event):
-        # 持续运行，不因为启用状态停止
+        # 调试：检查 modal 是否收到任何事件
+        if event.type == 'LEFTMOUSE':
+            print(f"[Smart Select] Modal 收到 LEFTMOUSE: value={event.value}, area={context.area.type if context.area else 'None'}")
+
         # 只处理左键点击
         if event.type == 'LEFTMOUSE' and event.value == 'PRESS':
             # 检查当前区域类型，只允许 3D 视图和 UV 编辑器
