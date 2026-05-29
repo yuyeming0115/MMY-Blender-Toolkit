@@ -76,6 +76,8 @@ _MENU_STATE = {
     "hover_item": None,
     "dragging": False,
     "last_toggled": None,  # 防止重复切换
+    "mouse_entered": False,  # 鼠标是否曾经进入菜单区域
+    "ignore_first_rightmouse": False,  # 忽略第一个右键事件（触发菜单的那个）
 }
 
 # 菜单选项
@@ -93,7 +95,6 @@ class MMY_OT_AutoMaskMenuModal(bpy.types.Operator):
     bl_options = {'INTERNAL'}
 
     _draw_handler = None
-    _menu_position: bpy.props.IntVectorProperty(size=2, default=(0, 0))  # 接收外部传入的菜单位置
 
     def invoke(self, context, event):
         window = context.window
@@ -154,6 +155,8 @@ class MMY_OT_AutoMaskMenuModal(bpy.types.Operator):
         _MENU_STATE["hover_item"] = None
         _MENU_STATE["dragging"] = False
         _MENU_STATE["last_toggled"] = None
+        _MENU_STATE["mouse_entered"] = False  # 鼠标未进入过菜单区域
+        _MENU_STATE["ignore_first_rightmouse"] = True  # 忽略触发菜单的右键事件
 
         # 注册绘制回调
         self._draw_handler = bpy.types.SpaceView3D.draw_handler_add(
@@ -201,6 +204,10 @@ class MMY_OT_AutoMaskMenuModal(bpy.types.Operator):
         in_menu = (menu_x <= region_mouse_x <= menu_x + MENU_WIDTH and
                    menu_y <= region_mouse_y <= menu_y + menu_height)
 
+        # 更新鼠标进入状态
+        if in_menu:
+            _MENU_STATE["mouse_entered"] = True
+
         # 左键按下：开始拖拽
         if event.type == 'LEFTMOUSE' and event.value == 'PRESS':
             if in_menu:
@@ -222,13 +229,21 @@ class MMY_OT_AutoMaskMenuModal(bpy.types.Operator):
                 return self._finish(context)
             return {'RUNNING_MODAL'}
 
-        # 右键或ESC：关闭菜单
-        if event.type in ('RIGHTMOUSE', 'ESC') and event.value == 'PRESS':
+        # 右键或ESC：关闭菜单（但忽略触发菜单的第一个右键事件）
+        if event.type == 'RIGHTMOUSE' and event.value == 'PRESS':
+            if _MENU_STATE["ignore_first_rightmouse"]:
+                _MENU_STATE["ignore_first_rightmouse"] = False
+                return {'RUNNING_MODAL'}
             return self._finish(context)
 
-        # 鼠标移出菜单区域（非拖拽状态）：关闭菜单
-        if event.type == 'MOUSEMOVE' and not _MENU_STATE["dragging"] and not in_menu:
+        if event.type == 'ESC' and event.value == 'PRESS':
             return self._finish(context)
+
+        # 鼠标移出菜单区域（非拖拽状态）：只有鼠标曾经进入过才关闭
+        if event.type == 'MOUSEMOVE' and not _MENU_STATE["dragging"] and not in_menu:
+            if _MENU_STATE["mouse_entered"]:
+                return self._finish(context)
+            return {'RUNNING_MODAL'}
 
         return {'PASS_THROUGH'}
 
@@ -909,8 +924,8 @@ class VIEW3D_OT_mmy_sculpt_hud_modal(bpy.types.Operator):
                 return {'RUNNING_MODAL'}
 
             if button_id == "auto_mask":
-                # 右键点击自动遮罩按钮：弹出拖拽切换菜单
-                bpy.ops.mmy.auto_mask_menu_modal('INVOKE_DEFAULT')
+                # 右键点击自动遮罩按钮：弹出类型选择菜单
+                bpy.ops.wm.call_menu("INVOKE_DEFAULT", name="MMY_MT_auto_mask_type_menu")
                 return {'RUNNING_MODAL'}
 
             return {'PASS_THROUGH'}
