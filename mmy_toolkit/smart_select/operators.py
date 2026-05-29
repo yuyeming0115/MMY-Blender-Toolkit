@@ -137,18 +137,16 @@ class MMY_OT_SmartSelectHandler(bpy.types.Operator):
     _running = False
 
     def modal(self, context, event):
-        # 检查是否启用
-        addon = context.preferences.addons.get("mmy_toolkit")
-        if not addon or not getattr(addon.preferences, "smart_select_enabled", True):
-            self._running = False
-            return {'CANCELLED'}
-
+        # 持续运行，不因为启用状态停止
         # 只处理左键点击
         if event.type == 'LEFTMOUSE' and event.value == 'PRESS':
             # 检查当前区域类型，只允许 3D 视图和 UV 编辑器
             area = context.area
             if area is None:
                 return {'PASS_THROUGH'}
+
+            # 调试：打印区域信息
+            print(f"[Smart Select] 区域检查: type={area.type}")
 
             # 只在 VIEW_3D 和 IMAGE_EDITOR（UV模式）中触发
             if area.type not in ('VIEW_3D', 'IMAGE_EDITOR'):
@@ -157,8 +155,16 @@ class MMY_OT_SmartSelectHandler(bpy.types.Operator):
             # IMAGE_EDITOR 需要检查是否是 UV 模式
             if area.type == 'IMAGE_EDITOR':
                 space = area.spaces.active
-                if space and hasattr(space, 'mode') and space.mode != 'VIEW':
-                    return {'PASS_THROUGH'}
+                if space:
+                    print(f"[Smart Select] UV空间模式: {space.mode if hasattr(space, 'mode') else 'N/A'}")
+                    # UV 编辑器 mode 为 'VIEW' 时是 UV 编辑模式
+                    if hasattr(space, 'mode') and space.mode != 'VIEW':
+                        return {'PASS_THROUGH'}
+
+            # 检查是否启用
+            addon = context.preferences.addons.get("mmy_toolkit")
+            if not addon or not getattr(addon.preferences, "smart_select_enabled", True):
+                return {'PASS_THROUGH'}
 
             interval = getattr(addon.preferences, "smart_select_double_click_interval", DOUBLE_CLICK_INTERVAL)
 
@@ -169,7 +175,7 @@ class MMY_OT_SmartSelectHandler(bpy.types.Operator):
             global _last_click_time, _last_click_x, _last_click_y
 
             # 调试：打印每次点击
-            print(f"[Smart Select] 点击检测: area={area.type}, time_diff={current_time - _last_click_time:.2f}")
+            print(f"[Smart Select] 点击检测: time_diff={current_time - _last_click_time:.2f}")
 
             if current_time - _last_click_time < interval:
                 dx = abs(mouse_x - _last_click_x)
