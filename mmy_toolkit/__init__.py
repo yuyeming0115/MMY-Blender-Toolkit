@@ -425,6 +425,31 @@ class MMY_Preferences(bpy.types.AddonPreferences):
         update=lambda self, ctx: _update_translation_buttons()
     )
 
+    # === 智能选择设置 ===
+    smart_select_double_click_interval: bpy.props.FloatProperty(
+        name="双击间隔",
+        description="双击检测的时间间隔（秒）",
+        default=0.25,
+        min=0.1,
+        max=0.5
+    )
+    smart_select_mode: bpy.props.EnumProperty(
+        name="选择模式",
+        description="双击智能选择的行为模式",
+        items=[
+            ('auto', "自动", "根据上下文自动判断选择类型"),
+            ('island', "UV孤岛", "始终选中UV孤岛"),
+            ('material', "材质", "始终选中相同材质"),
+            ('seam', "缝合边", "始终选中缝合边"),
+        ],
+        default='auto'
+    )
+    smart_select_enabled: bpy.props.BoolProperty(
+        name="启用智能选择",
+        description="启用双击智能选择功能",
+        default=True
+    )
+
     # === 修改器显示切换按钮位置 ===
     modifier_panel: bpy.props.BoolProperty(
         name="修改器面板",
@@ -752,6 +777,18 @@ class MMY_Preferences(bpy.types.AddonPreferences):
 
         layout.separator()
 
+        # === 智能选择设置 ===
+        layout.label(text="智能选择设置:", icon='RESTRICT_SELECT_OFF')
+        box = layout.box()
+        row = box.row()
+        row.prop(self, "smart_select_enabled", text="启用")
+        row.prop(self, "smart_select_double_click_interval", text="双击间隔")
+        row = box.row()
+        row.prop(self, "smart_select_mode", text="选择模式")
+        box.label(text="快捷键：Shift + 双击（UV编辑器选孤岛，3D视图选材质）")
+
+        layout.separator()
+
         # === 智能命名预设 ===
         layout.label(text="智能命名预设:", icon='SORTBYEXT')
         box = layout.box()
@@ -935,6 +972,7 @@ from . import project_switcher
 from . import transform_check
 from . import sculpt_tools
 from . import modifier_tools
+from . import smart_select
 
 
 # ============ 快捷键注册 ============
@@ -945,14 +983,40 @@ def _register_keymaps():
         wm = bpy.context.window_manager
         kc = wm.keyconfigs.addon
         if kc:
+            # UV孤岛缝合边快捷键（Mesh 编辑模式）
             km = kc.keymaps.find("Mesh", space_type="VIEW_3D")
             if km:
-                # UV孤岛缝合边快捷键（默认不绑定）
                 kmi = km.keymap_items.new(
                     idname="mmy.mark_uv_island_seams",
                     type="NONE",
                     value="PRESS",
                     shift=False,
+                    ctrl=False,
+                    alt=False
+                )
+                addon_keymaps.append((km, kmi))
+
+            # 智能选择快捷键（Shift+左键）
+            km = kc.keymaps.find("Mesh", space_type="VIEW_3D")
+            if km:
+                kmi = km.keymap_items.new(
+                    idname="mmy.smart_select_listener",
+                    type="LEFTMOUSE",
+                    value="PRESS",
+                    shift=True,
+                    ctrl=False,
+                    alt=False
+                )
+                addon_keymaps.append((km, kmi))
+
+            # UV 编辑器智能选择快捷键
+            km = kc.keymaps.find("UV Editor", space_type="EMPTY")
+            if km:
+                kmi = km.keymap_items.new(
+                    idname="mmy.smart_select_uv_island",
+                    type="LEFTMOUSE",
+                    value="DOUBLECLICK",
+                    shift=True,
                     ctrl=False,
                     alt=False
                 )
@@ -1003,6 +1067,7 @@ def register():
     transform_check.register()
     sculpt_tools.register()
     modifier_tools.register()
+    smart_select.register()
 
     # 注册快捷键
     _register_keymaps()
@@ -1082,6 +1147,7 @@ def unregister():
     transform_check.unregister()
     sculpt_tools.unregister()
     modifier_tools.unregister()
+    smart_select.unregister()
 
     # 移除绘制函数
     try:
