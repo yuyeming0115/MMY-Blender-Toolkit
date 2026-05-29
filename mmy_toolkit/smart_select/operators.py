@@ -3,7 +3,7 @@
 import bpy
 import time
 from bpy.props import EnumProperty
-from .utils import select_uv_island, select_uv_seams, select_faces_by_material, get_context_type
+from .utils import select_uv_island, select_uv_seams, select_faces_by_material
 
 
 # 双击检测常量
