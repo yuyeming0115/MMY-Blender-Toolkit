@@ -328,11 +328,15 @@ class MMY_OT_SelectAnimFile(bpy.types.Operator, ImportHelper):
                 if not preset_names:
                     preset_names = ["Ani"]
 
-                # 查找匹配的集合
+                # 查找匹配的集合（使用包含匹配，更宽松）
                 found_name = None
                 for preset in preset_names:
-                    if preset in collections:
-                        found_name = preset
+                    # 检查是否有集合名包含预设名称
+                    for col_name in collections:
+                        if preset in col_name:
+                            found_name = col_name
+                            break
+                    if found_name:
                         break
 
                 props.has_ani_collection = found_name is not None
