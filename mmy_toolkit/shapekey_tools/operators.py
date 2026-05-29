@@ -269,18 +269,41 @@ class MMY_OT_ApplyModifierWithShapeKeys(bpy.types.Operator):
 
 
 class MMY_OT_ApplyAllModifiersWithShapeKeys(bpy.types.Operator):
-    """应用所有修改器并保留形态键"""
+    """应用所有修改器并保留形态键（支持多选）"""
     bl_idname = "mmy.apply_all_modifiers_with_shapekeys"
     bl_label = "全部应用(保留形态键)"
     bl_options = {'REGISTER', 'UNDO'}
 
     @classmethod
     def poll(cls, context):
-        obj = context.active_object
-        return obj and obj.type == 'MESH' and len(obj.modifiers) > 0
+        # 至少有一个选中的网格对象且有修改器
+        for obj in context.selected_objects:
+            if obj.type == 'MESH' and len(obj.modifiers) > 0:
+                return True
+        return False
 
     def execute(self, context):
-        bpy.ops.mmy.apply_modifier_with_shapekeys(modifier_id='all')
+        objects = [obj for obj in context.selected_objects
+                   if obj.type == 'MESH' and len(obj.modifiers) > 0]
+
+        if not objects:
+            self.report({'WARNING'}, "没有可应用的对象")
+            return {'CANCELLED'}
+
+        count = 0
+        for obj in objects:
+            # 设置为活动对象
+            bpy.context.view_layer.objects.active = obj
+
+            try:
+                # 调用单对象应用逻辑（传入 'all' 表示应用所有修改器）
+                bpy.ops.mmy.apply_modifier_with_shapekeys(modifier_id='all')
+                count += 1
+            except Exception as e:
+                self.report({'WARNING'}, f"{obj.name} 应用失败: {e}")
+                continue
+
+        self.report({'INFO'}, f"已应用 {count} 个对象的修改器")
         return {'FINISHED'}
 
 
