@@ -91,6 +91,8 @@ class MMY_OT_SmartSelectDialog(bpy.types.Operator):
     _mouse_y = 0
 
     def execute(self, context):
+        print(f"[Smart Select] Dialog execute: select_type={self.select_type}")
+
         # 执行选择
         if self.select_type == 'ISLAND':
             if select_uv_island(context, self._mouse_x, self._mouse_y):
