@@ -79,7 +79,6 @@ class MMY_OT_SmartSelectHandler(bpy.types.Operator):
     bl_options = {'REGISTER'}
 
     _running = False
-    _timer = None
 
     def modal(self, context, event):
         # 检查是否启用
@@ -130,7 +129,7 @@ class MMY_OT_SmartSelectHandler(bpy.types.Operator):
             if success:
                 print(f"[Smart Select] 已选中 {count} 个相同材质的面")
 
-    def execute(self, context):
+    def invoke(self, context, event):
         if self._running:
             return {'PASS_THROUGH'}
 
@@ -138,19 +137,15 @@ class MMY_OT_SmartSelectHandler(bpy.types.Operator):
         context.window_manager.modal_handler_add(self)
         return {'RUNNING_MODAL'}
 
-    @classmethod
-    def start(cls):
-        """启动监听器"""
-        if not cls._running:
-            try:
-                bpy.ops.mmy.smart_select_handler()
-            except:
-                pass
 
-    @classmethod
-    def stop(cls):
-        """停止监听器"""
-        cls._running = False
+def _start_handler_delayed():
+    """延迟启动监听器（确保有窗口上下文）"""
+    try:
+        bpy.ops.mmy.smart_select_handler('INVOKE_DEFAULT')
+        print("[Smart Select] 监听器已启动")
+    except Exception as e:
+        print(f"[Smart Select] 启动失败: {e}")
+    return None  # 停止定时器
 
 
 _classes = (
@@ -165,13 +160,19 @@ def register():
     for cls in _classes:
         bpy.utils.register_class(cls)
 
-    # 启动监听器
-    MMY_OT_SmartSelectHandler.start()
+    # 延迟启动监听器（等待窗口上下文可用）
+    bpy.app.timers.register(_start_handler_delayed, first_interval=1.0)
 
 
 def unregister():
     # 停止监听器
-    MMY_OT_SmartSelectHandler.stop()
+    MMY_OT_SmartSelectHandler._running = False
+
+    # 取消定时器
+    try:
+        bpy.app.timers.unregister(_start_handler_delayed)
+    except:
+        pass
 
     for cls in reversed(_classes):
         try:
