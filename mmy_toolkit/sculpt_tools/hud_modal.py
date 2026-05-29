@@ -93,28 +93,42 @@ class MMY_OT_AutoMaskMenuModal(bpy.types.Operator):
     bl_options = {'INTERNAL'}
 
     _draw_handler = None
+    _menu_position: bpy.props.IntVectorProperty(size=2, default=(0, 0))  # 接收外部传入的菜单位置
 
     def invoke(self, context, event):
-        # 计算菜单位置（在auto_mask按钮旁边）
         window = context.window
         mouse_x, mouse_y = event.mouse_x, event.mouse_y
 
         # 获取按钮位置
         area, region, space, button_id = find_button_at_point(window, mouse_x, mouse_y)
-        if button_id != "auto_mask" or region is None:
-            return {'CANCELLED'}
 
-        # 计算菜单位置（在按钮右下方弹出）
-        bounds = get_effective_viewport_bounds(area, space, region)
+        # 如果找不到 region，尝试从 context 获取
+        if region is None:
+            area = getattr(context, "area", None)
+            region = getattr(context, "region", None)
+            space = getattr(context, "space_data", None)
+            if area is None or region is None:
+                print("[MMY Sculpt] 无法获取 region，菜单取消")
+                return {'CANCELLED'}
 
-        # 找到auto_mask按钮的具体位置
-        prefs = context.preferences.addons.get("mmy_toolkit").preferences if context.preferences.addons.get("mmy_toolkit") else None
+        # 计算菜单位置（在按钮下方弹出，如果找不到按钮则使用鼠标位置）
+        bounds = get_effective_viewport_bounds(area, space, region) if space else None
+
+        # 获取布局偏好
+        addon = context.preferences.addons.get("mmy_toolkit")
+        prefs = addon.preferences if addon else None
         layout_mode = getattr(prefs, "sculpt_hud_layout", "horizontal") if prefs else "horizontal"
         offset_x, offset_y = get_global_offset()
         user_buttons = get_user_buttons()
         buttons = user_buttons + ["add"]
 
-        if layout_mode == "horizontal":
+        # 鼠标相对 region 的坐标
+        region_mouse_x = mouse_x - region.x
+        region_mouse_y = mouse_y - region.y
+
+        # 计算菜单位置
+        if layout_mode == "horizontal" and bounds and button_id == "auto_mask":
+            # 水平布局：精确计算按钮位置
             hud_height = HUD_BUTTON_HEIGHT + HUD_MARGIN * 2
             center_y = (bounds["top"] + bounds["bottom"]) * 0.5
             base_y = center_y - hud_height * 0.5
@@ -130,10 +144,9 @@ class MMY_OT_AutoMaskMenuModal(bpy.types.Operator):
             menu_x = btn_x
             menu_y = btn_y - len(_MENU_ITEMS) * MENU_ITEM_HEIGHT - MENU_MARGIN
         else:
-            # 垂直布局
-            btn_x = bounds["left"] + bounds["width"] * 0.5 - (HUD_BUTTON_WIDTH + HUD_MARGIN * 2) * 0.5 + offset_x * bounds["width"]
-            menu_x = btn_x + HUD_BUTTON_WIDTH + MENU_MARGIN
-            menu_y = mouse_y - region.y
+            # 其他情况：菜单在鼠标位置附近弹出
+            menu_x = region_mouse_x
+            menu_y = region_mouse_y - len(_MENU_ITEMS) * MENU_ITEM_HEIGHT - MENU_MARGIN
 
         # 存储菜单位置（region相对坐标）
         _MENU_STATE["active"] = True
