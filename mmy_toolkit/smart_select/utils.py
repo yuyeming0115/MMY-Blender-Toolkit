@@ -6,11 +6,13 @@ import bmesh
 
 def select_uv_island(context, mouse_x, mouse_y):
     """在 UV 编辑器中选中鼠标位置的 UV 孤岛"""
-    # 找到 UV 编辑器区域
+    # 检查是否在 UV 编辑器
+    found_uv_editor = False
     for area in context.screen.areas:
         if area.type == 'IMAGE_EDITOR':
             space = area.spaces.active
             if space and hasattr(space, 'mode') and space.mode == 'VIEW':
+                found_uv_editor = True
                 # 找到区域内的鼠标坐标
                 for region in area.regions:
                     if region.type == 'WINDOW':
@@ -18,25 +20,38 @@ def select_uv_island(context, mouse_x, mouse_y):
                         region_mouse_x = mouse_x - region.x
                         region_mouse_y = mouse_y - region.y
 
+                        print(f"[Smart Select] UV编辑器坐标: ({region_mouse_x}, {region_mouse_y})")
+
                         # 使用 select_linked_pick
                         try:
                             # 临时切换到 UV 编辑器上下文
                             with context.temp_override(area=area, region=region):
-                                bpy.ops.uv.select_linked_pick(
-                                    extend=False,
-                                    location=(region_mouse_x, region_mouse_y)
-                                )
+                                # 先取消所有选择
+                                bpy.ops.uv.select_all(action='DESELECT')
+                                # 选中点击位置的 UV
+                                bpy.ops.uv.select(extend=False, location=(region_mouse_x, region_mouse_y))
+                                # 扩展到整个孤岛
+                                bpy.ops.uv.select_linked()
                             print(f"[Smart Select] UV孤岛选中成功")
                             return True
                         except Exception as e:
                             print(f"[Smart Select] UV孤岛选中失败: {e}")
-                            # 备用：选中所有 UV（简单的全选）
-                            try:
-                                with context.temp_override(area=area, region=region):
-                                    bpy.ops.uv.select_all(action='SELECT')
-                                return True
-                            except:
-                                return False
+                            return False
+
+    if not found_uv_editor:
+        print("[Smart Select] 未找到 UV 编辑器，请在 UV 编辑器中使用此功能")
+        # 尝试打开 UV 编辑器
+        try:
+            # 切换到编辑模式（如果不在）
+            obj = context.active_object
+            if obj and obj.mode != 'EDIT':
+                bpy.ops.object.mode_set(mode='EDIT')
+            # 打开 UV 编辑器（Split 区域）
+            # 这需要更复杂的操作，暂时返回 False 并提示
+            return False
+        except:
+            return False
+
     return False
 
 
