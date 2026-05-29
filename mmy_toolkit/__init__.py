@@ -996,27 +996,14 @@ def _register_keymaps():
                 )
                 addon_keymaps.append((km, kmi))
 
-            # 智能选择快捷键（Shift+左键）
-            km = kc.keymaps.find("Mesh", space_type="VIEW_3D")
-            if km:
-                kmi = km.keymap_items.new(
-                    idname="mmy.smart_select_listener",
-                    type="LEFTMOUSE",
-                    value="PRESS",
-                    shift=True,
-                    ctrl=False,
-                    alt=False
-                )
-                addon_keymaps.append((km, kmi))
-
-            # UV 编辑器智能选择快捷键
+            # 智能选择 - UV 编辑器双击选中孤岛
             km = kc.keymaps.find("UV Editor", space_type="EMPTY")
             if km:
                 kmi = km.keymap_items.new(
                     idname="mmy.smart_select_uv_island",
                     type="LEFTMOUSE",
                     value="DOUBLECLICK",
-                    shift=True,
+                    shift=False,
                     ctrl=False,
                     alt=False
                 )

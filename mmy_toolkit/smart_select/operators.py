@@ -6,8 +6,13 @@ from .utils import select_uv_island, select_uv_seams, select_faces_by_material, 
 
 
 # 双击检测常量
-DOUBLE_CLICK_INTERVAL = 0.25  # 秒
-CLICK_POS_TOLERANCE = 5       # 像素
+DOUBLE_CLICK_INTERVAL = 0.3  # 秒
+CLICK_POS_TOLERANCE = 10     # 像素
+
+# 全局状态（跨调用保持）
+_last_click_time = 0
+_last_click_x = 0
+_last_click_y = 0
 
 
 class MMY_OT_SmartSelectUVIsland(bpy.types.Operator):
@@ -29,8 +34,8 @@ class MMY_OT_SmartSelectUVIsland(bpy.types.Operator):
             return {'CANCELLED'}
 
     def invoke(self, context, event):
-        self._mouse_x = event.mouse_x
-        self._mouse_y = event.mouse_y
+        self._mouse_x = event.mouse_region_x
+        self._mouse_y = event.mouse_region_y
         return self.execute(context)
 
 
@@ -65,81 +70,94 @@ class MMY_OT_SmartSelectMaterial(bpy.types.Operator):
             return {'CANCELLED'}
 
 
-# ============ 双击检测监听器 ============
+# ============ 双击检测监听器（持续运行） ============
 
-class MMY_OT_SmartSelectListener(bpy.types.Operator):
-    """智能选择监听器 - 检测双击并执行智能选择"""
-    bl_idname = "mmy.smart_select_listener"
-    bl_label = "智能选择监听器"
+class MMY_OT_SmartSelectHandler(bpy.types.Operator):
+    """智能选择处理器 - 持续监听双击事件"""
+    bl_idname = "mmy.smart_select_handler"
+    bl_label = "智能选择处理器"
     bl_options = {'REGISTER'}
 
-    _last_click_time = 0
-    _last_click_x = 0
-    _last_click_y = 0
+    _running = False
     _timer = None
 
-    def invoke(self, context, event):
-        # 获取偏好设置中的双击间隔
+    def modal(self, context, event):
+        # 检查是否启用
         addon = context.preferences.addons.get("mmy_toolkit")
-        interval = DOUBLE_CLICK_INTERVAL
-        if addon and addon.preferences:
+        if not addon or not getattr(addon.preferences, "smart_select_enabled", True):
+            self._running = False
+            return {'CANCELLED'}
+
+        # 只处理左键点击
+        if event.type == 'LEFTMOUSE' and event.value == 'PRESS':
+            # 获取双击间隔
             interval = getattr(addon.preferences, "smart_select_double_click_interval", DOUBLE_CLICK_INTERVAL)
 
-        current_time = time.time()
-        mouse_x = event.mouse_x
-        mouse_y = event.mouse_y
+            current_time = time.time()
+            mouse_x = event.mouse_x
+            mouse_y = event.mouse_y
 
-        # 检测双击
-        is_double_click = False
-        if current_time - self._last_click_time < interval:
-            # 检查位置是否相近
-            dx = abs(mouse_x - self._last_click_x)
-            dy = abs(mouse_y - self._last_click_y)
-            if dx < CLICK_POS_TOLERANCE and dy < CLICK_POS_TOLERANCE:
-                is_double_click = True
+            # 检测双击
+            global _last_click_time, _last_click_x, _last_click_y
 
-        if is_double_click:
-            # 执行智能选择
-            self._execute_smart_select(context, event)
-            # 重置状态
-            self._last_click_time = 0
-            return {'FINISHED'}
-        else:
-            # 记录首次点击
-            self._last_click_time = current_time
-            self._last_click_x = mouse_x
-            self._last_click_y = mouse_y
-            return {'PASS_THROUGH'}
+            if current_time - _last_click_time < interval:
+                dx = abs(mouse_x - _last_click_x)
+                dy = abs(mouse_y - _last_click_y)
+                if dx < CLICK_POS_TOLERANCE and dy < CLICK_POS_TOLERANCE:
+                    # 双击触发！
+                    self._execute_smart_select(context, event)
+                    # 重置状态
+                    _last_click_time = 0
+                    return {'PASS_THROUGH'}
+
+            # 记录点击
+            _last_click_time = current_time
+            _last_click_x = mouse_x
+            _last_click_y = mouse_y
+
+        return {'PASS_THROUGH'}
 
     def _execute_smart_select(self, context, event):
         """根据上下文执行智能选择"""
         context_type = get_context_type(context)
 
-        # 获取选择模式偏好
-        addon = context.preferences.addons.get("mmy_toolkit")
-        mode = 'auto'  # 默认自动
-        if addon and addon.preferences:
-            mode = getattr(addon.preferences, "smart_select_mode", 'auto')
-
         if context_type == 'UV_EDITOR':
-            # UV 编辑器
-            if mode == 'auto' or mode == 'island':
-                # 尝试选中孤岛
-                select_uv_island(context, event.mouse_x, event.mouse_y)
+            # UV 编辑器 - 选中孤岛
+            select_uv_island(context, event.mouse_region_x, event.mouse_region_y)
         elif context_type == 'VIEW_3D_EDIT':
-            # 3D 视图编辑模式
-            if mode == 'auto' or mode == 'material':
-                # 选中相同材质的面
-                success, count = select_faces_by_material(context, event.mouse_x, event.mouse_y)
-                if success:
-                    self.report({'INFO'}, f"已选中 {count} 个相同材质的面")
+            # 3D 视图编辑模式 - 选中相同材质
+            success, count = select_faces_by_material(context, event.mouse_x, event.mouse_y)
+            if success:
+                print(f"[Smart Select] 已选中 {count} 个相同材质的面")
+
+    def execute(self, context):
+        if self._running:
+            return {'PASS_THROUGH'}
+
+        self._running = True
+        context.window_manager.modal_handler_add(self)
+        return {'RUNNING_MODAL'}
+
+    @classmethod
+    def start(cls):
+        """启动监听器"""
+        if not cls._running:
+            try:
+                bpy.ops.mmy.smart_select_handler()
+            except:
+                pass
+
+    @classmethod
+    def stop(cls):
+        """停止监听器"""
+        cls._running = False
 
 
 _classes = (
     MMY_OT_SmartSelectUVIsland,
     MMY_OT_SmartSelectUVSeams,
     MMY_OT_SmartSelectMaterial,
-    MMY_OT_SmartSelectListener,
+    MMY_OT_SmartSelectHandler,
 )
 
 
@@ -147,8 +165,14 @@ def register():
     for cls in _classes:
         bpy.utils.register_class(cls)
 
+    # 启动监听器
+    MMY_OT_SmartSelectHandler.start()
+
 
 def unregister():
+    # 停止监听器
+    MMY_OT_SmartSelectHandler.stop()
+
     for cls in reversed(_classes):
         try:
             bpy.utils.unregister_class(cls)
