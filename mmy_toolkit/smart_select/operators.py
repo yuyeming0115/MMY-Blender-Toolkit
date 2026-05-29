@@ -2,6 +2,7 @@
 
 import bpy
 import time
+from bpy.props import EnumProperty
 from .utils import select_uv_island, select_uv_seams, select_faces_by_material, get_context_type
 
 
@@ -22,7 +23,6 @@ class MMY_OT_SmartSelectUVIsland(bpy.types.Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
-        # 获取鼠标位置（在 invoke 中设置）
         mouse_x = getattr(self, '_mouse_x', 0)
         mouse_y = getattr(self, '_mouse_y', 0)
 
@@ -55,7 +55,7 @@ class MMY_OT_SmartSelectUVSeams(bpy.types.Operator):
 
 
 class MMY_OT_SmartSelectMaterial(bpy.types.Operator):
-    """双击选中相同材质的面"""
+    """选中相同材质的面"""
     bl_idname = "mmy.smart_select_material"
     bl_label = "选中相同材质"
     bl_options = {'REGISTER', 'UNDO'}
@@ -70,7 +70,69 @@ class MMY_OT_SmartSelectMaterial(bpy.types.Operator):
             return {'CANCELLED'}
 
 
-# ============ 双击检测监听器（持续运行） ============
+class MMY_OT_SmartSelectDialog(bpy.types.Operator):
+    """智能选择 - 弹出确认面板"""
+    bl_idname = "mmy.smart_select_dialog"
+    bl_label = "智能选择"
+    bl_options = {'REGISTER', 'UNDO', 'PRESET'}
+
+    select_type: EnumProperty(
+        name="选择类型",
+        description="选择要执行的智能选择类型",
+        items=[
+            ('ISLAND', "UV 孤岛", "选中整个 UV 孤岛"),
+            ('MATERIAL', "相同材质", "选中所有相同材质的面"),
+            ('SEAM', "缝合边", "选中所有缝合边"),
+        ],
+        default='ISLAND'
+    )
+
+    _mouse_x = 0
+    _mouse_y = 0
+
+    def execute(self, context):
+        # 保存偏好设置（记住用户选择）
+        addon = context.preferences.addons.get("mmy_toolkit")
+        if addon and addon.preferences:
+            # 记住上次的选择类型
+            addon.preferences["smart_select_last_type"] = self.select_type
+
+        # 执行选择
+        if self.select_type == 'ISLAND':
+            if select_uv_island(context, self._mouse_x, self._mouse_y):
+                self.report({'INFO'}, "已选中 UV 孤岛")
+            else:
+                self.report({'WARNING'}, "无法选中 UV 孤岛")
+        elif self.select_type == 'MATERIAL':
+            success, count = select_faces_by_material(context, 0, 0)
+            if success:
+                self.report({'INFO'}, f"已选中 {count} 个相同材质的面")
+            else:
+                self.report({'WARNING'}, "没有选中面")
+        elif self.select_type == 'SEAM':
+            if select_uv_seams(context):
+                self.report({'INFO'}, "已选中缝合边")
+            else:
+                self.report({'WARNING'}, "没有缝合边")
+
+        return {'FINISHED'}
+
+    def invoke(self, context, event):
+        self._mouse_x = event.mouse_region_x if hasattr(event, 'mouse_region_x') else event.mouse_x
+        self._mouse_y = event.mouse_region_y if hasattr(event, 'mouse_region_y') else event.mouse_y
+
+        # 尝试读取上次的选择类型
+        addon = context.preferences.addons.get("mmy_toolkit")
+        if addon and addon.preferences:
+            try:
+                self.select_type = addon.preferences.get("smart_select_last_type", 'ISLAND')
+            except:
+                pass
+
+        return context.window_manager.invoke_props_dialog(self, width=200)
+
+
+# ============ 双击检测监听器 ============
 
 class MMY_OT_SmartSelectHandler(bpy.types.Operator):
     """智能选择处理器 - 持续监听双击事件"""
@@ -89,24 +151,28 @@ class MMY_OT_SmartSelectHandler(bpy.types.Operator):
 
         # 只处理左键点击
         if event.type == 'LEFTMOUSE' and event.value == 'PRESS':
-            # 获取双击间隔
             interval = getattr(addon.preferences, "smart_select_double_click_interval", DOUBLE_CLICK_INTERVAL)
 
             current_time = time.time()
             mouse_x = event.mouse_x
             mouse_y = event.mouse_y
 
-            # 检测双击
             global _last_click_time, _last_click_x, _last_click_y
+
+            # 调试：打印每次点击
+            print(f"[Smart Select] 点击检测: time_diff={current_time - _last_click_time:.2f}, pos_diff=({abs(mouse_x - _last_click_x)}, {abs(mouse_y - _last_click_y)})")
 
             if current_time - _last_click_time < interval:
                 dx = abs(mouse_x - _last_click_x)
                 dy = abs(mouse_y - _last_click_y)
                 if dx < CLICK_POS_TOLERANCE and dy < CLICK_POS_TOLERANCE:
                     # 双击触发！
-                    self._execute_smart_select(context, event)
-                    # 重置状态
+                    print("[Smart Select] 双击检测成功！")
                     _last_click_time = 0
+                    try:
+                        bpy.ops.mmy.smart_select_dialog('INVOKE_DEFAULT')
+                    except Exception as e:
+                        print(f"[Smart Select] 弹出面板失败: {e}")
                     return {'PASS_THROUGH'}
 
             # 记录点击
@@ -115,19 +181,6 @@ class MMY_OT_SmartSelectHandler(bpy.types.Operator):
             _last_click_y = mouse_y
 
         return {'PASS_THROUGH'}
-
-    def _execute_smart_select(self, context, event):
-        """根据上下文执行智能选择"""
-        context_type = get_context_type(context)
-
-        if context_type == 'UV_EDITOR':
-            # UV 编辑器 - 选中孤岛
-            select_uv_island(context, event.mouse_region_x, event.mouse_region_y)
-        elif context_type == 'VIEW_3D_EDIT':
-            # 3D 视图编辑模式 - 选中相同材质
-            success, count = select_faces_by_material(context, event.mouse_x, event.mouse_y)
-            if success:
-                print(f"[Smart Select] 已选中 {count} 个相同材质的面")
 
     def invoke(self, context, event):
         if self._running:
@@ -139,19 +192,20 @@ class MMY_OT_SmartSelectHandler(bpy.types.Operator):
 
 
 def _start_handler_delayed():
-    """延迟启动监听器（确保有窗口上下文）"""
+    """延迟启动监听器"""
     try:
         bpy.ops.mmy.smart_select_handler('INVOKE_DEFAULT')
         print("[Smart Select] 监听器已启动")
     except Exception as e:
         print(f"[Smart Select] 启动失败: {e}")
-    return None  # 停止定时器
+    return None
 
 
 _classes = (
     MMY_OT_SmartSelectUVIsland,
     MMY_OT_SmartSelectUVSeams,
     MMY_OT_SmartSelectMaterial,
+    MMY_OT_SmartSelectDialog,
     MMY_OT_SmartSelectHandler,
 )
 
@@ -160,15 +214,12 @@ def register():
     for cls in _classes:
         bpy.utils.register_class(cls)
 
-    # 延迟启动监听器（等待窗口上下文可用）
     bpy.app.timers.register(_start_handler_delayed, first_interval=1.0)
 
 
 def unregister():
-    # 停止监听器
     MMY_OT_SmartSelectHandler._running = False
 
-    # 取消定时器
     try:
         bpy.app.timers.unregister(_start_handler_delayed)
     except:
