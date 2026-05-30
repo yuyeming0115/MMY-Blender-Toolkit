@@ -539,6 +539,45 @@ class MMY_Preferences(bpy.types.AddonPreferences):
         default=True
     )
 
+    # === UV 工具 / RizomUV 设置 ===
+    photoshop_path: bpy.props.StringProperty(
+        name="Photoshop 路径",
+        description="photoshop.exe 的完整路径",
+        subtype='FILE_PATH',
+        default=r"C:\Program Files\Adobe\Adobe Photoshop\Photoshop.exe"
+    )
+    rizomuv_enable: bpy.props.BoolProperty(
+        name="启用 RizomUV 桥接",
+        description="在面板中显示 RizomUV 桥接工具",
+        default=True,
+    )
+    rizomuv_app_path: bpy.props.StringProperty(
+        name="RizomUV 路径",
+        description="RizomUV 可执行文件所在目录",
+        subtype='DIR_PATH',
+    )
+    rizomuv_exit_after_save: bpy.props.BoolProperty(
+        name="保存后自动关闭 RizomUV",
+        default=False,
+    )
+    rizomuv_multi_uv: bpy.props.BoolProperty(
+        name="多 UV 通道模式",
+        default=False,
+    )
+    rizomuv_unwrap_tab: bpy.props.BoolProperty(name="Unwrap 设置", default=False)
+    rizomuv_unwrap_unfold_itr: bpy.props.IntProperty(name="展开迭代", default=1, min=1, max=1000)
+    rizomuv_unwrap_optimize_itr: bpy.props.IntProperty(name="优化迭代", default=10, min=1, max=1000)
+    rizomuv_unwrap_tflips: bpy.props.BoolProperty(name="防止三角翻转", default=False)
+    rizomuv_unwrap_overlaps: bpy.props.BoolProperty(name="防止自交重叠", default=False)
+    rizomuv_unwrap_overlaps_dist: bpy.props.FloatProperty(name="最小间距", default=0.001, min=0.0, max=1.0)
+    rizomuv_unwrap_free: bpy.props.BoolProperty(name="释放边界", default=False)
+    rizomuv_unwrap_fill: bpy.props.BoolProperty(name="填充孔洞", default=False)
+    rizomuv_unwrap_keep_metric: bpy.props.BoolProperty(name="保持比例", default=False)
+    rizomuv_layout_tab: bpy.props.BoolProperty(name="Layout 设置", default=False)
+    rizomuv_layout_margin: bpy.props.FloatProperty(name="边距", default=0.001, min=0.0, max=100.0)
+    rizomuv_layout_spacing: bpy.props.FloatProperty(name="间距", default=0.001, min=0.0, max=100.0)
+    rizomuv_layout_map_size: bpy.props.IntProperty(name="贴图分辨率", default=2048, min=1, max=65536)
+
     def draw(self, context):
         layout = self.layout
 
@@ -791,6 +830,54 @@ class MMY_Preferences(bpy.types.AddonPreferences):
         row = box.row()
         row.operator("mmy.add_suffix_preset", text="添加后缀", icon="ADD")
 
+        layout.separator()
+
+        # === UV 工具 / RizomUV 设置 ===
+        layout.label(text="UV 工具 / RizomUV:", icon='UV')
+        box = layout.box()
+
+        # Photoshop 路径
+        box.prop(self, "photoshop_path")
+        row = box.row()
+        row.operator("uv.mmy_test_photoshop_path", text="测试路径")
+
+        layout.separator()
+
+        # RizomUV 设置
+        box.prop(self, "rizomuv_enable")
+        col = box.column()
+        col.enabled = self.rizomuv_enable
+        col.prop(self, "rizomuv_app_path", text="RizomUV 目录")
+        row = col.row(align=True)
+        row.prop(self, "rizomuv_multi_uv", text="多通道")
+        row.prop(self, "rizomuv_exit_after_save", text="自动关闭")
+
+        # Unwrap 参数
+        col.separator()
+        col.prop(self, "rizomuv_unwrap_tab", text="展开参数")
+        if self.rizomuv_unwrap_tab:
+            sub = col.column(align=True)
+            r = sub.row(align=True)
+            r.prop(self, "rizomuv_unwrap_unfold_itr")
+            r.prop(self, "rizomuv_unwrap_optimize_itr")
+            sub.prop(self, "rizomuv_unwrap_tflips")
+            sub.prop(self, "rizomuv_unwrap_free")
+            sub.prop(self, "rizomuv_unwrap_fill")
+            sub.prop(self, "rizomuv_unwrap_keep_metric")
+            sub.prop(self, "rizomuv_unwrap_overlaps")
+            if self.rizomuv_unwrap_overlaps:
+                sub.prop(self, "rizomuv_unwrap_overlaps_dist")
+
+        # Layout 参数
+        col.separator()
+        col.prop(self, "rizomuv_layout_tab", text="排列参数")
+        if self.rizomuv_layout_tab:
+            sub = col.column(align=True)
+            r = sub.row(align=True)
+            r.prop(self, "rizomuv_layout_margin")
+            r.prop(self, "rizomuv_layout_spacing")
+            sub.prop(self, "rizomuv_layout_map_size")
+
 
 def _update_translation_buttons():
     """更新语言切换按钮显示"""
@@ -944,6 +1031,7 @@ from . import sculpt_tools
 from . import modifier_tools
 from . import smart_select
 from . import fbx_export
+from . import uv_tools
 
 
 # ============ 快捷键注册 ============
@@ -1014,6 +1102,7 @@ def register():
     modifier_tools.register()
     smart_select.register()
     fbx_export.register()
+    uv_tools.register()
 
     # 注册快捷键
     _register_keymaps()
@@ -1095,6 +1184,7 @@ def unregister():
     modifier_tools.unregister()
     smart_select.unregister()
     fbx_export.unregister()
+    uv_tools.unregister()
 
     # 移除绘制函数
     try:
