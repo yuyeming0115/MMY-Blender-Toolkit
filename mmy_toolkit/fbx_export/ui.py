@@ -72,9 +72,6 @@ class MMY_PT_FbxExport(Panel):
             grid = box.grid_flow(row_major=True, columns=2)
             grid.prop(settings, "deform_bones")
             grid.prop(settings, "leaf_bones")
-            row = box.row(align=True)
-            row.prop(settings, "primary_bbone_axis", text="主轴")
-            row.prop(settings, "secondary_bbone_axis", text="次轴")
 
         # NLA动画
         box = layout.box()

@@ -21,9 +21,9 @@ def unhide_collections(col):
         unhide_collections(item)
 
 
-def unhide_objects():
+def unhide_objects(context):
     """取消当前视图层所有对象的隐藏"""
-    view_layer_objects = [ob for ob in bpy.data.objects if ob.name in bpy.context.view_layer.objects]
+    view_layer_objects = [ob for ob in bpy.data.objects if ob.name in context.view_layer.objects]
     for ob in view_layer_objects:
         if ob.hide_get():
             ob.hide_set(False)
@@ -58,12 +58,12 @@ def export_contains_armature_content(objects):
     return False
 
 
-def apply_object_modifiers(objects):
+def apply_object_modifiers(objects, context):
     """应用修改器（排除骨骼修改器和形态键）"""
     bpy.ops.object.select_all(action='DESELECT')
     to_convert = []
     for ob in objects:
-        if ob.name not in bpy.context.view_layer.objects:
+        if ob.name not in context.view_layer.objects:
             continue
         bypass_modifiers = any(mod.type == 'ARMATURE' for mod in ob.modifiers)
         has_shape_keys = False
@@ -86,24 +86,25 @@ def apply_object_modifiers(objects):
 
 
 def export_unity_fbx(context, filepath, active_collection, selected_objects, deform_bones, leaf_bones,
-                     primary_bbone_axis, secondary_bbone_axis, tangent_space, triangulate_faces,
+                     tangent_space, triangulate_faces,
                      reset_transforms, export_textures, nla_items, animation_export_mode='NLA_ONLY',
-                     zero_transforms=False, batch_mode=False):
+                     zero_transforms=False, batch_mode=False, global_processed_images=None):
     """Unity FBX 主导出函数"""
     if not batch_mode:
         bpy.ops.ed.undo_push(message="Prepare Unity FBX")
 
-    selection = bpy.context.selected_objects
+    selection = list(context.selected_objects)
     export_objects = get_export_objects(context, selected_objects, active_collection)
+
     bake_space_transform = not export_contains_armature_content(export_objects)
     target_dir = os.path.dirname(filepath)
 
     if bpy.ops.object.mode_set.poll():
         bpy.ops.object.mode_set(mode="OBJECT")
 
-    unhide_collections(bpy.context.view_layer.layer_collection)
-    unhide_objects()
-    apply_object_modifiers(export_objects)
+    unhide_collections(context.view_layer.layer_collection)
+    unhide_objects(context)
+    apply_object_modifiers(export_objects, context)
 
     try:
         if export_textures:
@@ -113,20 +114,21 @@ def export_unity_fbx(context, filepath, active_collection, selected_objects, def
             if hasattr(context.scene, 'mmy_fbx_settings'):
                 resize_mode = context.scene.mmy_fbx_settings.texture_resize_mode
                 tex_size = int(resize_mode) if resize_mode != '0' else 0
-            print(f"[FBX Export] texture_resize={tex_size}, keep_original_names={keep_original_names}")
             for ob in tex_targets:
                 if ob.type == 'MESH':
-                    texture_utils.copy_and_rename_texture(ob, target_dir, target_size=tex_size, keep_original_names=keep_original_names)
+                    texture_utils.copy_and_rename_texture(ob, target_dir, target_size=tex_size,
+                                                          keep_original_names=keep_original_names,
+                                                          global_processed_images=global_processed_images)
 
         original_nla_states = nla_utils.apply_nla_selection(context, selected_objects, nla_items)
 
         if reset_transforms:
-            targets = selection if selected_objects else bpy.context.view_layer.objects
+            targets = selection if selected_objects else context.view_layer.objects
             targets = [o for o in targets if o.type in {'MESH', 'ARMATURE', 'EMPTY', 'CURVE', 'FONT', 'SURFACE'}]
             for ob in targets:
                 try:
                     ob_name = ob.name
-                    if ob_name not in bpy.context.view_layer.objects:
+                    if ob_name not in context.view_layer.objects:
                         continue
                 except (ReferenceError, AttributeError):
                     continue
@@ -161,7 +163,7 @@ def export_unity_fbx(context, filepath, active_collection, selected_objects, def
                     ob.select_set(True)
                 except RuntimeError:
                     continue
-                bpy.context.view_layer.objects.active = ob
+                context.view_layer.objects.active = ob
                 if bpy.ops.object.transform_apply.poll():
                     try:
                         bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
@@ -170,11 +172,11 @@ def export_unity_fbx(context, filepath, active_collection, selected_objects, def
                 ob.location = (0.0, 0.0, 0.0)
 
         elif zero_transforms:
-            targets = selection if selected_objects else bpy.context.view_layer.objects
+            targets = selection if selected_objects else context.view_layer.objects
             targets = [o for o in targets if o.type in {'MESH', 'ARMATURE', 'EMPTY', 'CURVE', 'FONT', 'SURFACE'}]
             for ob in targets:
                 try:
-                    if ob.name not in bpy.context.view_layer.objects:
+                    if ob.name not in context.view_layer.objects:
                         continue
                 except (ReferenceError, AttributeError):
                     continue
@@ -186,7 +188,7 @@ def export_unity_fbx(context, filepath, active_collection, selected_objects, def
                 ob.rotation_euler = (0.0, 0.0, 0.0)
                 ob.scale = (1.0, 1.0, 1.0)
 
-        bpy.context.view_layer.update()
+        context.view_layer.update()
         bpy.ops.object.select_all(action='DESELECT')
         for ob in list(selection):
             try:
@@ -209,8 +211,6 @@ def export_unity_fbx(context, filepath, active_collection, selected_objects, def
             use_selection=selected_objects,
             use_armature_deform_only=deform_bones,
             add_leaf_bones=leaf_bones,
-            primary_bbone_axis=primary_bbone_axis,
-            secondary_bbone_axis=secondary_bbone_axis,
             use_tspace=tangent_space,
             use_triangles=triangulate_faces,
             use_mesh_modifiers=False,
@@ -221,7 +221,6 @@ def export_unity_fbx(context, filepath, active_collection, selected_objects, def
             bake_anim_simplify_factor=0.0
         )
 
-        print(f"FBX Export: bake_space_transform={bake_space_transform}, animation_mode={animation_export_mode}")
         try:
             bpy.ops.export_scene.fbx(**params)
         except Exception as e:

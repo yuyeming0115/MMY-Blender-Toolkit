@@ -77,16 +77,6 @@ class MMYFbxExportSettings(PropertyGroup):
     triangulate_faces: BoolProperty(name="三角化面", default=False)
     deform_bones: BoolProperty(name="仅变形骨骼", default=False)
     leaf_bones: BoolProperty(name="添加叶骨", default=False)
-    primary_bbone_axis: EnumProperty(
-        name="主轴向",
-        items=[('X',"X",""),('Y',"Y",""),('Z',"Z",""),('-X',"-X",""),('-Y',"-Y",""),('-Z',"-Z","")],
-        default='Y'
-    )
-    secondary_bbone_axis: EnumProperty(
-        name="次轴向",
-        items=[('X',"X",""),('Y',"Y",""),('Z',"Z",""),('-X',"-X",""),('-Y',"-Y",""),('-Z',"-Z","")],
-        default='X'
-    )
     export_options_collapsed: BoolProperty(
         name="导出选项",
         default=True,

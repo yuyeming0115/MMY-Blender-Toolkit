@@ -112,8 +112,6 @@ class MMY_OT_QuickExportFBX(Operator):
                 selected_objects=settings.quick_selected_only,
                 deform_bones=settings.deform_bones,
                 leaf_bones=settings.leaf_bones,
-                primary_bbone_axis=settings.primary_bbone_axis,
-                secondary_bbone_axis=settings.secondary_bbone_axis,
                 tangent_space=settings.tangent_space,
                 triangulate_faces=settings.triangulate_faces,
                 reset_transforms=settings.quick_reset_transforms,
@@ -133,8 +131,6 @@ class MMY_OT_QuickExportFBX(Operator):
             cached_settings = {
                 'deform_bones': settings.deform_bones,
                 'leaf_bones': settings.leaf_bones,
-                'primary_bbone_axis': settings.primary_bbone_axis,
-                'secondary_bbone_axis': settings.secondary_bbone_axis,
                 'tangent_space': settings.tangent_space,
                 'triangulate_faces': settings.triangulate_faces,
                 'reset_transforms': settings.quick_reset_transforms,
@@ -142,6 +138,8 @@ class MMY_OT_QuickExportFBX(Operator):
                 'zero_transforms': settings.quick_zero_transforms,
             }
             cached_nla_items = list(settings.nla_items)
+            # 全局贴图去重字典，跨对象共享
+            global_processed_images = {}
 
             valid_objects = []
             for obj in context.selected_objects:
@@ -183,15 +181,14 @@ class MMY_OT_QuickExportFBX(Operator):
                     selected_objects=True,
                     deform_bones=cached_settings['deform_bones'],
                     leaf_bones=cached_settings['leaf_bones'],
-                    primary_bbone_axis=cached_settings['primary_bbone_axis'],
-                    secondary_bbone_axis=cached_settings['secondary_bbone_axis'],
                     tangent_space=cached_settings['tangent_space'],
                     triangulate_faces=cached_settings['triangulate_faces'],
                     reset_transforms=cached_settings['reset_transforms'],
                     export_textures=cached_settings['export_textures'],
                     nla_items=cached_nla_items,
                     zero_transforms=cached_settings['zero_transforms'],
-                    batch_mode=True
+                    batch_mode=True,
+                    global_processed_images=global_processed_images
                 )
 
                 if 'FINISHED' in result:
@@ -225,8 +222,6 @@ class MMY_OT_QuickExportFBX(Operator):
             selected_objects=settings.quick_selected_only,
             deform_bones=settings.deform_bones,
             leaf_bones=settings.leaf_bones,
-            primary_bbone_axis=settings.primary_bbone_axis,
-            secondary_bbone_axis=settings.secondary_bbone_axis,
             tangent_space=settings.tangent_space,
             triangulate_faces=settings.triangulate_faces,
             reset_transforms=settings.quick_reset_transforms,
@@ -274,8 +269,6 @@ class MMY_OT_QuickExportAnimationFBX(Operator):
             cached_settings = {
                 'deform_bones': settings.deform_bones,
                 'leaf_bones': settings.leaf_bones,
-                'primary_bbone_axis': settings.primary_bbone_axis,
-                'secondary_bbone_axis': settings.secondary_bbone_axis,
                 'tangent_space': settings.tangent_space,
                 'triangulate_faces': settings.triangulate_faces,
                 'reset_transforms': settings.quick_reset_transforms,
@@ -283,6 +276,8 @@ class MMY_OT_QuickExportAnimationFBX(Operator):
                 'zero_transforms': settings.quick_zero_transforms,
             }
             cached_nla_items = list(settings.nla_items)
+            # 全局贴图去重字典，跨对象共享
+            global_processed_images = {}
 
             valid_objects = []
             for obj in context.selected_objects:
@@ -337,15 +332,14 @@ class MMY_OT_QuickExportAnimationFBX(Operator):
                     selected_objects=True,
                     deform_bones=cached_settings['deform_bones'],
                     leaf_bones=cached_settings['leaf_bones'],
-                    primary_bbone_axis=cached_settings['primary_bbone_axis'],
-                    secondary_bbone_axis=cached_settings['secondary_bbone_axis'],
                     tangent_space=cached_settings['tangent_space'],
                     triangulate_faces=cached_settings['triangulate_faces'],
                     reset_transforms=cached_settings['reset_transforms'],
                     export_textures=cached_settings['export_textures'],
                     nla_items=cached_nla_items,
                     zero_transforms=cached_settings['zero_transforms'],
-                    batch_mode=True
+                    batch_mode=True,
+                    global_processed_images=global_processed_images
                 )
 
                 if 'FINISHED' in result:
@@ -379,8 +373,6 @@ class MMY_OT_QuickExportAnimationFBX(Operator):
             selected_objects=settings.quick_selected_only,
             deform_bones=settings.deform_bones,
             leaf_bones=settings.leaf_bones,
-            primary_bbone_axis=settings.primary_bbone_axis,
-            secondary_bbone_axis=settings.secondary_bbone_axis,
             tangent_space=settings.tangent_space,
             triangulate_faces=settings.triangulate_faces,
             reset_transforms=settings.quick_reset_transforms,
