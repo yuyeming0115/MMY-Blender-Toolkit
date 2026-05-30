@@ -9,17 +9,15 @@ def add_prefs_ui(layout, prefs):
     box.label(text="智能选择设置", icon='RESTRICT_SELECT_OFF')
 
     row = box.row()
-    row.prop(prefs, "smart_select_double_click_interval", text="双击间隔（秒）")
-
-    row = box.row()
-    row.prop(prefs, "smart_select_mode", text="选择模式")
-
-    row = box.row()
-    row.label(text="快捷键：Shift + 双击", icon='INFO')
+    row.label(text="快捷键：", icon='INFO')
+    col = box.column()
+    col.label(text="• UV 编辑器：双击选中孤岛")
+    col.label(text="• 3D 视图：双击选中相连元素")
+    col.label(text="• 3D 视图：Shift+双击选中相同材质")
+    col.label(text="• 3D 视图：Ctrl+双击选中缝合边")
 
 
 def register():
-    # UI 注册在 __init__.py 中统一处理
     pass
 
 

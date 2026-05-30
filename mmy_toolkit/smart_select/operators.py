@@ -1,19 +1,12 @@
-"""智能选择操作符"""
+"""智能选择操作符
+
+使用 Blender 原生操作符实现双击选择。
+"""
 
 import bpy
-import time
-from bpy.props import EnumProperty
-from .utils import select_uv_island, select_uv_seams, select_faces_by_material
-
-
-# 双击检测常量
-DOUBLE_CLICK_INTERVAL = 0.3  # 秒
-CLICK_POS_TOLERANCE = 10     # 像素
-
-# 全局状态（跨调用保持）
-_last_click_time = 0
-_last_click_x = 0
-_last_click_y = 0
+import bmesh
+from mathutils import Vector
+from .hud_tip import show_tip
 
 
 class MMY_OT_SmartSelectUVIsland(bpy.types.Operator):
@@ -23,241 +16,207 @@ class MMY_OT_SmartSelectUVIsland(bpy.types.Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
-        mouse_x = getattr(self, '_mouse_x', 0)
-        mouse_y = getattr(self, '_mouse_y', 0)
-
-        if select_uv_island(context, mouse_x, mouse_y):
-            self.report({'INFO'}, "已选中 UV 孤岛")
-            return {'FINISHED'}
-        else:
-            self.report({'WARNING'}, "无法选中 UV 孤岛")
+        obj = context.active_object
+        if not obj or obj.type != 'MESH':
+            self.report({'WARNING'}, "没有活动网格对象")
             return {'CANCELLED'}
 
-    def invoke(self, context, event):
-        self._mouse_x = event.mouse_region_x
-        self._mouse_y = event.mouse_region_y
-        return self.execute(context)
+        if context.scene.tool_settings.use_uv_select_sync:
+            bpy.ops.mesh.select_mode(use_extend=False, use_expand=False, type='FACE')
+
+        try:
+            bpy.ops.uv.select_linked_pick('INVOKE_DEFAULT')
+            show_tip("uv_island")
+            return {'FINISHED'}
+        except Exception as e:
+            self.report({'WARNING'}, f"选择失败: {e}")
+            return {'CANCELLED'}
+
+
+class MMY_OT_SmartSelectMeshLinked(bpy.types.Operator):
+    """双击选中相连网格元素"""
+    bl_idname = "mmy.smart_select_mesh_linked"
+    bl_label = "选中相连元素"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        obj = context.active_object
+        if not obj or obj.type != 'MESH':
+            self.report({'WARNING'}, "没有活动网格对象")
+            return {'CANCELLED'}
+
+        ts = context.tool_settings
+        if ts.mesh_select_mode[0]:
+            bpy.ops.mesh.select_linked_pick('INVOKE_DEFAULT')
+        elif ts.mesh_select_mode[1]:
+            bpy.ops.mesh.loop_select('INVOKE_DEFAULT', extend=True)
+        elif ts.mesh_select_mode[2]:
+            bpy.ops.mesh.select_linked_pick('INVOKE_DEFAULT')
+
+        show_tip("mesh_linked")
+        return {'FINISHED'}
 
 
 class MMY_OT_SmartSelectUVSeams(bpy.types.Operator):
-    """选中所有缝合边"""
+    """Ctrl+双击选中所有缝合边"""
     bl_idname = "mmy.smart_select_uv_seams"
     bl_label = "选中缝合边"
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
-        if select_uv_seams(context):
-            self.report({'INFO'}, "已选中缝合边")
-            return {'FINISHED'}
-        else:
-            self.report({'WARNING'}, "没有缝合边或不在编辑模式")
+        obj = context.active_object
+        if not obj or obj.type != 'MESH':
+            self.report({'WARNING'}, "没有活动网格对象")
             return {'CANCELLED'}
+
+        if obj.mode != 'EDIT':
+            self.report({'WARNING'}, "需要在编辑模式")
+            return {'CANCELLED'}
+
+        bm = bmesh.from_edit_mesh(obj.data)
+        if not bm:
+            return {'CANCELLED'}
+
+        bpy.ops.mesh.select_all(action='DESELECT')
+
+        count = 0
+        for edge in bm.edges:
+            if edge.seam:
+                edge.select = True
+                count += 1
+
+        bmesh.update_edit_mesh(obj.data)
+        context.tool_settings.mesh_select_mode = (False, True, False)
+
+        show_tip("seam")
+        return {'FINISHED'}
 
 
 class MMY_OT_SmartSelectMaterial(bpy.types.Operator):
-    """选中相同材质的面"""
+    """Shift+双击选中相同材质的面"""
     bl_idname = "mmy.smart_select_material"
     bl_label = "选中相同材质"
     bl_options = {'REGISTER', 'UNDO'}
 
+    def invoke(self, context, event):
+        # 使用窗口坐标（不是区域坐标）
+        self._mouse_x = event.mouse_x
+        self._mouse_y = event.mouse_y
+        return self.execute(context)
+
     def execute(self, context):
-        success, count = select_faces_by_material(context, 0, 0)
-        if success:
-            self.report({'INFO'}, f"已选中 {count} 个相同材质的面")
-            return {'FINISHED'}
-        else:
-            self.report({'WARNING'}, "没有选中面或不在编辑模式")
+        obj = context.active_object
+        if not obj or obj.type != 'MESH':
+            self.report({'WARNING'}, "没有活动网格对象")
             return {'CANCELLED'}
 
+        if obj.mode != 'EDIT':
+            self.report({'WARNING'}, "需要在编辑模式")
+            return {'CANCELLED'}
 
-class MMY_OT_SmartSelectDialog(bpy.types.Operator):
-    """智能选择 - 弹出确认面板"""
-    bl_idname = "mmy.smart_select_dialog"
-    bl_label = "智能选择"
-    bl_options = {'REGISTER', 'UNDO'}
+        bm = bmesh.from_edit_mesh(obj.data)
+        if not bm:
+            return {'CANCELLED'}
 
-    select_type: EnumProperty(
-        name="选择类型",
-        description="选择要执行的智能选择类型",
-        items=[
-            ('ISLAND', "UV 孤岛", "选中整个 UV 孤岛"),
-            ('MATERIAL', "相同材质", "选中所有相同材质的面"),
-            ('SEAM', "缝合边", "选中所有缝合边"),
-        ],
-        default='ISLAND'
-    )
+        # 先取消所有选择
+        for face in bm.faces:
+            face.select = False
 
-    _mouse_x = 0
-    _mouse_y = 0
+        # 射线检测找到点击位置的面
+        hit_face = self._raycast_face(context, obj)
 
-    def execute(self, context):
-        print(f"[Smart Select] Dialog execute: select_type={self.select_type}")
+        if hit_face is None:
+            self.report({'WARNING'}, "未检测到点击的面")
+            return {'CANCELLED'}
 
-        # 执行选择
-        if self.select_type == 'ISLAND':
-            if select_uv_island(context, self._mouse_x, self._mouse_y):
-                self.report({'INFO'}, "已选中 UV 孤岛")
-            else:
-                self.report({'WARNING'}, "无法选中 UV 孤岛")
-        elif self.select_type == 'MATERIAL':
-            success, count = select_faces_by_material(context, 0, 0)
-            if success:
-                self.report({'INFO'}, f"已选中 {count} 个相同材质的面")
-            else:
-                self.report({'WARNING'}, "没有选中面")
-        elif self.select_type == 'SEAM':
-            if select_uv_seams(context):
-                self.report({'INFO'}, "已选中缝合边")
-            else:
-                self.report({'WARNING'}, "没有缝合边")
+        target_material_index = hit_face.material_index
 
+        # 选中所有相同材质的面
+        count = 0
+        for face in bm.faces:
+            if face.material_index == target_material_index:
+                face.select = True
+                count += 1
+
+        bmesh.update_edit_mesh(obj.data)
+        context.tool_settings.mesh_select_mode = (False, False, True)
+
+        show_tip("material")
         return {'FINISHED'}
 
-    def invoke(self, context, event):
-        self._mouse_x = event.mouse_region_x if hasattr(event, 'mouse_region_x') else event.mouse_x
-        self._mouse_y = event.mouse_region_y if hasattr(event, 'mouse_region_y') else event.mouse_y
-
-        # 尝试读取上次的选择类型（使用场景属性存储）
+    def _raycast_face(self, context, obj):
+        """射线检测找到鼠标位置的面"""
         try:
-            last_type = context.scene.get("mmy_smart_select_last_type", 'ISLAND')
-            self.select_type = last_type
-        except:
-            pass
+            from bpy_extras.view3d_utils import region_2d_to_origin_3d, region_2d_to_vector_3d
 
-        # 使用 invoke_props_popup 在鼠标位置弹出（比 invoke_props_dialog 更轻量）
-        return context.window_manager.invoke_props_popup(self, event)
+            mouse_x, mouse_y = self._mouse_x, self._mouse_y
 
+            # 找到鼠标所在的 3D 视图区域
+            region = None
+            rv3d = None
 
-# ============ 双击检测监听器 ============
-
-class MMY_OT_SmartSelectHandler(bpy.types.Operator):
-    """智能选择处理器 - 持续监听双击事件"""
-    bl_idname = "mmy.smart_select_handler"
-    bl_label = "智能选择处理器"
-    bl_options = {'REGISTER'}
-
-    _running = False
-
-    def modal(self, context, event):
-        # 调试：检查 modal 是否收到任何事件
-        if event.type == 'LEFTMOUSE':
-            print(f"[Smart Select] Modal 收到 LEFTMOUSE: value={event.value}, area={context.area.type if context.area else 'None'}")
-
-        # 只处理左键点击
-        if event.type == 'LEFTMOUSE' and event.value == 'PRESS':
-            # context.area 在窗口级别 modal 中可能为 None
-            # 需要从鼠标位置找到实际区域
-            mouse_x = event.mouse_x
-            mouse_y = event.mouse_y
-
-            # 从窗口找到鼠标所在的区域
-            window = context.window
-            area = None
-            if window:
-                screen = window.screen
-                if screen:
-                    for a in screen.areas:
-                        if (a.x <= mouse_x <= a.x + a.width and
-                            a.y <= mouse_y <= a.y + a.height):
-                            area = a
+            for window in context.window_manager.windows:
+                for area in window.screen.areas:
+                    if area.type == 'VIEW_3D':
+                        if (area.x <= mouse_x < area.x + area.width and
+                            area.y <= mouse_y < area.y + area.height):
+                            space = area.spaces.active
+                            for r in area.regions:
+                                if r.type == 'WINDOW':
+                                    region = r
+                                    break
+                            if space:
+                                rv3d = space.region_3d
                             break
+                if region:
+                    break
 
-            if area is None:
-                return {'PASS_THROUGH'}
+            if region is None or rv3d is None:
+                return None
 
-            # 调试：打印区域信息
-            print(f"[Smart Select] 区域检查: type={area.type}")
+            # 计算区域内的坐标
+            region_x = mouse_x - area.x
+            region_y = mouse_y - area.y
 
-            # 只在 VIEW_3D 和 IMAGE_EDITOR（UV模式）中触发
-            if area.type not in ('VIEW_3D', 'IMAGE_EDITOR'):
-                return {'PASS_THROUGH'}
+            # 获取世界空间的射线
+            ray_origin = region_2d_to_origin_3d(region, rv3d, (region_x, region_y))
+            ray_dir = region_2d_to_vector_3d(region, rv3d, (region_x, region_y))
 
-            # IMAGE_EDITOR 需要检查是否是 UV 模式
-            if area.type == 'IMAGE_EDITOR':
-                space = area.spaces.active
-                if space:
-                    print(f"[Smart Select] UV空间模式: {space.mode if hasattr(space, 'mode') else 'N/A'}")
-                    # UV 编辑器 mode 为 'VIEW' 时是 UV 编辑模式
-                    if hasattr(space, 'mode') and space.mode != 'VIEW':
-                        return {'PASS_THROUGH'}
+            # 使用 scene.ray_cast 做世界空间检测
+            depsgraph = context.evaluated_depsgraph_get()
+            result, location, normal, face_index, hit_obj, matrix = context.scene.ray_cast(
+                depsgraph, ray_origin, ray_dir
+            )
 
-            # 检查是否启用
-            addon = context.preferences.addons.get("mmy_toolkit")
-            if not addon or not getattr(addon.preferences, "smart_select_enabled", True):
-                return {'PASS_THROUGH'}
+            if result and hit_obj == obj and face_index >= 0:
+                bm = bmesh.from_edit_mesh(obj.data)
+                if face_index < len(bm.faces):
+                    return bm.faces[face_index]
 
-            interval = getattr(addon.preferences, "smart_select_double_click_interval", DOUBLE_CLICK_INTERVAL)
+        except Exception as e:
+            print(f"[Smart Select Material] 射线检测失败: {e}")
 
-            current_time = time.time()
-
-            global _last_click_time, _last_click_x, _last_click_y
-
-            # 调试：打印每次点击
-            print(f"[Smart Select] 点击检测: time_diff={current_time - _last_click_time:.2f}")
-
-            if current_time - _last_click_time < interval:
-                dx = abs(mouse_x - _last_click_x)
-                dy = abs(mouse_y - _last_click_y)
-                if dx < CLICK_POS_TOLERANCE and dy < CLICK_POS_TOLERANCE:
-                    # 双击触发！
-                    print("[Smart Select] 双击检测成功！")
-                    _last_click_time = 0
-                    try:
-                        bpy.ops.mmy.smart_select_dialog('INVOKE_DEFAULT')
-                    except Exception as e:
-                        print(f"[Smart Select] 弹出面板失败: {e}")
-                    return {'PASS_THROUGH'}
-
-            # 记录点击
-            _last_click_time = current_time
-            _last_click_x = mouse_x
-            _last_click_y = mouse_y
-
-        return {'PASS_THROUGH'}
-
-    def invoke(self, context, event):
-        if self._running:
-            return {'PASS_THROUGH'}
-
-        self._running = True
-        context.window_manager.modal_handler_add(self)
-        return {'RUNNING_MODAL'}
-
-
-def _start_handler_delayed():
-    """延迟启动监听器"""
-    try:
-        bpy.ops.mmy.smart_select_handler('INVOKE_DEFAULT')
-        print("[Smart Select] 监听器已启动")
-    except Exception as e:
-        print(f"[Smart Select] 启动失败: {e}")
-    return None
+        return None
 
 
 _classes = (
     MMY_OT_SmartSelectUVIsland,
+    MMY_OT_SmartSelectMeshLinked,
     MMY_OT_SmartSelectUVSeams,
     MMY_OT_SmartSelectMaterial,
-    MMY_OT_SmartSelectDialog,
-    MMY_OT_SmartSelectHandler,
 )
 
 
 def register():
+    from .hud_tip import register as hud_register
+    hud_register()
     for cls in _classes:
         bpy.utils.register_class(cls)
 
-    bpy.app.timers.register(_start_handler_delayed, first_interval=1.0)
-
 
 def unregister():
-    MMY_OT_SmartSelectHandler._running = False
-
-    try:
-        bpy.app.timers.unregister(_start_handler_delayed)
-    except:
-        pass
-
+    from .hud_tip import unregister as hud_unregister
+    hud_unregister()
     for cls in reversed(_classes):
         try:
             bpy.utils.unregister_class(cls)

@@ -864,6 +864,11 @@ class VIEW3D_OT_mmy_sculpt_hud_modal(bpy.types.Operator):
         if self._window_id not in _HUD_STATE["modal_windows"]:
             return self._finish()
 
+        # 非雕刻模式时完全不处理事件，直接传递
+        obj = getattr(context, "active_object", None)
+        if obj is None or obj.mode != 'SCULPT':
+            return {'PASS_THROUGH'}
+
         window = getattr(context, "window", None)
         if window is None:
             return {'PASS_THROUGH'}
