@@ -943,6 +943,7 @@ from . import transform_check
 from . import sculpt_tools
 from . import modifier_tools
 from . import smart_select
+from . import fbx_export
 
 
 # ============ 快捷键注册 ============
@@ -1012,6 +1013,7 @@ def register():
     sculpt_tools.register()
     modifier_tools.register()
     smart_select.register()
+    fbx_export.register()
 
     # 注册快捷键
     _register_keymaps()
@@ -1092,6 +1094,7 @@ def unregister():
     sculpt_tools.unregister()
     modifier_tools.unregister()
     smart_select.unregister()
+    fbx_export.unregister()
 
     # 移除绘制函数
     try:
