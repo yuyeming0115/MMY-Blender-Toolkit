@@ -98,7 +98,7 @@ class MMY_PT_SmartNamingPanel(bpy.types.Panel):
         box = layout.box()
         box.label(text="集合架构", icon='OUTLINER')
 
-        # 模板选择
+        # 模板选择 + 3个按钮在一行
         props = context.scene.mmy_collection_template_props
         row = box.row(align=True)
         row.prop(props, "selected_template", text="")
@@ -113,16 +113,10 @@ class MMY_PT_SmartNamingPanel(bpy.types.Panel):
         else:
             template_name = get_default_template_name()
 
-        # 生成按钮
-        op = box.operator("mmy.generate_collection_template", text="生成架构", icon='ADD')
+        op = row.operator("mmy.generate_collection_template", text="", icon='ADD')
         op.template_name = template_name
-
-        # 快速生成器入口
-        box.operator("mmy.quick_generate_collections", text="快速生成器", icon='MODIFIER')
-
-        # 提取当前架构入口
-        row = box.row(align=True)
-        row.operator("mmy.save_current_architecture", text="提取架构", icon='FILE_NEW')
+        row.operator("mmy.quick_generate_collections", text="", icon='MODIFIER')
+        row.operator("mmy.save_current_architecture", text="", icon='FILE_NEW')
 
         # === 快捷归组 ===
         layout.separator()
