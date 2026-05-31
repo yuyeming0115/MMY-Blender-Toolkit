@@ -77,9 +77,9 @@ class MMY_PT_SmartNamingPanel(bpy.types.Panel):
     def draw(self, context):
         layout = self.layout
 
-        # === 快捷复制 ===
+        # === 增量复制 ===
         box = layout.box()
-        box.label(text="快捷复制", icon='DUPLICATE')
+        box.label(text="增量复制", icon='DUPLICATE')
 
         row = box.row(align=True)
         row.operator("mmy.smart_duplicate_collection", text="复制集合", icon='OUTLINER_COLLECTION')
