@@ -6,7 +6,7 @@ import bpy
 
 
 class VIEW3D_PT_uv_hub(bpy.types.Panel):
-    """UV 中台面板 - 3D视图"""
+    """UV 中台面板 - 3D视图（含 RizomUV 桥接）"""
     bl_label = "UV 中台"
     bl_idname = "VIEW3D_PT_mmy_uv_hub"
     bl_space_type = 'VIEW_3D'
@@ -17,8 +17,11 @@ class VIEW3D_PT_uv_hub(bpy.types.Panel):
     def draw(self, context):
         layout = self.layout
         scene = context.scene
+        prefs = context.preferences.addons.get("mmy_toolkit")
+        ruv_enabled = prefs is not None and getattr(prefs.preferences, "rizomuv_enable", True)
+        ruv_prefs = prefs.preferences if prefs else None
 
-        # UV传递区域
+        # ── UV传递区域 ──
         box = layout.box()
         box.label(text="UV传递", icon='UV')
 
@@ -35,7 +38,7 @@ class VIEW3D_PT_uv_hub(bpy.types.Panel):
 
         layout.separator()
 
-        # UVMap检查区域
+        # ── UVMap检查区域 ──
         box = layout.box()
         box.label(text="UVMap检查", icon='GROUP_UVS')
 
@@ -57,7 +60,7 @@ class VIEW3D_PT_uv_hub(bpy.types.Panel):
                 warning_row.alert = True
                 warning_row.label(text="UVMap名称不统一", icon='ERROR')
 
-            for obj in selected_meshes[:5]:  # 最多显示5个
+            for obj in selected_meshes[:5]:
                 row = box.row()
                 row.label(text=obj.name, icon='OBJECT_DATA')
 
@@ -75,104 +78,75 @@ class VIEW3D_PT_uv_hub(bpy.types.Panel):
             if len(selected_meshes) > 5:
                 box.label(text=f"... 还有 {len(selected_meshes) - 5} 个对象")
 
-            layout.separator()
-
             # 统一UVMap名称
-            unify_box = layout.box()
-            unify_box.label(text="统一UVMap名称", icon='SORTALPHA')
-            unify_box.prop(scene, "uv_unified_name", text="目标名称")
-            unify_box.operator("object.mmy_unify_uvmap_name", text="统一选中对象")
+            unify_row = box.row(align=True)
+            unify_row.prop(scene, "uv_unified_name", text="")
+            unify_row.operator("object.mmy_unify_uvmap_name", text="统一", icon='SORTALPHA')
 
+        # ── RizomUV桥接区域 ──
+        if ruv_enabled and ruv_prefs:
+            layout.separator()
+            ruv_box = layout.box()
+            ruv_box.label(text="RizomUV 桥接", icon='COMMUNITY')
 
-class VIEW3D_PT_rizomuv_tools(bpy.types.Panel):
-    """RizomUV 桥接面板 - 3D视图"""
-    bl_label = "RizomUV 桥接"
-    bl_idname = "VIEW3D_PT_mmy_rizomuv_tools"
-    bl_space_type = 'VIEW_3D'
-    bl_region_type = 'UI'
-    bl_category = "MMY工具"
-    bl_options = {'DEFAULT_CLOSED'}
+            ruv_path = ruv_prefs.rizomuv_app_path
+            multi_uv = ruv_prefs.rizomuv_multi_uv
+            has_path = bool(ruv_path)
 
-    @classmethod
-    def poll(cls, context):
-        ob = context.active_object
-        prefs = context.preferences.addons.get("mmy_toolkit")
-        if prefs is None:
-            return False
-        return (
-            ob is not None
-            and ob.type == 'MESH'
-            and context.mode == 'OBJECT'
-            and getattr(prefs.preferences, "rizomuv_enable", True)
-        )
+            # 模式和UV通道选择
+            if not multi_uv:
+                row = ruv_box.row(align=True)
+                row.prop(scene, "uv_ruv_mode", text="", icon='GROUP_UVS')
+                row.prop(scene, "uv_ruv_map", text="通道")
 
-    def draw(self, context):
-        layout = self.layout
-        scene = context.scene
-        prefs = context.preferences.addons["mmy_toolkit"].preferences
+            # 发送/回取按钮
+            col = ruv_box.column(align=True)
+            col.enabled = has_path
+            col.operator("uv.mmy_send_to_rizomuv", text="发送到 RizomUV", icon='EXPORT')
+            col.operator("uv.mmy_retake_rizomuv", text="手动回取 UV", icon='IMPORT')
 
-        ruv_path = prefs.rizomuv_app_path
-        multi_uv = prefs.rizomuv_multi_uv
-        has_path = bool(ruv_path)
+            # 路径未设置时提示
+            if not has_path:
+                ruv_box.label(text="请先在偏好设置中配置 RizomUV 路径", icon='ERROR')
 
-        # 模式和UV通道选择
-        if not multi_uv:
-            row = layout.row(align=True)
-            row.prop(scene, "uv_ruv_mode", text="", icon='GROUP_UVS')
-            row.prop(scene, "uv_ruv_map", text="通道")
+            # 多UV和自动关闭选项
+            row = ruv_box.row(align=True)
+            row.prop(ruv_prefs, "rizomuv_multi_uv", text="多通道")
+            row.prop(ruv_prefs, "rizomuv_exit_after_save", text="自动关闭")
 
-        # 发送按钮
-        col = layout.column(align=True)
-        col.enabled = has_path
-        col.operator("uv.mmy_send_to_rizomuv", text="发送到 RizomUV", icon='EXPORT')
+            # 展开参数（折叠）
+            icon = 'TRIA_RIGHT' if not ruv_prefs.rizomuv_unwrap_tab else 'TRIA_DOWN'
+            row = ruv_box.row(align=True)
+            row.prop(ruv_prefs, "rizomuv_unwrap_tab", text="", icon=icon, emboss=False)
+            row.label(text="展开参数")
 
-        # 手动回取按钮
-        col.operator("uv.mmy_retake_rizomuv", text="手动回取 UV", icon='IMPORT')
+            if ruv_prefs.rizomuv_unwrap_tab:
+                sub = ruv_box.column(align=True)
+                r = sub.row(align=True)
+                r.prop(ruv_prefs, "rizomuv_unwrap_unfold_itr", text="展开")
+                r.prop(ruv_prefs, "rizomuv_unwrap_optimize_itr", text="优化")
+                row = sub.row(align=True)
+                row.prop(ruv_prefs, "rizomuv_unwrap_tflips")
+                row.prop(ruv_prefs, "rizomuv_unwrap_free")
+                row = sub.row(align=True)
+                row.prop(ruv_prefs, "rizomuv_unwrap_fill")
+                row.prop(ruv_prefs, "rizomuv_unwrap_keep_metric")
+                sub.prop(ruv_prefs, "rizomuv_unwrap_overlaps")
+                if ruv_prefs.rizomuv_unwrap_overlaps:
+                    sub.prop(ruv_prefs, "rizomuv_unwrap_overlaps_dist", text="间距")
 
-        # 路径未设置时提示
-        if not has_path:
-            layout.label(text="请先在偏好设置中配置 RizomUV 路径", icon='ERROR')
+            # 排列参数（折叠）
+            icon = 'TRIA_RIGHT' if not ruv_prefs.rizomuv_layout_tab else 'TRIA_DOWN'
+            row = ruv_box.row(align=True)
+            row.prop(ruv_prefs, "rizomuv_layout_tab", text="", icon=icon, emboss=False)
+            row.label(text="排列参数")
 
-        # 多UV和自动关闭选项
-        layout.separator()
-        row = layout.row(align=True)
-        row.prop(prefs, "rizomuv_multi_uv", text="多通道")
-        row.prop(prefs, "rizomuv_exit_after_save", text="自动关闭")
-
-        # 展开参数（折叠）
-        layout.separator()
-        box = layout.box()
-        icon = 'TRIA_RIGHT' if not prefs.rizomuv_unwrap_tab else 'TRIA_DOWN'
-        row = box.row(align=True)
-        row.prop(prefs, "rizomuv_unwrap_tab", text="", icon=icon, emboss=False)
-        row.label(text="展开参数", icon='SETTINGS')
-
-        if prefs.rizomuv_unwrap_tab:
-            sub = box.column(align=True)
-            r = sub.row(align=True)
-            r.prop(prefs, "rizomuv_unwrap_unfold_itr")
-            r.prop(prefs, "rizomuv_unwrap_optimize_itr")
-            sub.prop(prefs, "rizomuv_unwrap_tflips")
-            sub.prop(prefs, "rizomuv_unwrap_free")
-            sub.prop(prefs, "rizomuv_unwrap_fill")
-            sub.prop(prefs, "rizomuv_unwrap_keep_metric")
-            sub.prop(prefs, "rizomuv_unwrap_overlaps")
-            if prefs.rizomuv_unwrap_overlaps:
-                sub.prop(prefs, "rizomuv_unwrap_overlaps_dist")
-
-        # 排列参数（折叠）
-        box = layout.box()
-        icon = 'TRIA_RIGHT' if not prefs.rizomuv_layout_tab else 'TRIA_DOWN'
-        row = box.row(align=True)
-        row.prop(prefs, "rizomuv_layout_tab", text="", icon=icon, emboss=False)
-        row.label(text="排列参数", icon='PACKAGE')
-
-        if prefs.rizomuv_layout_tab:
-            sub = box.column(align=True)
-            r = sub.row(align=True)
-            r.prop(prefs, "rizomuv_layout_margin")
-            r.prop(prefs, "rizomuv_layout_spacing")
-            sub.prop(prefs, "rizomuv_layout_map_size")
+            if ruv_prefs.rizomuv_layout_tab:
+                sub = ruv_box.column(align=True)
+                r = sub.row(align=True)
+                r.prop(ruv_prefs, "rizomuv_layout_margin", text="边距")
+                r.prop(ruv_prefs, "rizomuv_layout_spacing", text="间距")
+                sub.prop(ruv_prefs, "rizomuv_layout_map_size", text="分辨率")
 
 
 class IMAGE_EDITOR_PT_uv_export_tools(bpy.types.Panel):
@@ -247,7 +221,6 @@ class IMAGE_EDITOR_PT_uv_export_tools(bpy.types.Panel):
 
 classes = (
     VIEW3D_PT_uv_hub,
-    VIEW3D_PT_rizomuv_tools,
     IMAGE_EDITOR_PT_uv_export_tools,
 )
 
