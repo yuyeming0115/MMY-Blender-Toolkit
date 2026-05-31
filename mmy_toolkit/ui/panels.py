@@ -202,29 +202,108 @@ class VIEW3D_PT_MMYMeshTools(bpy.types.Panel):
         else:
             layout.label(text="请选择要转为资产的对象", icon='ERROR')
 
-        # 材质替换区块
-        try:
-            self._draw_mat_replacer(layout, context)
-        except Exception as e:
-            box3 = layout.box()
-            box3.label(text="材质替换", icon='MATERIAL')
-            box3.label(text=f"加载错误: {str(e)}", icon='ERROR')
+        # 关联管理面板（材质/动画/骨骼，折叠）
+        self._draw_link_manager(layout, context)
 
-        # 动画关联区块
-        try:
-            self._draw_anim_linker(layout, context)
-        except Exception as e:
-            box4 = layout.box()
-            box4.label(text="关联动画", icon='ANIM_DATA')
-            box4.label(text=f"加载错误: {str(e)}", icon='ERROR')
+    def _draw_link_manager(self, layout, context):
+        """绘制关联管理面板（材质/动画/骨骼，可折叠）"""
+        if not hasattr(context.scene, 'mmy_mat_replacer'):
+            return
 
-        # 骨骼缩放控制区块
-        try:
-            self._draw_armature_scale(layout, context)
-        except Exception as e:
-            box5 = layout.box()
-            box5.label(text="骨骼缩放", icon='ARMATURE_DATA')
-            box5.label(text=f"加载错误: {str(e)}", icon='ERROR')
+        props = context.scene.mmy_mat_replacer
+
+        layout.separator()
+        box = layout.box()
+
+        # 折叠按钮行
+        icon = 'TRIA_RIGHT' if props.link_panel_collapsed else 'TRIA_DOWN'
+        row = box.row(align=True)
+        row.prop(props, "link_panel_collapsed", text="", icon=icon, emboss=False)
+        row.label(text="关联管理", icon='LINK_BLEND')
+
+        # 如果展开，显示内容
+        if not props.link_panel_collapsed:
+            # === 材质管理 ===
+            self._draw_mat_section(box, context, props)
+
+            # === 关联动画 ===
+            self._draw_anim_section(box, context, props)
+
+            # === 骨骼缩放 ===
+            self._draw_armature_section(box, context, props)
+
+    def _draw_mat_section(self, box, context, props):
+        """材质管理区块"""
+        import os
+
+        sub = box.box()
+        sub.label(text="材质管理", icon='MATERIAL')
+
+        row = sub.row(align=True)
+        row.operator("mmy.select_external_file", text="选择Mat文件", icon='FILE_FOLDER')
+
+        if props.external_file:
+            filename = os.path.basename(props.external_file)
+            row.label(text=filename)
+
+            if len(props.external_materials) > 0:
+                col = sub.column()
+                row = col.row(align=True)
+                row.operator("mmy.link_materials", text="Link材质", icon='LINK_BLEND')
+
+                if len(props.mappings) > 0:
+                    row.operator("mmy.execute_replace", text="替换材质", icon='PLAY')
+
+                row.operator("mmy.clear_all", text="清除", icon='X')
+
+    def _draw_anim_section(self, box, context, props):
+        """关联动画区块"""
+        import os
+
+        sub = box.box()
+        sub.label(text="关联动画", icon='ANIM_DATA')
+
+        row = sub.row(align=True)
+        row.operator("mmy.select_anim_file", text="选择动画文件", icon='FILE_FOLDER')
+
+        if props.anim_file:
+            filename = os.path.basename(props.anim_file)
+            row.label(text=filename)
+
+            if props.has_ani_collection:
+                row = sub.row(align=True)
+                row.operator("mmy.link_animation", text="关联 Ani 集合", icon='LINK_BLEND')
+            else:
+                sub.label(text="文件中未找到 Ani 集合", icon='ERROR')
+
+    def _draw_armature_section(self, box, context, props):
+        """骨骼缩放区块"""
+        sub = box.box()
+        sub.label(text="骨骼缩放", icon='ARMATURE_DATA')
+
+        row = sub.row(align=True)
+        row.prop(props, "target_armature_enum", text="骨骼")
+
+        if props.target_armature_enum != "none":
+            row.operator("mmy.create_scale_constraint", text="创建约束", icon='CONSTRAINT')
+
+            # 如果约束已存在，显示启用开关
+            from ..mat_replacer.properties import decode_armature_id
+            armature_name = props.target_armature_enum
+            if armature_name != "none":
+                real_name = decode_armature_id(armature_name)
+                armature = bpy.data.objects.get(real_name) if real_name else None
+                if armature:
+                    has_constraint = any(c.name == "MMY_Copy_Scale" for c in armature.constraints)
+                    if has_constraint:
+                        row.prop(props, "constraint_enabled", text="", icon='CHECKMARK' if props.constraint_enabled else 'X')
+
+        # 缩放控制
+        scale_obj = bpy.data.objects.get("Scale")
+        if scale_obj:
+            row = sub.row(align=True)
+            row.prop(props, "scale_value", text="缩放")
+            row.prop(props, "use_offset", text="", icon='ADD' if props.use_offset else 'X')
 
     def _draw_armature_scale(self, layout, context):
         """绘制骨骼缩放控制区块"""

@@ -171,6 +171,13 @@ class MMY_MatReplacerProps(bpy.types.PropertyGroup):
     source_object_index: IntProperty(default=0, name="源对象索引")
     manual_source_name: StringProperty(default="", name="手动源对象名")
 
+    # === 面板折叠属性 ===
+    link_panel_collapsed: BoolProperty(
+        name="关联面板折叠",
+        default=True,
+        description="材质/动画/骨骼面板的折叠状态"
+    )
+
 
 _classes = (
     MMY_MaterialMappingItem,
