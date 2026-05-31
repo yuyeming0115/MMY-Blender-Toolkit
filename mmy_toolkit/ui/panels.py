@@ -67,21 +67,21 @@ class VIEW3D_PT_MMYMeshTools(bpy.types.Panel):
             # 导入工具
             box = layout.box()
             box.label(text="导入工具", icon='IMPORT')
+
+            # 第一行：导入FBX + Better Import FBX
             row = box.row(align=True)
             row.operator("mmy.import_fbx", text="导入FBX")
-            row.prop(context.scene, "mmy_import_anim", text="动画")
-            # 第二行：材质引用 + 清零变换
+            has_better_fbx = hasattr(bpy.ops, 'better_import') and hasattr(bpy.ops.better_import, 'fbx')
+            if has_better_fbx:
+                row.operator("mmy.better_import_fbx", text="Better Import FBX")
+
+            # 第二行：动画 + 引用材质 + 清零变换
             row2 = box.row(align=True)
+            row2.prop(context.scene, "mmy_import_anim", text="动画")
             row2.prop(context.scene, "mmy_reuse_materials", text="引用材质")
             row2.prop(context.scene, "mmy_clear_transforms", text="清零变换")
 
-            # Better FBX按钮
-            has_better_fbx = hasattr(bpy.ops, 'better_import') and hasattr(bpy.ops.better_import, 'fbx')
-            if has_better_fbx:
-                row2 = box.row()
-                row2.operator("mmy.better_import_fbx", text="Better Import FBX")
-
-            # 查找缺失文件
+            # 第三行：查找缺失文件
             box.operator("file.find_missing_files", text="查找缺失文件", icon='FILE_REFRESH')
 
             # 资产创建工具
